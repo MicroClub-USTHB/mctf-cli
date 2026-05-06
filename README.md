@@ -1,64 +1,143 @@
 # MTCF CLI
 
-> Modern CTF Framework — an opinionated, end-to-end CLI for building, deploying, and operating Capture The Flag competitions as reproducible infrastructure.
+> **Modern CTF Framework** — opinionated, end-to-end CLI for running CTF competitions as reproducible infrastructure.
 
 [![ci](https://github.com/MicroClub-USTHB/mctf-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/MicroClub-USTHB/mctf-cli/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Status: alpha.** The challenge contract (Phase 0) is locked at schema v1. The Go CLI (Phase 1) currently ships `validate` and `generate`; `init`, `build`, `deploy`, and `doctor` land next. See the [roadmap](#roadmap).
+> ⚠️ **Internal alpha — MicroClub USTHB devs only.** Public release happens once Phase 1 (`init` / `build` / `deploy`) is complete. The on-disk contract (Phase 0, schema v1) is locked. This README is the internal handbook; the public-facing README + `CONTRIBUTING.md` will replace it before going public.
 
-## What it does
+---
 
-MTCF turns a CTF event into a single declarative repository. One [`mtcf.config.yml`](docs/spec/repository-layout.md), the per-challenge contract under [`challenges/`](docs/spec/repository-layout.md), and a strict source-of-truth-vs-derived-files separation give you reproducible builds, deterministic deployment, and per-team instancing — all from one binary.
+## What's in this repo
 
-| Command | Status | What it does |
-|---|:---:|---|
-| `mtcf validate` | ✅ shipped | Runs every spec rule against the repo. Hard-fails block, warnings inform. |
-| `mtcf generate [--check]` | ✅ shipped | Re-emits the four derived files (CTFd manifest, `instance.toml`, CSV, JSON index). `--check` is the CI integration point. |
-| `mtcf version` | ✅ shipped | Prints version, commit, build date. |
-| `mtcf init` | 🚧 next | Scaffold a new event repo from embedded templates. |
-| `mtcf build [--push]` | 🚧 next | Build and tag every deployable challenge image, optionally push to the registry. |
-| `mtcf deploy [--dry-run]` | 🚧 planned | Generate compose / k8s manifests, bring up containers, register in CTFd. |
-| `mtcf doctor` | 🚧 planned | Preflight: docker daemon, registry auth, CTFd token, ports free. |
-| `mtcf logs [chall]` | 🚧 planned | Stream container logs. |
-| `mtcf dev`, `mtcf down` | 🚧 planned | Local dev mode and teardown. |
+| Path | Purpose |
+|---|---|
+| `cmd/`, `internal/`, `main.go`, `go.mod` | The Go CLI source. |
+| `schema/` | The 4 canonical JSON Schemas (the contract). |
+| `internal/schemas/` | Embedded copy used by the binary. Synced from `schema/` by `make schemas`. |
+| `docs/spec/` | The 6 spec docs every contributor should read first. |
+| `examples/sample-event/` | Reference event (5 challenges, one per archetype) — the e2e fixture. |
+| `scripts/` | Python sanity-check validators used by CI. |
+| `.github/workflows/ci.yml` | CI: `go vet/test/build`, `validate`, `generate --check`, schema sanity. |
+| `Makefile` | `make build / test / lint / tidy / schemas / clean`. |
 
-## Install
-
-### From source (recommended while alpha)
+## Quick start (internal devs)
 
 ```sh
-git clone https://github.com/MicroClub-USTHB/mctf-cli.git
+git clone git@github.com:MicroClub-USTHB/mctf-cli.git
 cd mtcf-cli
-make build           # produces ./mtcf
-./mtcf version
+make build                                            # ./mtcf
+
+./mtcf -C examples/sample-event validate              # spec rules
+./mtcf -C examples/sample-event generate              # write derived files
+./mtcf -C examples/sample-event generate --check      # CI integration point
+
+go test ./...                                         # unit tests
 ```
 
-Requirements: Go 1.23+, GNU make.
+Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you run the script-based sanity checks.
 
-## Quick start
+---
 
-A complete reference event lives at [`examples/sample-event/`](examples/sample-event/) — five challenges covering all three archetypes (static / service / instanced).
+## Features
 
-```sh
-# from the repo root, against the bundled sample event:
-./mtcf -C examples/sample-event validate
-./mtcf -C examples/sample-event generate
-./mtcf -C examples/sample-event generate --check     # CI integration point
+### Shipped (alpha)
+
+#### Core contract
+- **CTF-as-Infrastructure-as-Code** — every event is one declarative repo.
+- **Single source of truth** — `mtcf.config.yml` + per-challenge `challenge.yml`.
+- **Strict challenge contract** — 4-folder layout (`challenge/`, `solution/`, `assets/`, `other/`).
+- **Three archetypes** — `static`, `service`, `instanced`. Derived from the manifest, not declared separately.
+- **22 challenge categories** — 10 core (web, pwn, crypto, reverse, forensics, osint, misc, ai, hardware, jailbreak), 12 opt-in extended, plus arbitrary custom slugs.
+- **Per-category port-range allocation** (10000–17999, deterministic).
+- **Source-of-truth vs derived files** separation.
+
+#### Validation
+- **Schema-driven validation** (Draft 2020-12 JSON Schema).
+- **Event-wide uniqueness checks** (port, subdomain, flag).
+- **Static-flag image-leak guard** — scans `challenge/src/` for hardcoded flags before they bake into a public image.
+- **Hard-fail vs warning catalog** — every rule has an ID for clean CI output.
+
+#### Generation
+- **Auto-generated derived artifacts** — CTFd-format manifest, instancer `instance.toml`, `challenges.csv`, `index.json`.
+- **Deterministic, idempotent** — same input → byte-identical output.
+- **`--check` mode** — exits non-zero on drift; the CI gate that keeps sources and derived files locked together.
+
+#### Distribution
+- **Single static Go binary**, cross-platform.
+- **GitHub Actions CI** runs Go build/test + schema sanity on every push and PR.
+- **Embedded JSON Schemas** — no external file lookups at runtime.
+
+### Coming
+
+#### Build & deploy
+- **Multi-mode deployment** — Docker (compose), SSH (single VPS), Kubernetes (cluster).
+- **Opinionated profiles** — `simple` / `instanced` / `pro` curated presets.
+- **Build-once-deploy-many** — images built ahead of time, deploys are near-instant pulls.
+- **Container image registry integration** — Docker Hub, GHCR, others.
+- **Image tagging convention** — `<registry>/<event>-<cat>-<chall>:<sha>` + `:latest`.
+- **Auto-generated CI/CD pipelines** for the event repo (GitHub Actions, GitLab CI).
+- **Compose / Kubernetes manifest generation** from the manifest.
+- **Ingress & TLS routing** — Traefik (Docker mode), Nginx/IngressRoute (K8s mode).
+
+#### Runtime
+- **Native instancer** — per-team isolated challenges, predictable naming, TTL cleanup, no Whaley dependency.
+- **Per-team isolation** — containers under Docker, Pods under Kubernetes.
+- **Dynamic flags** — per-team flag values minted at spawn time.
+- **Resource limits & sandbox isolation** — `cpu` / `memory` / `pids` caps, `nsjail` / `redpwn/jail` for pwn.
+- **Continuous health checks** with optional auto-restart.
+
+#### Infrastructure
+- **Terraform wrapper** — `mtcf infra plan|apply|destroy` for VPS, clusters, networking, DNS.
+- **VPS provisioning templates** — DigitalOcean, Hetzner.
+- **Cluster provisioning templates** — DOKS, EKS, GKE.
+- **DNS automation** for `<subdomain>.<event-domain>` routing.
+- **Autoscaling** under the `pro` profile.
+
+#### Observability & comms
+- **Monitoring stack** — Prometheus + Grafana with prebuilt dashboards.
+- **Container metrics** via cAdvisor.
+- **Real-time notifications** — Discord webhooks (deploy success/failure, downtime, instancer errors); generic webhook target.
+
+#### Extensibility
+- **Plugin system** — subprocess + JSON-RPC over stdio (Terraform-style); language-agnostic, crash-isolated.
+- **Lifecycle hooks** — `before/after_build`, `before/after_deploy`, `on_instance_spawn`, `on_health_failure`.
+- **Pluggable platform integration** — CTFd first-class; rCTF and generic-webhook platforms via plugin.
+
+#### DX & ops
+- **`mtcf init`** — scaffold a complete event repo from embedded templates.
+- **`mtcf doctor`** — preflight: docker daemon, registry auth, CTFd token, ports free, disk, DNS.
+- **Local dev mode** — full stack on a laptop with hot reload.
+- **Per-challenge log streaming**.
+- **Dry-run + safe teardown** — preview every change; tear environments down without orphans.
+
+#### Security
+- **Secrets hygiene** — env-only, never on disk.
+- **Network isolation** — explicit ports, ingress rules, per-event Docker network.
+- **Privileged-mode policy** — warn under `simple`, block under `pro`.
+- **Capability allowlist** — `cap_add` audited.
+
+#### Distribution
+- **Homebrew tap, Scoop bucket, `.deb`/`.rpm`** via goreleaser.
+- **Cross-platform binaries** — darwin-arm64/amd64, linux-amd64/arm64, windows-amd64.
+
+---
+
+## Roadmap (versions)
+
+| Version | Focus |
+|---|---|
+| **v0 (alpha, current)** | Phase 0 spec + `validate` + `generate`. |
+| **v0.1** | `mtcf init`, `mtcf build`, `mtcf deploy` (Docker mode), CTFd integration, `mtcf doctor`, log streaming, dev mode, safe teardown. |
+| **v0.2** | SSH deploy, native instancer, Discord notifications, plugin system, dynamic flags. |
+| **v0.3** | Kubernetes deploy, Terraform infra wrapper, Prometheus + Grafana, `pro` profile fully wired. |
+| **v0.4** | rCTF + generic-webhook platform integrations, read-only web dashboard, goreleaser distribution. |
+
+## How the contract works
+
 ```
-
-To run against your own event:
-
-```sh
-./mtcf -C path/to/your-event validate
-```
-
-## How it works
-
-Authors only edit four folders per challenge — `challenge/`, `solution/`, `assets/`, `other/`. The CLI does the rest:
-
-```
-challenges/<cat>/<slug>/                           ← author edits the four folders
+challenges/<cat>/<slug>/                       ← author edits these four folders
 ├── challenge.yml          ← AUTO-GENERATED (CTFd format)
 ├── instance.toml          ← AUTO-GENERATED (only when instanced)
 ├── challenge/
@@ -70,46 +149,33 @@ challenges/<cat>/<slug>/                           ← author edits the four fol
 └── other/                 ← private author-only files
 ```
 
-Run `mtcf generate` and the derived files at the challenge root + `challenges/challenges.csv` + `challenges/index.json` are re-emitted deterministically. CI runs `mtcf generate --check` on every PR and refuses to merge if the committed derived files would change — the contract that keeps sources and derived files in lockstep.
+`mtcf generate` re-emits the derived files deterministically. CI runs `mtcf generate --check` on every PR and refuses to merge if the committed derived files would change.
 
 ## Documentation
 
-The contract is the docs.
-
-- **[Repository layout](docs/spec/repository-layout.md)** — directory contract for an event repo.
-- **[Categories](docs/spec/categories.md)** — 10 core + 12 extended challenge categories.
-- **[Challenge manifest](docs/spec/challenge-manifest.md)** — every field of `challenge.yml`, with examples.
-- **[Derived files](docs/spec/derived-files.md)** — exact format of generated files.
-- **[Validation](docs/spec/validation.md)** — every hard-fail and warning, with rationale.
+- **[Repository layout](docs/spec/repository-layout.md)** — directory contract.
+- **[Categories](docs/spec/categories.md)** — 22 categories + sub-tag conventions.
+- **[Challenge manifest](docs/spec/challenge-manifest.md)** — every field of `challenge.yml`.
+- **[Derived files](docs/spec/derived-files.md)** — exact format of generated artifacts.
+- **[Validation](docs/spec/validation.md)** — every rule with rationale.
 - **[CHANGELOG](docs/spec/CHANGELOG.md)** — schema version history.
-
-JSON Schemas are in [`schema/`](schema/) for editor autocomplete and external tooling.
-
-## Roadmap
-
-- **v0 (alpha, current)** — Phase 0 spec + `validate` + `generate`.
-- **v0.1** — `mtcf init` + `mtcf build` + `mtcf deploy` (Docker mode) + CTFd integration.
-- **v0.2** — SSH deploy, native instancer, Discord notifications, plugin system (subprocess + JSON-RPC stdio).
-- **v0.3** — Kubernetes deploy, Terraform infra wrapper, Prometheus + Grafana monitoring.
-- **v0.4** — additional platform integrations (rCTF, generic webhook), web dashboard.
-
-## Background
-
-MTCF is the spiritual successor to the tooling that grew up around the [MCTF 5.0 challenge repository](https://github.com/MicroClub-USTHB/MCTF-5.0-Challenges). MTCF 5.0's on-disk format works — 50+ challenges across 10 categories ran a real event on it. But the surrounding tooling fragmented into a Bun/TypeScript validator, a Windows `.bat` sync script calling Python `ctfcli`, hand-edited Traefik configs, and a separate "Whaley" instancer service.
-
-MTCF replaces all of that with one Go binary that reads (almost) exactly the same on-disk format — challenge authors keep writing challenges the way they already do.
 
 ## Contributing
 
-This repo is currently in private alpha for [MicroClub-USTHB](https://github.com/MicroClub-USTHB) members. A `CONTRIBUTING.md` will land before the public release.
+Internal MCTF devs only while alpha — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, project layout, the five non-negotiable rules, and how-to recipes for adding validation rules, commands, and derived-file formats.
 
-Local development:
+Quick local loop:
 
 ```sh
-make build       # build the binary
-make test        # run all tests
-go vet ./...     # static analysis
+make build       # produce ./mtcf
+make test        # unit tests
+make schemas     # re-sync embedded schemas from schema/
+go vet ./...
 ```
+
+## Background
+
+MTCF is the spiritual successor to the tooling that grew up around the [MCTF 5.0 challenge repository](https://github.com/MicroClub-USTHB/MCTF-5.0-Challenges). The on-disk format works (50+ challenges, 10 categories, ran a real event), but the surrounding tooling fragmented into a Bun/TypeScript validator, a Windows `.bat` sync script calling Python `ctfcli`, hand-edited Traefik configs, and a separate "Whaley" instancer. **MTCF replaces all of it with one Go binary** that reads (almost) exactly the same on-disk format — challenge authors keep writing challenges the way they already do.
 
 ## License
 
