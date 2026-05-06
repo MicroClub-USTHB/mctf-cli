@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mtcf.dev/schema/v1/mtcf-config.schema.json",
+  "title": "MTCF Event Config",
+  "description": "Central event config (mtcf.config.yml). Replaces the hardcoded TypeScript Config module from MCTF 5.0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "event"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Config schema version. Locked at 1."
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "slug"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,40}$",
+          "description": "Used in image tags, network names, container labels."
+        },
+        "domain": {
+          "type": "string",
+          "description": "Public DNS used for ingress: <subdomain>.<domain>. Required if any deployable challenge exists."
+        },
+        "flag_prefix": {
+          "type": "string",
+          "default": "mctf",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9]*$",
+          "description": "Flag wrapper prefix: <prefix>{...}."
+        },
+        "waves_number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3
+        },
+        "current_wave": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Maximum wave to register as visible. null hides everything (pre-event)."
+        },
+        "scoring": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "enum": ["static", "dynamic"] },
+            "initial": { "type": "integer", "minimum": 1, "default": 500 },
+            "decay": { "type": "integer", "minimum": 1, "default": 10 },
+            "minimum": { "type": "integer", "minimum": 1, "default": 100 },
+            "points": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["simple", "instanced", "pro"],
+      "default": "simple",
+      "description": "Curated preset. simple=docker-compose only; instanced=adds instancer; pro=K8s + ingress + monitoring."
+    },
+    "categories": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Extend or customize the category catalog. Core 10 are always enabled.",
+      "properties": {
+        "extended": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "stego",
+              "mobile",
+              "blockchain",
+              "network",
+              "ppc",
+              "realistic",
+              "cloud",
+              "iot",
+              "sysadmin",
+              "defensive",
+              "welcome",
+              "quiz"
+            ]
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "custom": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["slug", "name"],
+            "properties": {
+              "slug": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,30}$"
+              },
+              "name": { "type": "string", "minLength": 1 },
+              "deployable": { "type": "boolean", "default": false },
+              "port_range": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["min", "max"],
+                "properties": {
+                  "min": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+                  "max": { "type": "integer", "minimum": 1024, "maximum": 65535 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "e.g. ghcr.io/myorg or docker.io/myuser. Auth via MTCF_REGISTRY_USER/MTCF_REGISTRY_TOKEN env vars."
+        }
+      }
+    },
+    "deploy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["docker", "ssh", "kubernetes"]
+        },
+        "docker": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "network": { "type": "string" },
+            "ingress": { "enum": ["traefik", "none"], "default": "traefik" }
+          }
+        },
+        "ssh": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["host"],
+          "properties": {
+            "host": { "type": "string" },
+            "user": { "type": "string", "default": "root" },
+            "key_path": { "type": "string" }
+          }
+        },
+        "kubernetes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kubeconfig": { "type": "string" },
+            "namespace": { "type": "string", "default": "mtcf" },
+            "ingress_class": { "type": "string", "default": "nginx" }
+          }
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ctfd"],
+          "description": "v1 supports CTFd; rCTF and others via plugin in v0.4."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "instancer": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Reserved keys ignored in v0.1 with a warning; activated in v0.2.",
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "default_timeout": { "type": "integer", "minimum": 60, "default": 1800 },
+        "default_extend_time": { "type": "integer", "minimum": 0, "default": 900 }
+      }
+    },
+    "challenges_dir": {
+      "type": "string",
+      "default": "./challenges"
+    },
+    "notifications": { "type": "object" },
+    "monitoring": { "type": "object" },
+    "plugins": { "type": "array", "items": { "type": "object" } }
+  }
+}

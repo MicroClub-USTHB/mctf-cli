@@ -1,0 +1,21 @@
+schema: 1
+
+challenge:
+  name: "rsa-baby"
+  author: "alice"
+  category: crypto
+  difficulty: easy
+  description: |
+    Tiny modulus, tiny exponent. Recover the message and find the flag.
+
+    The encryption transcript and a Python reproduction script are attached.
+  wave: 1
+  flags:
+    - { flag: "mctf{f4ct0r1ng_15_h4rd_unt1l_1t_15nt}", case_sensitive: true }
+  need_deploy: false
+  tags: ["rsa"]
+  hints:
+    - cost: 0
+      content: "How big is the modulus, really?"
+    - cost: 50
+      content: "Try `factordb` or `sympy.factorint`."

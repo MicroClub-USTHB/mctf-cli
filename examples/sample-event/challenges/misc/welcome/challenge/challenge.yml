@@ -1,0 +1,31 @@
+schema: 1
+
+challenge:
+  name: "welcome"
+  author: "ops"
+  category: misc
+  difficulty: easy
+  description: |
+    Welcome to the event! Visit the site and read the flag.
+  wave: 1
+  flags:
+    - { flag: "mctf{w3lc0m3_t0_th3_g4me}", case_sensitive: true }
+  need_deploy: true
+  tags: ["welcome"]
+
+deploy:
+  subdomain: "welcome"
+  port: 14000
+  internal_port: null
+  dynamic_instances: false
+  tcp: false
+  noSsl: false
+  resources:
+    cpu: "0.25"
+    memory: "64M"
+  healthcheck:
+    type: http
+    path: "/"
+    interval: "30s"
+    timeout: "5s"
+    retries: 3

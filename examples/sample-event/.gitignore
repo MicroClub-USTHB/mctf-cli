@@ -1,0 +1,5 @@
+.mtcf/
+.env
+.env.local
+*.flag
+.DS_Store

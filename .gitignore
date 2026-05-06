@@ -1,0 +1,23 @@
+# MTCF working directory (never committed)
+.mtcf/
+
+# Local environment
+.env
+.env.local
+*.flag
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+.claude/
+*.swp
+
+# Go (Phase 1)
+/mtcf
+/dist/
+*.test
+*.out

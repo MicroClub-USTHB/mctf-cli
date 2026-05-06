@@ -1,0 +1,6 @@
+category,slug,name,author,difficulty,wave,deploy,dynamic,archetype,flag_count,has_writeup,has_hints,asset_count
+crypto,rsa-baby,rsa-baby,alice,easy,1,false,false,static,1,true,true,1
+forensics,pcap-101,pcap-101,bob,easy,1,false,false,static,1,true,false,0
+misc,welcome,welcome,ops,easy,1,true,false,service,1,true,false,0
+pwn,baby-overflow,baby-overflow,spinel,easy,1,true,true,instanced,1,true,false,0
+web,cub3-clone,cub3-clone,$h3rL0ck,easy,1,true,true,instanced,1,true,false,0

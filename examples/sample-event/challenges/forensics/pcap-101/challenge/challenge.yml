@@ -1,0 +1,17 @@
+schema: 1
+
+challenge:
+  name: "pcap-101"
+  author: "bob"
+  category: forensics
+  difficulty: easy
+  description: |
+    A capture from a coffee-shop network. Someone exfiltrated something they
+    shouldn't have. Find the flag in the traffic.
+
+    Open `capture.pcapng` in Wireshark.
+  wave: 1
+  flags:
+    - { flag: "mctf{w1r3sh4rk_15_y0ur_fr13nd}", case_sensitive: true }
+  need_deploy: false
+  tags: ["pcap"]

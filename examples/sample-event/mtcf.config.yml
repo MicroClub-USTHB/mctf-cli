@@ -1,0 +1,44 @@
+# MTCF event config — sample event used as a reference for the spec.
+# Schema: schema/mtcf-config.schema.json
+version: 1
+
+event:
+  name: "Sample MTCF Event"
+  slug: "sample-event"
+  domain: "ctf.example.com"
+  flag_prefix: "mctf"
+  waves_number: 3
+  current_wave: 1
+  scoring:
+    type: dynamic
+    initial: 500
+    decay: 10
+    minimum: 100
+
+profile: instanced
+
+categories:
+  extended: []
+  custom: []
+
+registry:
+  url: "ghcr.io/example"
+  # Auth via env: MTCF_REGISTRY_USER / MTCF_REGISTRY_TOKEN
+
+deploy:
+  mode: docker
+  docker:
+    network: "sample-event-net"
+    ingress: traefik
+
+platform:
+  type: ctfd
+  url: "https://ctf.example.com"
+  # Token via env: MTCF_CTFD_TOKEN
+
+instancer:
+  url: "https://instancer.ctf.example.com"
+  default_timeout: 1800
+  default_extend_time: 900
+
+challenges_dir: "./challenges"

@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "event": "sample-event",
+  "challenges": [
+    {
+      "category": "crypto",
+      "slug": "rsa-baby",
+      "name": "rsa-baby",
+      "author": "alice",
+      "difficulty": "easy",
+      "wave": 1,
+      "archetype": "static",
+      "flag_count": 1,
+      "has_writeup": true,
+      "has_hints": true,
+      "asset_count": 1
+    },
+    {
+      "category": "forensics",
+      "slug": "pcap-101",
+      "name": "pcap-101",
+      "author": "bob",
+      "difficulty": "easy",
+      "wave": 1,
+      "archetype": "static",
+      "flag_count": 1,
+      "has_writeup": true,
+      "has_hints": false,
+      "asset_count": 0
+    },
+    {
+      "category": "misc",
+      "slug": "welcome",
+      "name": "welcome",
+      "author": "ops",
+      "difficulty": "easy",
+      "wave": 1,
+      "archetype": "service",
+      "deploy": {
+        "subdomain": "welcome",
+        "port": 14000
+      },
+      "flag_count": 1,
+      "has_writeup": true,
+      "has_hints": false,
+      "asset_count": 0
+    },
+    {
+      "category": "pwn",
+      "slug": "baby-overflow",
+      "name": "baby-overflow",
+      "author": "spinel",
+      "difficulty": "easy",
+      "wave": 1,
+      "archetype": "instanced",
+      "deploy": {
+        "subdomain": "baby-overflow",
+        "internal_port": 5000,
+        "tcp": true
+      },
+      "flag_count": 1,
+      "has_writeup": true,
+      "has_hints": false,
+      "asset_count": 0
+    },
+    {
+      "category": "web",
+      "slug": "cub3-clone",
+      "name": "cub3-clone",
+      "author": "$h3rL0ck",
+      "difficulty": "easy",
+      "wave": 1,
+      "archetype": "instanced",
+      "deploy": {
+        "subdomain": "cub3",
+        "internal_port": 8000
+      },
+      "flag_count": 1,
+      "has_writeup": true,
+      "has_hints": false,
+      "asset_count": 0
+    }
+  ]
+}

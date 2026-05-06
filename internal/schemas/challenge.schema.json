@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mtcf.dev/schema/v1/challenge.schema.json",
+  "title": "MTCF Challenge Manifest",
+  "description": "Author-edited source-of-truth manifest at challenges/<category>/<name>/challenge/challenge.yml. Schema v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["challenge"],
+  "properties": {
+    "schema": {
+      "description": "Manifest schema version. Defaults to 1 when omitted.",
+      "type": "integer",
+      "const": 1
+    },
+    "challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "author",
+        "category",
+        "difficulty",
+        "description",
+        "wave",
+        "flags",
+        "need_deploy"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Display name shown to players. Underscored slug also acceptable."
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Single author handle/name. Multi-author support deferred to v0.2."
+        },
+        "category": {
+          "description": "Must match parent directory name. Core 10 always allowed; extended/custom categories enabled in mtcf.config.yml.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,30}$"
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": ["easy", "medium", "hard", "extreme"],
+          "description": "Locked enum (improvement over MCTF 5.0 free-string)."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "description": "Markdown. CTFd renders this directly."
+        },
+        "wave": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Deployment wave (1..waves_number from mtcf.config.yml)."
+        },
+        "force_hidden": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, registered as hidden in CTFd regardless of state."
+        },
+        "flags": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "description": "Exactly one flag per challenge in v1; multi-flag deferred to v0.2.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["flag", "case_sensitive"],
+            "properties": {
+              "flag": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9]*\\{[^}]+\\}$",
+                "description": "Format <prefix>{...}; prefix configurable in mtcf.config.yml::event.flag_prefix (default mctf)."
+              },
+              "case_sensitive": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        },
+        "need_deploy": {
+          "type": "boolean",
+          "description": "True when a Dockerfile + docker-compose.yml live in challenge/. Determines archetype: false=static."
+        },
+        "links": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string",
+            "format": "uri"
+          },
+          "description": "External URLs shown to players (mirrors, supplemental resources)."
+        },
+        "tags": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "description": "Free-form CTFd tags. 'wave N' is auto-added by mtcf generate."
+        },
+        "hints": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["cost", "content"],
+            "properties": {
+              "cost": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Points deducted on unlock. 0 = always visible."
+              },
+              "content": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            }
+          }
+        },
+        "scoring": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Per-challenge override of mtcf.config.yml::event.scoring.",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["static", "dynamic"]
+            },
+            "initial": { "type": "integer", "minimum": 1 },
+            "decay": { "type": "integer", "minimum": 1 },
+            "minimum": { "type": "integer", "minimum": 1 },
+            "points": { "type": "integer", "minimum": 1 }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "type": { "const": "dynamic" } } },
+              "then": { "required": ["initial", "decay", "minimum"] }
+            },
+            {
+              "if": { "properties": { "type": { "const": "static" } } },
+              "then": { "required": ["points"] }
+            }
+          ]
+        }
+      }
+    },
+    "deploy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subdomain", "dynamic_instances"],
+      "description": "Required when challenge.need_deploy is true. See challenge-manifest.md for service/instanced rules.",
+      "properties": {
+        "subdomain": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$",
+          "description": "DNS-safe slug for ingress routing: <subdomain>.<event-domain>. Allow empty string only when tcp:true."
+        },
+        "port": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Required when dynamic_instances=false. Must be null when dynamic_instances=true. CLI auto-assigns within category port range when null."
+        },
+        "internal_port": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Required when dynamic_instances=true. The port the container listens on."
+        },
+        "dynamic_instances": {
+          "type": "boolean",
+          "description": "false=service archetype, true=instanced archetype."
+        },
+        "tcp": {
+          "type": "boolean",
+          "default": false,
+          "description": "true for raw TCP (e.g. pwn), false for HTTP."
+        },
+        "noSsl": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt out of TLS (rare; for local-only or HTTP-required challenges)."
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpu": { "type": "string", "pattern": "^\\d+(\\.\\d+)?$" },
+            "memory": { "type": "string", "pattern": "^\\d+[KMG]$" },
+            "pids": { "type": "integer", "minimum": 1 },
+            "disk": { "type": "string", "pattern": "^\\d+[KMG]$" }
+          }
+        },
+        "healthcheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "enum": ["tcp", "http", "cmd"] },
+            "path": { "type": "string" },
+            "cmd": { "type": "array", "items": { "type": "string" } },
+            "interval": { "type": "string", "pattern": "^\\d+[smh]$" },
+            "timeout": { "type": "string", "pattern": "^\\d+[smh]$" },
+            "retries": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "instance": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Only meaningful when dynamic_instances=true.",
+          "properties": {
+            "timeout": {
+              "type": "integer",
+              "minimum": 60,
+              "default": 1800,
+              "description": "Auto-destroy seconds after spawn."
+            },
+            "extend_time": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 900,
+              "description": "Seconds players can extend the timer by."
+            },
+            "max_per_team": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          }
+        },
+        "security_opts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow_caps": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Linux capabilities allowed via cap_add. Anything not listed triggers a lint warning."
+            },
+            "allow_privileged": {
+              "type": "boolean",
+              "default": false,
+              "description": "Hard-fail in pro profile when privileged:true is used in compose unless this is true."
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "challenge": {
+            "properties": { "need_deploy": { "const": true } }
+          }
+        },
+        "required": ["challenge"]
+      },
+      "then": { "required": ["deploy"] }
+    },
+    {
+      "if": {
+        "properties": {
+          "deploy": {
+            "properties": { "dynamic_instances": { "const": true } }
+          }
+        },
+        "required": ["deploy"]
+      },
+      "then": {
+        "properties": {
+          "deploy": {
+            "required": ["internal_port"],
+            "properties": {
+              "port": { "type": "null" },
+              "internal_port": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "deploy": {
+            "properties": { "dynamic_instances": { "const": false } }
+          }
+        },
+        "required": ["deploy"]
+      },
+      "then": {
+        "properties": {
+          "deploy": {
+            "required": ["port"],
+            "properties": {
+              "port": { "type": "integer" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

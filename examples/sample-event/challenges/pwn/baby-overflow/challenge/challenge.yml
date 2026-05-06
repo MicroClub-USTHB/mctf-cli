@@ -1,0 +1,38 @@
+schema: 1
+
+challenge:
+  name: "baby-overflow"
+  author: "spinel"
+  category: pwn
+  difficulty: easy
+  description: |
+    A classic stack smash. The binary asks for your name; give it more than
+    it expects.
+
+    Connect via `nc {{host}} {{port}}`. The binary is attached.
+  wave: 1
+  flags:
+    - { flag: "mctf{cl4ss1c_buff3r_0v3rfl0w}", case_sensitive: true }
+  need_deploy: true
+  tags: ["bof", "x86_64"]
+
+deploy:
+  subdomain: "baby-overflow"     # used for TLS-SNI routing even on tcp:true
+  port: null
+  internal_port: 5000
+  dynamic_instances: true
+  tcp: true
+  noSsl: false
+  resources:
+    cpu: "0.25"
+    memory: "64M"
+    pids: 32
+  healthcheck:
+    type: tcp
+    interval: "10s"
+    timeout: "3s"
+    retries: 3
+  instance:
+    timeout: 1800
+    extend_time: 900
+    max_per_team: 1

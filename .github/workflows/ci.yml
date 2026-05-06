@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+    branches: [main, production]
+  pull_request:
+    branches: [main, production]
+
+jobs:
+  go:
+    name: go (build / test / validate / generate --check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: make build
+
+      - name: validate the sample event
+        run: ./mtcf -C examples/sample-event validate
+
+      - name: confirm derived files are in sync
+        run: ./mtcf -C examples/sample-event generate --check
+
+  schemas:
+    name: schemas (python sanity check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - run: pip install --quiet pyyaml jsonschema
+
+      - name: source manifests validate against challenge.schema.json
+        run: python3 scripts/validate-examples.py
+
+      - name: derived files validate against their schemas
+        run: python3 scripts/validate-generated.py

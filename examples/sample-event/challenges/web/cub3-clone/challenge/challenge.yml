@@ -1,0 +1,37 @@
+schema: 1
+
+challenge:
+  name: "cub3-clone"
+  author: "$h3rL0ck"
+  category: web
+  difficulty: easy
+  description: |
+    Can you solve a randomly scrambled Rubik's cube?
+
+    Each team gets its own instance — solve speed matters.
+  wave: 1
+  flags:
+    - { flag: "mctf{k3y5tr0k35_b4tt13_w0n}", case_sensitive: true }
+  need_deploy: true
+  tags: ["js", "client-side"]
+
+deploy:
+  subdomain: "cub3"
+  port: null
+  internal_port: 8000
+  dynamic_instances: true
+  tcp: false
+  noSsl: false
+  resources:
+    cpu: "0.5"
+    memory: "256M"
+  healthcheck:
+    type: http
+    path: "/"
+    interval: "10s"
+    timeout: "3s"
+    retries: 3
+  instance:
+    timeout: 1800
+    extend_time: 900
+    max_per_team: 1

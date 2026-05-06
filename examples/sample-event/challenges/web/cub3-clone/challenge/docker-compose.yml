@@ -1,0 +1,16 @@
+name: cub3-clone
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      # Instanced challenge — host port is provided by the MTCF instancer
+      # at spawn time via the PORT_<internal> env var. Default for local dev.
+      - "${PORT_8000:-8000}:8000"
+    environment:
+      - FLAG_FILE=/app/flag.txt
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5

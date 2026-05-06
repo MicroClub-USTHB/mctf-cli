@@ -1,0 +1,34 @@
+VERSION ?= 0.0.0-dev
+COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -X github.com/MicroClub-USTHB/mctf-cli/cmd.version=$(VERSION) \
+           -X github.com/MicroClub-USTHB/mctf-cli/cmd.commit=$(COMMIT) \
+           -X github.com/MicroClub-USTHB/mctf-cli/cmd.date=$(DATE)
+
+.PHONY: build test lint tidy run clean schemas
+
+build: schemas
+	go build -ldflags "$(LDFLAGS)" -o mtcf .
+
+# Sync the canonical /schema/ JSON files into the embed package so the
+# binary stays self-contained. Errors out if drift is detected after sync,
+# which means someone edited internal/schemas/*.json directly.
+schemas:
+	@cp schema/*.json internal/schemas/
+	@if ! diff -q schema/challenge.schema.json internal/schemas/challenge.schema.json >/dev/null; then \
+	    echo "schema drift detected"; exit 1; fi
+
+test:
+	go test ./...
+
+lint:
+	go vet ./...
+
+tidy:
+	go mod tidy
+
+run:
+	go run -ldflags "$(LDFLAGS)" . $(ARGS)
+
+clean:
+	rm -f mtcf
