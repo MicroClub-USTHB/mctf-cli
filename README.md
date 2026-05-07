@@ -75,6 +75,10 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 #### Build
 - **`mtcf build`** — builds one container image per deployable challenge; tags `<registry>/<event>-<cat>-<slug>:<sha>` plus `:latest`; stamps `mtcf.*` OCI labels; `--dry-run` previews commands; `--category` / `--slug` filters scope a build; `--push` ships to the registry.
 
+#### Deploy (Docker mode)
+- **`mtcf deploy`** — `docker compose up -d` for every service-archetype challenge; per-challenge project name `mtcf-<event>-<cat>-<slug>`; auto-stamps `PORT_<internal>` env so the compose's `${PORT_N:-N}` convention picks the right host port; instanced challenges are skipped (the instancer owns those at game time).
+- **`mtcf down`** — symmetric teardown in reverse-deploy order; `--volumes` to also drop named volumes.
+
 #### Distribution
 - **Single static Go binary**, cross-platform.
 - **GitHub Actions CI** runs Go build/test + schema sanity on every push and PR.
@@ -137,8 +141,8 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 
 | Version | Focus |
 |---|---|
-| **v0 (alpha, current)** | Phase 0 spec + `validate` + `generate` + `init` + `init challenge` + `info` + `doctor` + `build`. |
-| **v0.1** | `mtcf deploy` (Docker mode), CTFd integration, log streaming, dev mode, safe teardown. |
+| **v0 (alpha, current)** | Phase 0 spec + `validate` + `generate` + `init` + `init challenge` + `info` + `doctor` + `build` + `deploy` + `down`. |
+| **v0.1** | CTFd integration, log streaming, dev mode, image-leak guard hardening, ingress/Traefik config generation. |
 | **v0.2** | SSH deploy, native instancer, Discord notifications, plugin system, dynamic flags. |
 | **v0.3** | Kubernetes deploy, Terraform infra wrapper, Prometheus + Grafana, `pro` profile fully wired. |
 | **v0.4** | rCTF + generic-webhook platform integrations, read-only web dashboard, goreleaser distribution. |
