@@ -3,13 +3,16 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/deploy"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/notify"
 )
 
 var (
@@ -51,12 +54,43 @@ var deployCmd = &cobra.Command{
 		} else {
 			runner = deploy.NewDockerRunner()
 		}
-		if err := deploy.ApplyUp(context.Background(), runner, plan); err != nil {
+		ctx := context.Background()
+		if err := deploy.ApplyUp(ctx, runner, plan); err != nil {
+			notifyDiscord(ctx, "deploy failed", "error",
+				fmt.Sprintf("%s: %v", planSlugs(plan), err))
 			return err
 		}
 		fmt.Println("\ndeploy complete")
+		if !flagDeployDryRun {
+			notifyDiscord(ctx, "deploy succeeded", "success",
+				fmt.Sprintf("%d challenge(s) up:\n%s", len(plan), planSlugs(plan)))
+		}
 		return nil
 	},
+}
+
+func planSlugs(plan []deploy.Unit) string {
+	if len(plan) == 0 {
+		return "(none)"
+	}
+	out := make([]string, len(plan))
+	for i, u := range plan {
+		out[i] = u.Challenge
+	}
+	return strings.Join(out, ", ")
+}
+
+// notifyDiscord posts to MTCF_DISCORD_WEBHOOK if set. Best-effort:
+// errors are surfaced on stderr but never fail the deploy.
+func notifyDiscord(ctx context.Context, title, level, body string) {
+	url := os.Getenv("MTCF_DISCORD_WEBHOOK")
+	if url == "" {
+		return
+	}
+	n := notify.NewDiscord(url)
+	if err := n.Notify(ctx, notify.Message{Title: title, Body: body, Level: level}); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: discord notification failed: %v\n", err)
+	}
 }
 
 var (
@@ -95,10 +129,17 @@ var downCmd = &cobra.Command{
 		} else {
 			runner = deploy.NewDockerRunner()
 		}
-		if err := deploy.ApplyDown(context.Background(), runner, plan, flagDownVolumes); err != nil {
+		ctx := context.Background()
+		if err := deploy.ApplyDown(ctx, runner, plan, flagDownVolumes); err != nil {
+			notifyDiscord(ctx, "teardown failed", "error",
+				fmt.Sprintf("%s: %v", planSlugs(plan), err))
 			return err
 		}
 		fmt.Println("\ndown complete")
+		if !flagDownDryRun {
+			notifyDiscord(ctx, "teardown complete", "info",
+				fmt.Sprintf("%d challenge(s) down:\n%s", len(plan), planSlugs(plan)))
+		}
 		return nil
 	},
 }
