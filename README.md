@@ -82,6 +82,9 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **`mtcf down`** — symmetric teardown in reverse-deploy order; `--volumes` to also drop named volumes.
 - **`mtcf logs <category>/<slug>`** — stream logs from a deployed challenge's compose project; `-f` to follow, `--tail N` for the tail.
 
+#### Platform integration (CTFd)
+- **`mtcf platform sync`** — push challenges to the CTFd instance configured in `mtcf.config.yml`. Diffs vs the platform's existing state, creates what's missing, attaches flags / tags / hints. `--update` reconciles existing challenges; `--dry-run` previews; `--category` / `--slug` filter; `--json` for scripting. Requires `MTCF_CTFD_TOKEN` env var.
+
 #### Distribution
 - **Single static Go binary**, cross-platform.
 - **GitHub Actions CI** runs Go build/test + schema sanity on every push and PR.
@@ -144,8 +147,8 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 
 | Version | Focus |
 |---|---|
-| **v0 (alpha, current)** | Phase 0 spec + `validate` + `generate` + `init` + `init challenge` + `info` + `doctor` + `build` + `deploy` + `down`. |
-| **v0.1** | CTFd integration, log streaming, dev mode, image-leak guard hardening, ingress/Traefik config generation. |
+| **v0 (alpha, current)** | Phase 0 spec + every command above (`init` / `validate` / `generate` / `info` / `list` / `categories` / `doctor` / `build` / `deploy` / `down` / `logs` / `platform sync`). |
+| **v0.1** | Ingress/Traefik config generation, dev mode with hot reload, image-leak guard hardening, CTFd file uploads. |
 | **v0.2** | SSH deploy, native instancer, Discord notifications, plugin system, dynamic flags. |
 | **v0.3** | Kubernetes deploy, Terraform infra wrapper, Prometheus + Grafana, `pro` profile fully wired. |
 | **v0.4** | rCTF + generic-webhook platform integrations, read-only web dashboard, goreleaser distribution. |
