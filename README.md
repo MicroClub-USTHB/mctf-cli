@@ -84,6 +84,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **`mtcf deploy`** — `docker compose up -d` for every service-archetype challenge; per-challenge project name `mtcf-<event>-<cat>-<slug>`; auto-stamps `PORT_<internal>` env so the compose's `${PORT_N:-N}` convention picks the right host port; instanced challenges are skipped (the instancer owns those at game time).
 - **`mtcf down`** — symmetric teardown in reverse-deploy order; `--volumes` to also drop named volumes.
 - **`mtcf logs <category>/<slug>`** — stream logs from a deployed challenge's compose project; `-f` to follow, `--tail N` for the tail.
+- **`mtcf solve <category>/<slug>`** — runs `solution/solve.sh` (or `solve.py` / `solve` binary) with `HOST` / `PORT` / `URL` / `FLAG_PREFIX` env, asserts the manifest flag appears in output. `--all` smoke-tests every solver; `--timeout` caps each run; `--json` for scripting.
 
 #### Platform integration (CTFd)
 - **`mtcf platform sync`** — push challenges to the CTFd instance configured in `mtcf.config.yml`. Diffs vs the platform's existing state, creates what's missing, attaches flags / tags / hints / **file uploads (assets/)**. `--update` reconciles existing challenges; `--dry-run` previews; `--category` / `--slug` filter; `--json` for scripting. Requires `MTCF_CTFD_TOKEN` env var.
