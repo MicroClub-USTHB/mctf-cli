@@ -90,6 +90,14 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 #### Notifications
 - **Discord webhook** — set `MTCF_DISCORD_WEBHOOK` and `mtcf deploy` / `mtcf down` post embedded status messages (success/failure with the challenge list). Best-effort — webhook errors warn but never block the deploy.
 
+#### Native instancer (v0 — CLI mode)
+- **`mtcf instance spawn <chall> --team <id>`** — bring up a per-team docker compose project for an instanced challenge with auto-allocated host ports (default range 30000–32999) and stamped `PORT_<n>` / `INSTANCE_ID` / `TEAM_ID` / `FLAG` env. Idempotent per (team, challenge): re-running returns the existing instance.
+- **`mtcf instance destroy <id>`** — tear down and remove from the store. `--force` cleans up store records even when the compose project is already gone; `--volumes` drops named volumes.
+- **`mtcf instance list`** — table of live spawns: id, slug, team, port mapping, time-to-expiry. `--json` for scripting.
+- **`mtcf instance extend <id> --by 15m`** — bump expiry.
+- **`mtcf instance reap`** — destroy every expired instance (manual cleanup; the daemon mode that automates this lands later).
+- State persists at `.mtcf/instances.json` with atomic file rewrite + mutex protection.
+
 #### Platform integration (CTFd)
 - **`mtcf platform sync`** — push challenges to the CTFd instance configured in `mtcf.config.yml`. Diffs vs the platform's existing state, creates what's missing, attaches flags / tags / hints / **file uploads (assets/)**. `--update` reconciles existing challenges; `--dry-run` previews; `--category` / `--slug` filter; `--json` for scripting. Requires `MTCF_CTFD_TOKEN` env var.
 - **`mtcf platform configure`** — sync `ctf_name` from `event.name` to CTFd's `/api/v1/configs`. Theme settings are intentionally not synced (one-time UI setup). `--dry-run` previews.
