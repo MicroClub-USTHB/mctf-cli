@@ -132,11 +132,65 @@ func platformType(cfg *config.Config) string {
 	return cfg.Platform.Type
 }
 
+var (
+	flagConfigureDryRun bool
+)
+
+var platformConfigureCmd = &cobra.Command{
+	Use:   "configure",
+	Short: "Sync event-level CTFd config (ctf_name) from mtcf.config.yml",
+	Long: "Pushes ctf_name to CTFd's /api/v1/configs from the loaded\n" +
+		"event config. Theme settings (theme_name, theme_color, custom\n" +
+		"HTML) are intentionally not synced — those are typically a one-\n" +
+		"time UI setup, not per-event automation.\n\n" +
+		"Token: export MTCF_CTFD_TOKEN=<your-token> before running.\n\n" +
+		"Examples:\n" +
+		"  mtcf platform configure --dry-run\n" +
+		"  mtcf platform configure",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.Load(flagDir)
+		if err != nil {
+			return err
+		}
+		if cfg.Platform == nil || cfg.Platform.Type != "ctfd" {
+			return fmt.Errorf("platform.type must be 'ctfd' (got %q)", platformType(cfg))
+		}
+		if cfg.Platform.URL == "" {
+			return fmt.Errorf("platform.url is empty in mtcf.config.yml")
+		}
+		token := os.Getenv("MTCF_CTFD_TOKEN")
+		if token == "" {
+			return fmt.Errorf("MTCF_CTFD_TOKEN env var is empty")
+		}
+		if cfg.Event.Name == "" {
+			return fmt.Errorf("event.name is empty in mtcf.config.yml — nothing to push")
+		}
+
+		fmt.Printf("planned config:\n")
+		fmt.Printf("  ctf_name = %q\n", cfg.Event.Name)
+		if flagConfigureDryRun {
+			return nil
+		}
+
+		client := ctfd.New(cfg.Platform.URL, token)
+		ctx := context.Background()
+		if err := client.SetConfig(ctx, "ctf_name", cfg.Event.Name); err != nil {
+			return fmt.Errorf("set ctf_name: %w", err)
+		}
+		fmt.Println("\nconfig pushed")
+		return nil
+	},
+}
+
 func init() {
 	platformSyncCmd.Flags().BoolVar(&flagSyncDryRun, "dry-run", false, "show the plan without applying it")
 	platformSyncCmd.Flags().BoolVar(&flagSyncUpdate, "update", false, "reconcile existing challenges (default: skip them)")
 	platformSyncCmd.Flags().StringVar(&flagSyncCat, "category", "", "sync only challenges in this category")
 	platformSyncCmd.Flags().StringVar(&flagSyncSlug, "slug", "", "sync only the challenge with this slug")
 	platformCmd.AddCommand(platformSyncCmd)
+
+	platformConfigureCmd.Flags().BoolVar(&flagConfigureDryRun, "dry-run", false, "show what would be set without making the request")
+	platformCmd.AddCommand(platformConfigureCmd)
+
 	rootCmd.AddCommand(platformCmd)
 }

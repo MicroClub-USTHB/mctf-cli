@@ -300,6 +300,31 @@ func (c *Client) DeleteFile(ctx context.Context, fileID int) error {
 	return c.do(ctx, "DELETE", fmt.Sprintf("/api/v1/files/%d", fileID), nil, nil)
 }
 
+// ConfigEntry is one CTFd global-config key/value pair.
+type ConfigEntry struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// SetConfig PATCHes a single config key to value via /api/v1/configs/<key>.
+//
+// CTFd's config API uses string values for everything (numeric values
+// are stored as their string representation); callers convert
+// before/after as needed.
+func (c *Client) SetConfig(ctx context.Context, key, value string) error {
+	body := map[string]string{"value": value}
+	return c.do(ctx, "PATCH", "/api/v1/configs/"+key, body, nil)
+}
+
+// GetConfig fetches a single config key.
+func (c *Client) GetConfig(ctx context.Context, key string) (string, error) {
+	var env envelope[ConfigEntry]
+	if err := c.do(ctx, "GET", "/api/v1/configs/"+key, nil, &env); err != nil {
+		return "", err
+	}
+	return env.Data.Value, nil
+}
+
 // envelopeOK reports whether the CTFd response had success=true.
 func envelopeOK(body []byte) bool {
 	var sc struct {

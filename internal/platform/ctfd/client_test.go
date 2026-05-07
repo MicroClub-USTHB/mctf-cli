@@ -259,6 +259,38 @@ func TestFile_Basename(t *testing.T) {
 	}
 }
 
+func TestSetConfig_PATCHesValue(t *testing.T) {
+	f, c, _ := newFake(t)
+	f.handler = func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "PATCH" || r.URL.Path != "/api/v1/configs/ctf_name" {
+			t.Errorf("unexpected: %s %s", r.Method, r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"success": true, "data": {"key": "ctf_name", "value": "MCTF 6.0"}}`))
+	}
+	if err := c.SetConfig(context.Background(), "ctf_name", "MCTF 6.0"); err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]string
+	_ = json.Unmarshal(f.bodies[0], &got)
+	if got["value"] != "MCTF 6.0" {
+		t.Errorf("body = %+v", got)
+	}
+}
+
+func TestGetConfig_DecodesValue(t *testing.T) {
+	f, c, _ := newFake(t)
+	f.handler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"success": true, "data": {"key": "ctf_name", "value": "Hello"}}`))
+	}
+	got, err := c.GetConfig(context.Background(), "ctf_name")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "Hello" {
+		t.Errorf("config value = %q", got)
+	}
+}
+
 func TestUpdateChallenge_PATCH(t *testing.T) {
 	f, c, _ := newFake(t)
 	f.handler = func(w http.ResponseWriter, r *http.Request) {
