@@ -35,6 +35,15 @@ func Run(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, lo
 	return r
 }
 
+// assetMentionRe matches `filename.ext` or [text](filename.ext) in markdown descriptions.
+var assetMentionRe = regexp.MustCompile("`([^`\\s]+\\.[a-zA-Z0-9]+)`" + `|` + `\\[[^\\]]+\\]\\(([^\\)\\s]+\\.[a-zA-Z0-9]+)\\)`)
+
+// mutableStateRe matches keywords that suggest a challenge has mutable state (DB, sessions, etc.)
+var mutableStateRe = regexp.MustCompile(`(?i)\b(database|sql|login|register|account|session|admin|password)\b`)
+
+// rateLimitRe matches keywords related to rate-limiting or proof-of-work.
+var rateLimitRe = regexp.MustCompile(`(?i)(rate[ -]?limit|pow|proof[ -]of[ -]work|captcha|seconds|delay)`)
+
 // checkOne runs the per-challenge rules (those that don't need event-wide context).
 func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *challenge.Challenge, eventRoot string) {
 	m := c.Manifest
@@ -177,6 +186,51 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 	} else if n > 1500 {
 		r.Warnf("W010", manifestPath,
 			"description is %d chars — consider trimming for UX (hard cap at 4000)", n)
+	}
+
+	// W011 — asset filename referenced in description but missing from assets/
+	matches := assetMentionRe.FindAllStringSubmatch(m.Challenge.Description, -1)
+	if len(matches) > 0 {
+		assetsOnDisk := make(map[string]bool)
+		entries, err := os.ReadDir(c.AssetsDir)
+		if err == nil {
+			for _, e := range entries {
+				if !e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
+					assetsOnDisk[e.Name()] = true
+				}
+			}
+		}
+
+		for _, match := range matches {
+			fileName := match[1]
+			if fileName == "" {
+				fileName = match[2]
+			}
+			
+			fileName = filepath.Base(fileName)
+
+			if fileName != "" && !assetsOnDisk[fileName] {
+				r.Warnf("W011", manifestPath,
+					"asset %q referenced in description but missing from %s",
+					fileName, relTo(eventRoot, c.AssetsDir))
+			}
+		}
+	}
+
+	// W003 — web archetype service but description hints at mutable state
+	if m.Challenge.Category == "web" && archetype == challenge.ArchetypeService {
+		if mutableStateRe.MatchString(m.Challenge.Description) {
+			r.Warnf("W003", manifestPath,
+				"web challenge is 'service' archetype but description hints at mutable state; consider 'instanced' to avoid player interference")
+		}
+	}
+
+	// W009 — crypto service-archetype with no rate-limit hint
+	if m.Challenge.Category == "crypto" && archetype == challenge.ArchetypeService {
+		if !rateLimitRe.MatchString(m.Challenge.Description) {
+			r.Warnf("W009", manifestPath,
+				"crypto challenge is 'service' archetype but description has no rate-limit hint (POW, delay, etc.); players might brute-force your oracle")
+		}
 	}
 
 	// W006 — challenge has no hints in either supported form.
