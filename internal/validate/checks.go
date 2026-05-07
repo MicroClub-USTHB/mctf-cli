@@ -203,6 +203,15 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 				"service-archetype challenge has no healthcheck — failures will surface as 502s to players (set deploy.healthcheck or add HEALTHCHECK to Dockerfile)")
 		}
 	}
+
+	// A007 — service archetype needs internal_port for ingress
+	// generation (Traefik routes by container port, not host port).
+	if archetype == challenge.ArchetypeService {
+		if m.Deploy == nil || m.Deploy.InternalPort == nil || *m.Deploy.InternalPort == 0 {
+			r.Errorf("A007", manifestPath,
+				"service-archetype challenge has no deploy.internal_port — required for ingress and instancer wiring (the container's listening port)")
+		}
+	}
 }
 
 func fileExistsNonEmpty(path string) bool {

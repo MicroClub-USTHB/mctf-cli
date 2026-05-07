@@ -90,6 +90,54 @@ func TestW006_HintsFromManifestSatisfies(t *testing.T) {
 	}
 }
 
+func TestA007_ServiceMissingInternalPortFails(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	c.Manifest.Challenge.NeedDeploy = true
+	c.Manifest.Challenge.Category = "misc"
+	c.CategoryDir = "misc"
+	port := 14000
+	c.Manifest.Deploy = &challenge.DeployBlock{
+		Subdomain: "x",
+		Port:      &port,
+		// internal_port intentionally unset
+	}
+	c.Archetype = challenge.ArchetypeService
+	// Need Dockerfile + compose to clear A006
+	if err := os.WriteFile(filepath.Join(c.ChallengeDir, "Dockerfile"), []byte("FROM scratch\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(c.ChallengeDir, "docker-compose.yml"), []byte("services:\n  app: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if !hasRule(r, "A007", SeverityError) {
+		t.Errorf("A007 should hard-fail: %s", r.String())
+	}
+}
+
+func TestA007_ServiceWithInternalPortOK(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	c.Manifest.Challenge.NeedDeploy = true
+	c.Manifest.Challenge.Category = "misc"
+	c.CategoryDir = "misc"
+	port := 14000
+	internal := 8000
+	c.Manifest.Deploy = &challenge.DeployBlock{
+		Subdomain:    "x",
+		Port:         &port,
+		InternalPort: &internal,
+	}
+	c.Archetype = challenge.ArchetypeService
+	_ = os.WriteFile(filepath.Join(c.ChallengeDir, "Dockerfile"), []byte("FROM scratch\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(c.ChallengeDir, "docker-compose.yml"), []byte("services:\n  app: {}\n"), 0o644)
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if hasRule(r, "A007", SeverityError) {
+		t.Errorf("A007 should not fire when internal_port is set: %s", r.String())
+	}
+}
+
 func TestW007_HighWaveWarns(t *testing.T) {
 	root := t.TempDir()
 	c := fixtureChallenge(t, root, "x", "fine")
