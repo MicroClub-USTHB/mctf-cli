@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -19,6 +20,7 @@ var (
 	flagBuildCat     string
 	flagBuildSlug    string
 	flagBuildSHA     string
+	flagBuildScan    bool
 )
 
 var buildCmd = &cobra.Command{
@@ -87,9 +89,40 @@ var buildCmd = &cobra.Command{
 		if err := build.Apply(ctx, runner, plan, opts); err != nil {
 			return err
 		}
+
+		if !flagBuildDryRun && flagBuildScan {
+			if err := scanBuiltImages(ctx, plan); err != nil {
+				return err
+			}
+		}
+
 		fmt.Println("\nbuild complete")
 		return nil
 	},
+}
+
+// scanBuiltImages runs the post-build leak scan for every spec in
+// plan and aborts on the first hit.
+func scanBuiltImages(ctx context.Context, plan []build.ImageSpec) error {
+	for _, spec := range plan {
+		if len(spec.FlagValues) == 0 || len(spec.Tags) == 0 {
+			continue
+		}
+		fmt.Printf("\nscanning %s for leaked flag values...\n", spec.Tags[0])
+		hits, err := build.ScanImage(ctx, spec.Tags[0], spec.FlagValues)
+		if err != nil {
+			return fmt.Errorf("%s: scan failed: %w", spec.Challenge, err)
+		}
+		if len(hits) > 0 {
+			for _, h := range hits {
+				fmt.Fprintf(os.Stderr, "  LEAK %s: %s contains %s\n", spec.Challenge, h.Path, h.Flag)
+			}
+			return fmt.Errorf("%s: %d file(s) contain a manifest flag value — fix and rebuild (or load the flag from env at runtime)",
+				spec.Challenge, len(hits))
+		}
+		fmt.Printf("  ok — no flag values in image filesystem\n")
+	}
+	return nil
 }
 
 func init() {
@@ -99,5 +132,6 @@ func init() {
 	buildCmd.Flags().StringVar(&flagBuildCat, "category", "", "build only challenges in this category")
 	buildCmd.Flags().StringVar(&flagBuildSlug, "slug", "", "build only the challenge with this slug")
 	buildCmd.Flags().StringVar(&flagBuildSHA, "sha", "", "image tag sha override (default: short HEAD or 'dev')")
+	buildCmd.Flags().BoolVar(&flagBuildScan, "scan", true, "post-build scan for manifest flag values inside the image (use --scan=false to disable)")
 	rootCmd.AddCommand(buildCmd)
 }

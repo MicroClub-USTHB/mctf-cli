@@ -21,13 +21,17 @@ import (
 
 // ImageSpec is what the builder needs to produce one image.
 type ImageSpec struct {
-	Challenge   string            // <category>/<slug>
-	Category    string
-	Slug        string
-	Context     string            // absolute path to challenge/ folder
-	Dockerfile  string            // absolute path
-	Tags        []string          // primary then :latest
-	Labels      map[string]string // OCI labels stamped on the image
+	Challenge  string            // <category>/<slug>
+	Category   string
+	Slug       string
+	Context    string            // absolute path to challenge/ folder
+	Dockerfile string            // absolute path
+	Tags       []string          // primary then :latest
+	Labels     map[string]string // OCI labels stamped on the image
+	// FlagValues are the manifest-declared flag values for this
+	// challenge — used by the post-build leak scan. Empty for static
+	// challenges (which never produce an image anyway).
+	FlagValues []string
 }
 
 // Options narrows or alters the plan.
@@ -81,6 +85,12 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, o
 		}
 		base := fmt.Sprintf("%s/%s-%s-%s", registry, cfg.Event.Slug, c.CategoryDir, c.Slug)
 		ctxPath, _ := filepath.Abs(c.ChallengeDir)
+		flagVals := make([]string, 0, len(c.Manifest.Challenge.Flags))
+		for _, f := range c.Manifest.Challenge.Flags {
+			if f.Flag != "" {
+				flagVals = append(flagVals, f.Flag)
+			}
+		}
 		out = append(out, ImageSpec{
 			Challenge:  c.CategoryDir + "/" + c.Slug,
 			Category:   c.CategoryDir,
@@ -94,6 +104,7 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, o
 				"mtcf.challenge": c.Slug,
 				"mtcf.archetype": string(c.Archetype),
 			},
+			FlagValues: flagVals,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Challenge < out[j].Challenge })

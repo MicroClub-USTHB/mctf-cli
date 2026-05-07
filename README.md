@@ -79,7 +79,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **`mtcf doctor`** — preflight checks: event config, challenge validation, docker binary/daemon/compose, git, registry creds, CTFd token, **host ports free for service-archetype challenges**; `--skip-env` and `--json` modes.
 
 #### Build
-- **`mtcf build`** — builds one container image per deployable challenge; tags `<registry>/<event>-<cat>-<slug>:<sha>` plus `:latest`; stamps `mtcf.*` OCI labels; `--dry-run` previews commands; `--category` / `--slug` filters scope a build; `--push` ships to the registry.
+- **`mtcf build`** — builds one container image per deployable challenge; tags `<registry>/<event>-<cat>-<slug>:<sha>` plus `:latest`; stamps `mtcf.*` OCI labels; `--dry-run` previews commands; `--category` / `--slug` filters scope a build; `--push` ships to the registry. **Post-build leak scan** (on by default; `--scan=false` to disable) runs `docker create` + `docker export` and walks the image filesystem for any manifest flag value, exempting `flag.txt`/`FLAG`/`*.flag`. Build fails if a flag string is found in source code, configs, or other unexpected places.
 
 #### Deploy (Docker mode)
 - **`mtcf deploy`** — `docker compose up -d` for every service-archetype challenge; per-challenge project name `mtcf-<event>-<cat>-<slug>`; auto-stamps `PORT_<internal>` env so the compose's `${PORT_N:-N}` convention picks the right host port; instanced challenges are skipped (the instancer owns those at game time).
