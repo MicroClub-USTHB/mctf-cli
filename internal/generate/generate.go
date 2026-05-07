@@ -10,6 +10,7 @@ import (
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/ingress"
 )
 
 // Outputs collects every file `mtcf generate` would write, keyed by
@@ -58,7 +59,31 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge) (
 	}
 	out.Files[filepath.Join(challengesRoot, "index.json")] = idx
 
+	// 5. Traefik ingress config (Docker mode + ingress=traefik only)
+	if shouldEmitTraefik(cfg) {
+		entries, err := ingress.PlanEntries(cfg, challs)
+		if err != nil {
+			return nil, fmt.Errorf("ingress: %w", err)
+		}
+		ingressDir := filepath.Join(eventRoot, "ingress", "traefik")
+		out.Files[filepath.Join(ingressDir, "traefik.yml")] = ingress.TraefikStatic(cfg)
+		out.Files[filepath.Join(ingressDir, "dynamic", "dynamic.yml")] = ingress.TraefikDynamic(entries)
+	}
+
 	return out, nil
+}
+
+func shouldEmitTraefik(cfg *config.Config) bool {
+	if cfg == nil || cfg.Deploy == nil {
+		return false
+	}
+	if cfg.Deploy.Mode != "docker" {
+		return false
+	}
+	if cfg.Deploy.Docker == nil {
+		return false
+	}
+	return cfg.Deploy.Docker.Ingress == "traefik"
 }
 
 // Apply writes every planned file. Files that already match on disk are

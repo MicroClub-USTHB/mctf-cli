@@ -64,9 +64,12 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **Hard-fail vs warning catalog** — every rule has an ID for clean CI output.
 
 #### Generation
-- **Auto-generated derived artifacts** — CTFd-format manifest, instancer `instance.toml`, `challenges.csv`, `index.json`.
+- **Auto-generated derived artifacts** — CTFd-format manifest, instancer `instance.toml`, `challenges.csv`, `index.json`, Traefik dynamic + static config.
 - **Deterministic, idempotent** — same input → byte-identical output.
 - **`--check` mode** — exits non-zero on drift; the CI gate that keeps sources and derived files locked together.
+
+#### Ingress (Docker mode + Traefik)
+- **`mtcf generate` emits Traefik config** — `ingress/traefik/traefik.yml` (entrypoints + file provider) and `ingress/traefik/dynamic/dynamic.yml` (HTTP routers/services for service archetype, TCP routers/services for `tcp: true` challenges). Backend URL points at `<project>-<service>-1:<internal_port>` inside the docker network. Instanced challenges are skipped — they are routed by the instancer at game time.
 
 #### Inspection
 - **`mtcf list`** — table of every challenge in the event, with `--category` / `--archetype` / `--wave` / `--difficulty` filters; `--json` for scripting.
@@ -147,8 +150,8 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 
 | Version | Focus |
 |---|---|
-| **v0 (alpha, current)** | Phase 0 spec + every command above (`init` / `validate` / `generate` / `info` / `list` / `categories` / `doctor` / `build` / `deploy` / `down` / `logs` / `platform sync`). |
-| **v0.1** | Ingress/Traefik config generation, dev mode with hot reload, image-leak guard hardening, CTFd file uploads. |
+| **v0 (alpha, current)** | Phase 0 spec + Traefik ingress generation + every command above (`init` / `validate` / `generate` / `info` / `list` / `categories` / `doctor` / `build` / `deploy` / `down` / `logs` / `platform sync`). |
+| **v0.1** | Dev mode with hot reload, image-leak guard hardening, CTFd file uploads, native instancer. |
 | **v0.2** | SSH deploy, native instancer, Discord notifications, plugin system, dynamic flags. |
 | **v0.3** | Kubernetes deploy, Terraform infra wrapper, Prometheus + Grafana, `pro` profile fully wired. |
 | **v0.4** | rCTF + generic-webhook platform integrations, read-only web dashboard, goreleaser distribution. |

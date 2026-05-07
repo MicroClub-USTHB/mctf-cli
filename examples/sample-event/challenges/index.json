@@ -38,7 +38,8 @@
       "archetype": "service",
       "deploy": {
         "subdomain": "welcome",
-        "port": 14000
+        "port": 14000,
+        "internal_port": 8000
       },
       "flag_count": 1,
       "has_writeup": true,

@@ -16,7 +16,7 @@ challenge:
 deploy:
   subdomain: "welcome"
   port: 14000
-  internal_port: null
+  internal_port: 8000
   dynamic_instances: false
   tcp: false
   noSsl: false
