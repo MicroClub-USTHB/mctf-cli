@@ -18,8 +18,11 @@ import (
 	"strings"
 	"time"
 
+	"path/filepath"
+
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/instancer"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/validate"
 )
 
@@ -78,7 +81,38 @@ func Run(dir string, opts Options) []Check {
 		}
 	}
 
+	checks = append(checks, checkExpiredInstances(dir))
+
 	return checks
+}
+
+// checkExpiredInstances surfaces stale entries in .mtcf/instances.json
+// that the operator should reap with `mtcf instance reap`.
+func checkExpiredInstances(dir string) Check {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return Check{ID: "D031", Name: "expired instances", Status: StatusSkip, Detail: err.Error()}
+	}
+	storePath := filepath.Join(abs, ".mtcf", "instances.json")
+	if _, err := os.Stat(storePath); err != nil {
+		// Store doesn't exist yet — nothing to report.
+		return Check{ID: "D031", Name: "expired instances", Status: StatusSkip, Detail: "no instance store"}
+	}
+	store, err := instancer.NewStore(storePath)
+	if err != nil {
+		return Check{ID: "D031", Name: "expired instances", Status: StatusFail, Detail: err.Error()}
+	}
+	expired := store.Expired(time.Now().UTC())
+	if len(expired) == 0 {
+		return Check{ID: "D031", Name: "expired instances", Status: StatusOK,
+			Detail: fmt.Sprintf("%d live, 0 expired", len(store.List()))}
+	}
+	return Check{
+		ID: "D031", Name: "expired instances",
+		Status:  StatusWarn,
+		Detail:  fmt.Sprintf("%d expired instance(s) need reaping", len(expired)),
+		Suggest: "run `mtcf instance reap`",
+	}
 }
 
 func checkConfig(dir string) (*config.Config, Check) {

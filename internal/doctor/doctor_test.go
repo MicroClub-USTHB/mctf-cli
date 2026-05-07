@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/instancer"
 )
 
 const minimalConfig = `version: 1
@@ -167,6 +169,47 @@ func TestCheckPortsFree_Skip(t *testing.T) {
 	})
 	if got.Status != StatusSkip {
 		t.Errorf("static-only event should skip: %+v", got)
+	}
+}
+
+func TestCheckExpiredInstances_NoStore(t *testing.T) {
+	got := checkExpiredInstances(t.TempDir())
+	if got.Status != StatusSkip {
+		t.Errorf("missing store should skip: %+v", got)
+	}
+}
+
+func TestCheckExpiredInstances_HasExpired(t *testing.T) {
+	dir := t.TempDir()
+	storePath := filepath.Join(dir, ".mtcf", "instances.json")
+	store, err := instancer.NewStore(storePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = store.Put(instancer.Instance{
+		ID: "old", ChallengeSlug: "x/y", TeamID: "t",
+		ExpiresAt: time.Now().Add(-time.Hour),
+	})
+	got := checkExpiredInstances(dir)
+	if got.Status != StatusWarn {
+		t.Errorf("expired instance should warn: %+v", got)
+	}
+	if !strings.Contains(got.Suggest, "instance reap") {
+		t.Errorf("suggest should reference reap: %q", got.Suggest)
+	}
+}
+
+func TestCheckExpiredInstances_AllLive(t *testing.T) {
+	dir := t.TempDir()
+	storePath := filepath.Join(dir, ".mtcf", "instances.json")
+	store, _ := instancer.NewStore(storePath)
+	_ = store.Put(instancer.Instance{
+		ID: "live", ChallengeSlug: "x/y", TeamID: "t",
+		ExpiresAt: time.Now().Add(time.Hour),
+	})
+	got := checkExpiredInstances(dir)
+	if got.Status != StatusOK {
+		t.Errorf("live-only store should be ok: %+v", got)
 	}
 }
 
