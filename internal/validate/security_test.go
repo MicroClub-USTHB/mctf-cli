@@ -91,6 +91,29 @@ func TestSEC003_PwnWithUserOK(t *testing.T) {
 	}
 }
 
+func TestSEC003_MultiStageUserOnlyInBuilder(t *testing.T) {
+	root := t.TempDir()
+	// USER ctf in the builder stage doesn't apply to the runtime stage,
+	// so this Dockerfile should still trip SEC003.
+	df := `FROM golang:1.23 AS builder
+RUN adduser ctf
+USER ctf
+WORKDIR /src
+
+FROM alpine:3.20
+COPY --from=builder /src/app /app
+CMD ["/app"]
+`
+	c := makeChallenge(t, root, "pwn", "ms", df, `services:
+  app: { image: x }
+`)
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if !hasRule(r, "SEC003", SeverityWarn) {
+		t.Errorf("SEC003 should warn when USER is only in builder stage: %s", r.String())
+	}
+}
+
 func TestSEC003_OnlyForPwnAndJailbreak(t *testing.T) {
 	root := t.TempDir()
 	c := makeChallenge(t, root, "web", "no-user", "FROM scratch\n", `services:

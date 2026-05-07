@@ -81,10 +81,16 @@ func checkPrivileged(r *Report, cfg *config.Config, compose *composeShape, manif
 }
 
 // SEC003 — pwn / jailbreak Dockerfiles must end with a USER directive
-// (so the challenge process doesn't run as root). Pro profile escalates
-// to a hard-fail; the runtime --user override is technically valid, but
-// pinning in the image is the convention we want to enforce.
-var reUserDirective = regexp.MustCompile(`(?im)^\s*USER\b`)
+// after the last FROM (the runtime stage of a multi-stage build).
+// Pro profile escalates to a hard-fail.
+//
+// In a multi-stage build, a USER in the builder stage doesn't apply to
+// the final image, so we look for USER positioned after the last FROM
+// to ensure the runtime user is non-root.
+var (
+	reFromLine = regexp.MustCompile(`(?im)^\s*FROM\b`)
+	reUserLine = regexp.MustCompile(`(?im)^\s*USER\b`)
+)
 
 func checkNonRootForPwn(r *Report, cfg *config.Config, c *challenge.Challenge, manifestPath string) {
 	cat := c.Manifest.Challenge.Category
@@ -96,15 +102,25 @@ func checkNonRootForPwn(r *Report, cfg *config.Config, c *challenge.Challenge, m
 	if err != nil {
 		return
 	}
-	if reUserDirective.Match(data) {
+	if userAfterLastFrom(data) {
 		return
 	}
-	msg := fmt.Sprintf("%s Dockerfile has no USER directive — process will run as root inside the container", cat)
+	msg := fmt.Sprintf("%s Dockerfile has no USER directive after the last FROM — process will run as root inside the container", cat)
 	if profileIs(cfg, config.ProfilePro) {
 		r.Errorf("SEC003", manifestPath, "%s", msg)
 	} else {
 		r.Warnf("SEC003", manifestPath, "%s", msg)
 	}
+}
+
+func userAfterLastFrom(dockerfile []byte) bool {
+	froms := reFromLine.FindAllIndex(dockerfile, -1)
+	if len(froms) == 0 {
+		// No FROM at all — odd, but not our problem to flag here.
+		return reUserLine.Match(dockerfile)
+	}
+	lastFrom := froms[len(froms)-1][0]
+	return reUserLine.Match(dockerfile[lastFrom:])
 }
 
 // SEC004 — `cap_add` contains a capability that defeats container
