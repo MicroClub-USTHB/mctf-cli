@@ -69,6 +69,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **`--check` mode** — exits non-zero on drift; the CI gate that keeps sources and derived files locked together.
 
 #### Inspection
+- **`mtcf list`** — table of every challenge in the event, with `--category` / `--archetype` / `--wave` / `--difficulty` filters; `--json` for scripting.
 - **`mtcf info <category>/<slug>`** — show derived facts for one challenge: archetype, ingress URL, image-tag template, flag, file inventory; `--json` for machine-readable output.
 - **`mtcf doctor`** — preflight checks: event config, challenge validation, docker binary/daemon/compose, git, registry creds, CTFd token; `--skip-env` and `--json` modes.
 
