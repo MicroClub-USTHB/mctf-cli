@@ -70,6 +70,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 
 #### Inspection
 - **`mtcf info <category>/<slug>`** — show derived facts for one challenge: archetype, ingress URL, image-tag template, flag, file inventory; `--json` for machine-readable output.
+- **`mtcf doctor`** — preflight checks: event config, challenge validation, docker binary/daemon/compose, git, registry creds, CTFd token; `--skip-env` and `--json` modes.
 
 #### Distribution
 - **Single static Go binary**, cross-platform.
@@ -113,7 +114,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **Pluggable platform integration** — CTFd first-class; rCTF and generic-webhook platforms via plugin.
 
 #### DX & ops
-- **`mtcf doctor`** — preflight: docker daemon, registry auth, CTFd token, ports free, disk, DNS.
+- **Live ports / disk / DNS preflight** — extend `mtcf doctor` with port-availability, free-disk, and DNS-resolution checks.
 - **Local dev mode** — full stack on a laptop with hot reload.
 - **Per-challenge log streaming**.
 - **Dry-run + safe teardown** — preview every change; tear environments down without orphans.
@@ -134,8 +135,8 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 
 | Version | Focus |
 |---|---|
-| **v0 (alpha, current)** | Phase 0 spec + `validate` + `generate` + `init` + `init challenge`. |
-| **v0.1** | `mtcf build`, `mtcf deploy` (Docker mode), CTFd integration, `mtcf doctor`, log streaming, dev mode, safe teardown. |
+| **v0 (alpha, current)** | Phase 0 spec + `validate` + `generate` + `init` + `init challenge` + `info` + `doctor`. |
+| **v0.1** | `mtcf build`, `mtcf deploy` (Docker mode), CTFd integration, log streaming, dev mode, safe teardown. |
 | **v0.2** | SSH deploy, native instancer, Discord notifications, plugin system, dynamic flags. |
 | **v0.3** | Kubernetes deploy, Terraform infra wrapper, Prometheus + Grafana, `pro` profile fully wired. |
 | **v0.4** | rCTF + generic-webhook platform integrations, read-only web dashboard, goreleaser distribution. |
