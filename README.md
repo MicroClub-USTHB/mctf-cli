@@ -98,6 +98,17 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **`mtcf instance reap`** — destroy every expired instance (manual cleanup; the daemon mode that automates this lands later).
 - State persists at `.mtcf/instances.json` with atomic file rewrite + mutex protection.
 
+#### Native instancer (HTTP daemon)
+- **`mtcf instancer serve --addr :8080`** — long-running daemon. Bearer-token auth via `MTCF_INSTANCER_TOKEN` (comma-separated for rotation). Routes:
+  - `GET /healthz` — no-auth liveness probe
+  - `GET /instances` / `GET /instances/{id}` — list / fetch
+  - `POST /spawn` — `{team_id, challenge_slug, flag?}` (idempotent per team+chall)
+  - `POST /destroy/{id}` — tear down + remove from store
+  - `POST /extend/{id}` — `{by_seconds: N}` (default 900)
+- **Reaper goroutine** — runs at `--reap-interval` (default 30s); calls `Down` + `Store.Delete` for every expired instance. Failed teardowns leave the record in the store so the next tick retries.
+- **Graceful shutdown** — SIGINT/SIGTERM stops the reaper and gives in-flight requests 10s before close.
+- `--quiet` discards docker compose stdout/stderr (recommended in production).
+
 #### Platform integration (CTFd)
 - **`mtcf platform sync`** — push challenges to the CTFd instance configured in `mtcf.config.yml`. Diffs vs the platform's existing state, creates what's missing, attaches flags / tags / hints / **file uploads (assets/)**. `--update` reconciles existing challenges; `--dry-run` previews; `--category` / `--slug` filter; `--json` for scripting. Requires `MTCF_CTFD_TOKEN` env var.
 - **`mtcf platform configure`** — sync `ctf_name` from `event.name` to CTFd's `/api/v1/configs`. Theme settings are intentionally not synced (one-time UI setup). `--dry-run` previews.

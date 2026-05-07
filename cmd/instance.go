@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -84,13 +83,10 @@ var instanceSpawnCmd = &cobra.Command{
 
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
-		if err := dockerComposeUp(ctx, *spec); err != nil {
-			return fmt.Errorf("docker compose up: %w", err)
-		}
-
-		containers, err := dockerComposePs(ctx, spec.ID, spec.ComposeFile)
+		runner := instancer.NewDockerRunner()
+		containers, err := runner.Up(ctx, *spec)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not enumerate containers: %v\n", err)
+			return err
 		}
 
 		inst := instancer.Instance{
@@ -142,7 +138,8 @@ var instanceDestroyCmd = &cobra.Command{
 
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
-		if err := dockerComposeDown(ctx, spec, flagInstDestroyVolumes); err != nil {
+		runner := instancer.NewDockerRunner()
+		if err := runner.Down(ctx, spec, flagInstDestroyVolumes); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: docker compose down: %v\n", err)
 			if !flagInstDestroyForce {
 				return err
@@ -239,11 +236,12 @@ var instanceReapCmd = &cobra.Command{
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
+		runner := instancer.NewDockerRunner()
 		var failed int
 		for _, inst := range expired {
 			composeFile, _ := composeFileForSlug(inst.ChallengeSlug)
 			spec := instancer.SpawnSpec{ID: inst.ID, ComposeFile: composeFile}
-			if err := dockerComposeDown(ctx, spec, false); err != nil {
+			if err := runner.Down(ctx, spec, false); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: %s: %v\n", inst.ID, err)
 				failed++
 			}
@@ -305,38 +303,6 @@ func composeFileForSlug(slug string) (string, error) {
 		root = filepath.Join(abs, root)
 	}
 	return filepath.Join(root, parts[0], parts[1], "challenge", "docker-compose.yml"), nil
-}
-
-func dockerComposeUp(ctx context.Context, s instancer.SpawnSpec) error {
-	cmd := exec.CommandContext(ctx, "docker", instancer.UpArgs(s)...)
-	cmd.Dir = filepath.Dir(s.ComposeFile)
-	cmd.Env = append(os.Environ(), s.EnvSlice()...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func dockerComposeDown(ctx context.Context, s instancer.SpawnSpec, volumes bool) error {
-	cmd := exec.CommandContext(ctx, "docker", instancer.DestroyArgs(s, volumes)...)
-	cmd.Dir = filepath.Dir(s.ComposeFile)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func dockerComposePs(ctx context.Context, project, composeFile string) ([]string, error) {
-	cmd := exec.CommandContext(ctx, "docker", "compose", "-p", project, "-f", composeFile, "ps", "-q")
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-	var ids []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line = strings.TrimSpace(line); line != "" {
-			ids = append(ids, line)
-		}
-	}
-	return ids, nil
 }
 
 func parsePortRange(s string) (int, int, error) {
