@@ -18,6 +18,11 @@ type ChallengeVars struct {
 	Name       string // display name; defaults to Slug if empty
 	Author     string
 	Difficulty string // optional override; "easy" if empty
+
+	// Archetype controls the deploy block in the rendered manifest:
+	// "static" (default) leaves it commented; "service" writes a
+	// fixed-port deploy block; "instanced" writes a per-team block.
+	Archetype string
 }
 
 // ChallengeOptions configures Challenge.
@@ -177,6 +182,7 @@ var (
 	reManifestAuthor     = regexp.MustCompile(`(?m)^(\s*author:\s*)(?:".*?"|\S+)(.*)$`)
 	reManifestCategory   = regexp.MustCompile(`(?m)^(\s*category:\s*)\S+(.*)$`)
 	reManifestDifficulty = regexp.MustCompile(`(?m)^(\s*difficulty:\s*)\S+(.*)$`)
+	reNeedDeployFalse    = regexp.MustCompile(`(?m)^(\s*need_deploy:\s+)false`)
 	reComposeName        = regexp.MustCompile(`(?m)^(name:\s*)\S+(.*)$`)
 	reWriteupTitle       = regexp.MustCompile(`(?m)^# .*$`)
 )
@@ -188,7 +194,94 @@ func rewriteManifest(body string, v ChallengeVars) string {
 	if v.Author != "" {
 		body = reManifestAuthor.ReplaceAllString(body, fmt.Sprintf(`${1}"%s"${2}`, escapeYAMLDouble(v.Author)))
 	}
+	if v.Archetype == "service" || v.Archetype == "instanced" {
+		body = enableDeployBlock(body, v)
+	}
 	return body
+}
+
+// enableDeployBlock flips need_deploy to true and replaces the
+// commented-out deploy block at the bottom of the template with a
+// real one shaped for the requested archetype.
+func enableDeployBlock(body string, v ChallengeVars) string {
+	body = reNeedDeployFalse.ReplaceAllString(body, "${1}true")
+
+	// Strip everything from the "# Uncomment when need_deploy: true."
+	// marker through end of file (the commented-out template block).
+	if idx := strings.Index(body, "# Uncomment when need_deploy: true."); idx >= 0 {
+		body = strings.TrimRight(body[:idx], "\n") + "\n"
+	}
+
+	body += "\n" + deployBlock(v) + "\n"
+	return body
+}
+
+func deployBlock(v ChallengeVars) string {
+	subdomain := v.Slug
+	switch v.Archetype {
+	case "instanced":
+		return strings.Join([]string{
+			"deploy:",
+			fmt.Sprintf("  subdomain: %q", subdomain),
+			"  port: null",
+			"  internal_port: 8000",
+			"  dynamic_instances: true",
+			"  tcp: false",
+			"  noSsl: false",
+			"  resources:",
+			"    cpu: \"0.5\"",
+			"    memory: \"256M\"",
+			"  healthcheck:",
+			"    type: http",
+			"    path: \"/\"",
+			"    interval: \"30s\"",
+			"    timeout: \"5s\"",
+			"    retries: 3",
+		}, "\n")
+	default: // service
+		port := defaultServicePort(v.Category)
+		return strings.Join([]string{
+			"deploy:",
+			fmt.Sprintf("  subdomain: %q", subdomain),
+			fmt.Sprintf("  port: %d", port),
+			"  internal_port: 8000",
+			"  dynamic_instances: false",
+			"  tcp: false",
+			"  noSsl: false",
+			"  resources:",
+			"    cpu: \"0.5\"",
+			"    memory: \"256M\"",
+			"  healthcheck:",
+			"    type: http",
+			"    path: \"/\"",
+			"    interval: \"30s\"",
+			"    timeout: \"5s\"",
+			"    retries: 3",
+		}, "\n")
+	}
+}
+
+// defaultServicePort returns a reasonable starting port within the
+// category's port range. Authors should adjust if they conflict.
+func defaultServicePort(category string) int {
+	switch category {
+	case "web":
+		return 10500
+	case "pwn":
+		return 11500
+	case "crypto":
+		return 12500
+	case "ai":
+		return 13500
+	case "misc":
+		return 14500
+	case "reverse":
+		return 15500
+	case "jailbreak":
+		return 16500
+	default:
+		return 14000
+	}
 }
 
 func rewriteCompose(body string, v ChallengeVars) string {

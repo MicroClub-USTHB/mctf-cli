@@ -125,6 +125,87 @@ func TestChallenge_NeedsCategoryAndSlug(t *testing.T) {
 	}
 }
 
+func TestChallenge_ServiceArchetypeWritesDeployBlock(t *testing.T) {
+	dir := t.TempDir()
+	res, err := Challenge(
+		ChallengeVars{Slug: "welcome", Category: "misc", Author: "ops", Archetype: "service"},
+		ChallengeOptions{EventRoot: dir, ChallengesDir: "challenges"},
+	)
+	if err != nil {
+		t.Fatalf("Challenge: %v", err)
+	}
+	if len(res.Written) == 0 {
+		t.Fatal("no files written")
+	}
+	body, err := os.ReadFile(filepath.Join(dir, "challenges", "misc", "welcome", "challenge", "challenge.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(body)
+	for _, want := range []string{
+		`need_deploy: true`,
+		`deploy:`,
+		`subdomain: "welcome"`,
+		`port: 14500`,                  // misc category default
+		`internal_port: 8000`,
+		`dynamic_instances: false`,
+		`healthcheck:`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("service manifest missing %q\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "# Uncomment when need_deploy: true.") {
+		t.Errorf("commented-out template still present:\n%s", got)
+	}
+}
+
+func TestChallenge_InstancedArchetypeWritesDeployBlock(t *testing.T) {
+	dir := t.TempDir()
+	_, err := Challenge(
+		ChallengeVars{Slug: "cub3", Category: "web", Archetype: "instanced"},
+		ChallengeOptions{EventRoot: dir, ChallengesDir: "challenges"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(dir, "challenges", "web", "cub3", "challenge", "challenge.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(body)
+	for _, want := range []string{
+		`need_deploy: true`,
+		`subdomain: "cub3"`,
+		`port: null`,
+		`internal_port: 8000`,
+		`dynamic_instances: true`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("instanced manifest missing %q\n%s", want, got)
+		}
+	}
+}
+
+func TestChallenge_StaticArchetypeKeepsCommentedDeploy(t *testing.T) {
+	dir := t.TempDir()
+	_, err := Challenge(
+		ChallengeVars{Slug: "rsa", Category: "crypto"}, // no archetype = static
+		ChallengeOptions{EventRoot: dir, ChallengesDir: "challenges"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(filepath.Join(dir, "challenges", "crypto", "rsa", "challenge", "challenge.yml"))
+	got := string(body)
+	if !strings.Contains(got, "need_deploy: false") {
+		t.Errorf("static should leave need_deploy: false\n%s", got)
+	}
+	if !strings.Contains(got, "# Uncomment when need_deploy: true.") {
+		t.Errorf("static should preserve the commented deploy template\n%s", got)
+	}
+}
+
 func TestRewriteManifest_PreservesComments(t *testing.T) {
 	in := `# top comment
 schema: 1

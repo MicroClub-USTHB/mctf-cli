@@ -19,6 +19,7 @@ var (
 	flagInitChallengeAuthor     string
 	flagInitChallengeName       string
 	flagInitChallengeDifficulty string
+	flagInitChallengeArchetype  string
 )
 
 var initChallengeCmd = &cobra.Command{
@@ -58,12 +59,19 @@ var initChallengeCmd = &cobra.Command{
 			display = slug
 		}
 
+		switch flagInitChallengeArchetype {
+		case "", "static", "service", "instanced":
+		default:
+			return fmt.Errorf("invalid --archetype %q (want static | service | instanced)", flagInitChallengeArchetype)
+		}
+
 		vars := scaffold.ChallengeVars{
 			Slug:       slug,
 			Category:   category,
 			Name:       display,
 			Author:     flagInitChallengeAuthor,
 			Difficulty: flagInitChallengeDifficulty,
+			Archetype:  flagInitChallengeArchetype,
 		}
 		opts := scaffold.ChallengeOptions{
 			EventRoot:     flagDir,
@@ -134,5 +142,6 @@ func init() {
 	initChallengeCmd.Flags().StringVar(&flagInitChallengeAuthor, "author", "", "author handle (filled into challenge.yml)")
 	initChallengeCmd.Flags().StringVar(&flagInitChallengeName, "name", "", "display name (default: slug)")
 	initChallengeCmd.Flags().StringVar(&flagInitChallengeDifficulty, "difficulty", "easy", "difficulty: easy | medium | hard | extreme")
+	initChallengeCmd.Flags().StringVar(&flagInitChallengeArchetype, "archetype", "", "scaffold a deployable variant: service | instanced (default: static)")
 	initCmd.AddCommand(initChallengeCmd)
 }

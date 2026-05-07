@@ -46,7 +46,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 
 #### Scaffolding
 - **`mtcf init`** — scaffold a new event repo from embedded templates (config, README, CI workflow, gitignore, starter challenge template).
-- **`mtcf init challenge <category>/<slug>`** — scaffold a single challenge from the event-local template (with embedded fallback); rewrites name, category, difficulty, and author in place.
+- **`mtcf init challenge <category>/<slug>`** — scaffold a single challenge from the event-local template (with embedded fallback); rewrites name, category, difficulty, and author in place. `--archetype service|instanced` writes a deployable variant with the appropriate deploy block (subdomain, ports, healthcheck) instead of the static default.
 
 #### Core contract
 - **CTF-as-Infrastructure-as-Code** — every event is one declarative repo.
