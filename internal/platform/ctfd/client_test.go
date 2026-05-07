@@ -1,6 +1,7 @@
 package ctfd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -27,6 +28,8 @@ func newFake(t *testing.T) (*fakeServer, *Client, func()) {
 		body, _ := io.ReadAll(r.Body)
 		f.requests = append(f.requests, r)
 		f.bodies = append(f.bodies, body)
+		// Restore body so handlers can re-read (e.g. ParseMultipartForm).
+		r.Body = io.NopCloser(bytes.NewReader(body))
 		if f.handler != nil {
 			f.handler(w, r)
 			return
@@ -162,6 +165,97 @@ func TestDelete_NoBody(t *testing.T) {
 	}
 	if f.requests[0].Method != "DELETE" || f.requests[0].URL.Path != "/api/v1/flags/42" {
 		t.Errorf("wrong request: %s %s", f.requests[0].Method, f.requests[0].URL.Path)
+	}
+}
+
+func TestUploadFile_SendsMultipart(t *testing.T) {
+	f, c, _ := newFake(t)
+	f.handler = func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/files" || r.Method != "POST" {
+			t.Errorf("unexpected: %s %s", r.Method, r.URL.Path)
+		}
+		ct := r.Header.Get("Content-Type")
+		if !strings.HasPrefix(ct, "multipart/form-data") {
+			t.Errorf("content-type = %q", ct)
+		}
+		// Parse the multipart body and verify fields.
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Fatalf("parse multipart: %v", err)
+		}
+		if got := r.FormValue("challenge_id"); got != "5" {
+			t.Errorf("challenge_id = %q", got)
+		}
+		if got := r.FormValue("type"); got != "challenge" {
+			t.Errorf("type = %q", got)
+		}
+		fhs, ok := r.MultipartForm.File["file"]
+		if !ok || len(fhs) != 1 {
+			t.Fatalf("file field missing")
+		}
+		if fhs[0].Filename != "handout.zip" {
+			t.Errorf("filename = %q", fhs[0].Filename)
+		}
+		_, _ = w.Write([]byte(`{"success": true, "data": [{"id": 9, "type": "challenge", "location": "uploads/abcd/handout.zip"}]}`))
+	}
+	out, err := c.UploadFile(context.Background(), 5, "handout.zip", strings.NewReader("zip-bytes"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.ID != 9 || out.Basename() != "handout.zip" {
+		t.Errorf("uploaded file = %+v", out)
+	}
+}
+
+func TestUploadFile_ErrorResponse(t *testing.T) {
+	f, c, _ := newFake(t)
+	f.handler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"success": false, "errors": {"file": ["too big"]}}`))
+	}
+	_, err := c.UploadFile(context.Background(), 5, "x.zip", strings.NewReader("body"))
+	var api *APIError
+	if !errors.As(err, &api) || !strings.Contains(api.Body, "too big") {
+		t.Errorf("want APIError with too-big, got %v", err)
+	}
+}
+
+func TestListFiles_FiltersByChallenge(t *testing.T) {
+	f, c, _ := newFake(t)
+	f.handler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{
+            "success": true,
+            "data": [
+                {"id": 1, "type": "challenge", "location": "uploads/a/x.zip", "challenge_id": 5},
+                {"id": 2, "type": "challenge", "location": "uploads/b/y.zip", "challenge_id": 6},
+                {"id": 3, "type": "challenge", "location": "uploads/c/z.zip", "challenge_id": 5}
+            ]
+        }`))
+	}
+	got, err := c.ListFiles(context.Background(), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("want 2 files for challenge 5, got %d", len(got))
+	}
+	for _, file := range got {
+		if file.ChallengeID != 5 {
+			t.Errorf("filtered wrong: %+v", file)
+		}
+	}
+}
+
+func TestFile_Basename(t *testing.T) {
+	cases := map[string]string{
+		"uploads/abcd/handout.zip": "handout.zip",
+		"plain.txt":                "plain.txt",
+		"":                         "",
+	}
+	for loc, want := range cases {
+		got := File{Location: loc}.Basename()
+		if got != want {
+			t.Errorf("Basename(%q) = %q, want %q", loc, got, want)
+		}
 	}
 }
 

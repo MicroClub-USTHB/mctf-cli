@@ -3,6 +3,8 @@ package ctfd
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -29,7 +31,12 @@ type Item struct {
 	Flags    []FlagDelta
 	Tags     []TagDelta
 	Hints    []HintDelta
+	Files    []FileDelta
 	ExistingID int     // non-zero on update
+
+	// challengePtr threads the source challenge through to Apply so
+	// it can resolve absolute paths for file uploads.
+	challengePtr *challenge.Challenge
 }
 
 // FlagDelta describes a flag-level diff (replace-all semantics for v0).
@@ -51,6 +58,16 @@ type HintDelta struct {
 	Op       string
 	Existing *Hint
 	Wanted   *Hint
+}
+
+// FileDelta describes an asset-level diff. WantedPath is the absolute
+// path on disk; Existing carries the CTFd-side file identity for
+// deletes.
+type FileDelta struct {
+	Op         string // "add" | "delete"
+	Existing   *File
+	WantedName string // basename, used for display + sort
+	WantedPath string // absolute local path (only set for "add")
 }
 
 // Plan is the full set of actions for a sync run.
@@ -121,6 +138,32 @@ func PayloadTags(c *challenge.Challenge) []Tag {
 	return out
 }
 
+// PayloadFiles enumerates the assets/ directory and returns one entry
+// per file (as basename + absolute path). Hidden files and the
+// .gitkeep placeholder are filtered out. Output is sorted.
+func PayloadFiles(c *challenge.Challenge) []FileDelta {
+	if c.AssetsDir == "" {
+		return nil
+	}
+	entries, err := os.ReadDir(c.AssetsDir)
+	if err != nil {
+		return nil
+	}
+	var out []FileDelta
+	for _, e := range entries {
+		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		out = append(out, FileDelta{
+			Op:         "add",
+			WantedName: e.Name(),
+			WantedPath: filepath.Join(c.AssetsDir, e.Name()),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].WantedName < out[j].WantedName })
+	return out
+}
+
 // PayloadHints returns the CTFd Hint list a manifest wants.
 func PayloadHints(c *challenge.Challenge) []Hint {
 	var out []Hint
@@ -166,11 +209,12 @@ func Diff(ctx context.Context, c *Client, cfg *config.Config, challs []*challeng
 					Reason:  fmt.Sprintf("already exists (id=%d) — re-run with --update to reconcile", ec.ID),
 					Payload: payload,
 					ExistingID: ec.ID,
+					challengePtr: ch,
 				})
 				continue
 			}
-			// Update path: compute deltas for flags/tags/hints.
-			flagDeltas, tagDeltas, hintDeltas, err := childDeltas(ctx, c, ec.ID, ch)
+			// Update path: compute deltas for flags/tags/hints/files.
+			flagDeltas, tagDeltas, hintDeltas, fileDeltas, err := childDeltas(ctx, c, ec.ID, ch)
 			if err != nil {
 				return nil, err
 			}
@@ -183,6 +227,8 @@ func Diff(ctx context.Context, c *Client, cfg *config.Config, challs []*challeng
 				Flags:      flagDeltas,
 				Tags:       tagDeltas,
 				Hints:      hintDeltas,
+				Files:      fileDeltas,
+				challengePtr: ch,
 			})
 		} else {
 			items = append(items, Item{
@@ -193,6 +239,8 @@ func Diff(ctx context.Context, c *Client, cfg *config.Config, challs []*challeng
 				Flags:   wantFlagDeltas(PayloadFlags(ch)),
 				Tags:    wantTagDeltas(PayloadTags(ch)),
 				Hints:   wantHintDeltas(PayloadHints(ch)),
+				Files:   PayloadFiles(ch),
+				challengePtr: ch,
 			})
 		}
 	}
@@ -267,33 +315,97 @@ func applyChildResources(ctx context.Context, c *Client, challengeID int, item I
 			}
 		}
 	}
+	for _, fd := range item.Files {
+		switch fd.Op {
+		case "add":
+			f, err := os.Open(fd.WantedPath)
+			if err != nil {
+				return fmt.Errorf("%s: open asset %s: %w", item.Slug, fd.WantedName, err)
+			}
+			_, uploadErr := c.UploadFile(ctx, challengeID, fd.WantedName, f)
+			f.Close()
+			if uploadErr != nil {
+				return fmt.Errorf("%s: upload %s: %w", item.Slug, fd.WantedName, uploadErr)
+			}
+		case "delete":
+			if err := c.DeleteFile(ctx, fd.Existing.ID); err != nil {
+				return fmt.Errorf("%s: delete file %d: %w", item.Slug, fd.Existing.ID, err)
+			}
+		}
+	}
 	return nil
 }
 
-// childDeltas computes flag/tag/hint deltas for an existing challenge:
-// add what's wanted-but-missing, delete what's existing-but-unwanted.
-func childDeltas(ctx context.Context, c *Client, existingID int, ch *challenge.Challenge) ([]FlagDelta, []TagDelta, []HintDelta, error) {
+// childDeltas computes flag/tag/hint/file deltas for an existing
+// challenge: add what's wanted-but-missing, delete what's existing-
+// but-unwanted.
+func childDeltas(ctx context.Context, c *Client, existingID int, ch *challenge.Challenge) ([]FlagDelta, []TagDelta, []HintDelta, []FileDelta, error) {
 	flags, err := c.ListFlags(ctx, existingID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	tags, err := c.ListTags(ctx, existingID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	hints, err := c.ListHints(ctx, existingID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+	files, err := c.ListFiles(ctx, existingID)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	wantFlags := PayloadFlags(ch)
 	wantTags := PayloadTags(ch)
 	wantHints := PayloadHints(ch)
+	wantFiles := PayloadFiles(ch)
 
 	flagDeltas := diffFlags(flags, wantFlags)
 	tagDeltas := diffTags(tags, wantTags)
 	hintDeltas := diffHints(hints, wantHints)
-	return flagDeltas, tagDeltas, hintDeltas, nil
+	fileDeltas := diffFiles(files, wantFiles)
+	return flagDeltas, tagDeltas, hintDeltas, fileDeltas, nil
+}
+
+// diffFiles matches local assets to CTFd-side files by basename. Local
+// content changes are not detected (CTFd hashes server-side); to force
+// a re-upload, delete the file in CTFd first.
+func diffFiles(have []File, want []FileDelta) []FileDelta {
+	wantIdx := map[string]FileDelta{}
+	for _, f := range want {
+		wantIdx[f.WantedName] = f
+	}
+	haveIdx := map[string]File{}
+	for _, f := range have {
+		haveIdx[f.Basename()] = f
+	}
+	var out []FileDelta
+	for name, f := range wantIdx {
+		if _, ok := haveIdx[name]; !ok {
+			out = append(out, f)
+		}
+	}
+	for name, f := range haveIdx {
+		if _, ok := wantIdx[name]; !ok {
+			f := f
+			out = append(out, FileDelta{Op: "delete", Existing: &f, WantedName: name})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		ki := fileSortKey(out[i])
+		kj := fileSortKey(out[j])
+		return ki < kj
+	})
+	return out
+}
+
+func fileSortKey(d FileDelta) string {
+	if d.Op == "delete" {
+		return "d:" + d.WantedName
+	}
+	return "a:" + d.WantedName
 }
 
 func diffFlags(have, want []Flag) []FlagDelta {
@@ -557,6 +669,9 @@ func (p *Plan) Render() string {
 		}
 		for _, hd := range item.Hints {
 			fmt.Fprintf(&sb, "          hint.%s   %s\n", hd.Op, hintDisplay(hd))
+		}
+		for _, fd := range item.Files {
+			fmt.Fprintf(&sb, "          file.%s   %s\n", fd.Op, fd.WantedName)
 		}
 	}
 	nCreate, nUpdate, nSkip := 0, 0, 0

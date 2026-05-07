@@ -86,7 +86,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **`mtcf logs <category>/<slug>`** — stream logs from a deployed challenge's compose project; `-f` to follow, `--tail N` for the tail.
 
 #### Platform integration (CTFd)
-- **`mtcf platform sync`** — push challenges to the CTFd instance configured in `mtcf.config.yml`. Diffs vs the platform's existing state, creates what's missing, attaches flags / tags / hints. `--update` reconciles existing challenges; `--dry-run` previews; `--category` / `--slug` filter; `--json` for scripting. Requires `MTCF_CTFD_TOKEN` env var.
+- **`mtcf platform sync`** — push challenges to the CTFd instance configured in `mtcf.config.yml`. Diffs vs the platform's existing state, creates what's missing, attaches flags / tags / hints / **file uploads (assets/)**. `--update` reconciles existing challenges; `--dry-run` previews; `--category` / `--slug` filter; `--json` for scripting. Requires `MTCF_CTFD_TOKEN` env var.
 
 #### Distribution
 - **Single static Go binary**, cross-platform.
@@ -151,7 +151,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 | Version | Focus |
 |---|---|
 | **v0 (alpha, current)** | Phase 0 spec + Traefik ingress generation + every command above (`init` / `validate` / `generate` / `info` / `list` / `categories` / `doctor` / `build` / `deploy` / `down` / `logs` / `platform sync`). |
-| **v0.1** | Dev mode with hot reload, image-leak guard hardening, CTFd file uploads, native instancer. |
+| **v0.1** | Dev mode with hot reload, image-leak guard hardening, native instancer. |
 | **v0.2** | SSH deploy, native instancer, Discord notifications, plugin system, dynamic flags. |
 | **v0.3** | Kubernetes deploy, Terraform infra wrapper, Prometheus + Grafana, `pro` profile fully wired. |
 | **v0.4** | rCTF + generic-webhook platform integrations, read-only web dashboard, goreleaser distribution. |

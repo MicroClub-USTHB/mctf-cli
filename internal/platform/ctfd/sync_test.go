@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -239,6 +241,106 @@ func TestApply_CreatesChallengeWithChildResources(t *testing.T) {
 	}
 }
 
+func TestPayloadFiles_EnumeratesAssets(t *testing.T) {
+	dir := t.TempDir()
+	assets := filepath.Join(dir, "assets")
+	if err := os.MkdirAll(assets, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"handout.zip", "image.png", ".gitkeep", ".DS_Store"} {
+		if err := os.WriteFile(filepath.Join(assets, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := sampleStatic()
+	c.AssetsDir = assets
+	got := PayloadFiles(c)
+	if len(got) != 2 {
+		t.Fatalf("want 2 assets (hidden filtered), got %d: %+v", len(got), got)
+	}
+	if got[0].WantedName != "handout.zip" || got[1].WantedName != "image.png" {
+		t.Errorf("not sorted alphabetically: %+v", got)
+	}
+	for _, fd := range got {
+		if fd.Op != "add" || fd.WantedPath == "" {
+			t.Errorf("bad delta: %+v", fd)
+		}
+	}
+}
+
+func TestDiffFiles_ByBasename(t *testing.T) {
+	have := []File{
+		{ID: 1, Location: "uploads/abc/keep.zip", ChallengeID: 5},
+		{ID: 2, Location: "uploads/def/stale.zip", ChallengeID: 5},
+	}
+	want := []FileDelta{
+		{Op: "add", WantedName: "keep.zip", WantedPath: "/local/keep.zip"},
+		{Op: "add", WantedName: "new.zip", WantedPath: "/local/new.zip"},
+	}
+	got := diffFiles(have, want)
+	var add, del int
+	for _, d := range got {
+		switch d.Op {
+		case "add":
+			add++
+			if d.WantedName != "new.zip" {
+				t.Errorf("unexpected add: %+v", d)
+			}
+		case "delete":
+			del++
+			if d.Existing.ID != 2 {
+				t.Errorf("unexpected delete: %+v", d)
+			}
+		}
+	}
+	if add != 1 || del != 1 {
+		t.Errorf("add=%d delete=%d, want 1/1", add, del)
+	}
+}
+
+func TestApply_UploadsAssets(t *testing.T) {
+	srv := newSyncFake(t, syncFakeState{})
+	defer srv.close()
+	c := New(srv.URL, "tok")
+
+	// Set up a challenge with a real assets directory.
+	dir := t.TempDir()
+	chRoot := filepath.Join(dir, "crypto", "rsa-baby")
+	assets := filepath.Join(chRoot, "assets")
+	if err := os.MkdirAll(assets, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(assets, "transcript.txt"), []byte("...rsa transcript..."), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ch := sampleStatic()
+	ch.AssetsDir = assets
+
+	plan, err := Diff(context.Background(), c, sampleConfig(), []*challenge.Challenge{ch}, PlanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Items[0].Files) != 1 || plan.Items[0].Files[0].WantedName != "transcript.txt" {
+		t.Fatalf("plan should include transcript.txt: %+v", plan.Items[0].Files)
+	}
+
+	if _, err := Apply(context.Background(), c, plan); err != nil {
+		t.Fatal(err)
+	}
+
+	st := srv.snapshot()
+	if len(st.existing) != 1 {
+		t.Fatalf("want 1 challenge created, got %d", len(st.existing))
+	}
+	cid := st.existing[0].ID
+	if len(st.files[cid]) != 1 {
+		t.Fatalf("want 1 file uploaded, got %d", len(st.files[cid]))
+	}
+	if st.files[cid][0].Basename() != "transcript.txt" {
+		t.Errorf("uploaded basename = %q", st.files[cid][0].Basename())
+	}
+}
+
 func TestRender_HasActionLines(t *testing.T) {
 	plan := &Plan{Items: []Item{
 		{Slug: "web/x", Action: ActionCreate, Reason: "missing"},
@@ -259,6 +361,7 @@ type syncFakeState struct {
 	flags    map[int][]Flag
 	tags     map[int][]Tag
 	hints    map[int][]Hint
+	files    map[int][]File
 	nextID   int32
 }
 
@@ -285,6 +388,9 @@ func newSyncFake(t *testing.T, initial syncFakeState) *syncFake {
 	}
 	if state.hints == nil {
 		state.hints = map[int][]Hint{}
+	}
+	if state.files == nil {
+		state.files = map[int][]File{}
 	}
 	if state.nextID == 0 {
 		state.nextID = 100
@@ -345,6 +451,38 @@ func newSyncFake(t *testing.T, initial syncFakeState) *syncFake {
 			in.ID = int(atomic.AddInt32(&state.nextID, 1))
 			state.hints[in.ChallengeID] = append(state.hints[in.ChallengeID], in)
 			writeEnvelope(w, in)
+		case method == "GET" && path == "/api/v1/files":
+			// CTFd returns all files; the client filters by challenge.
+			var all []File
+			for _, fs := range state.files {
+				all = append(all, fs...)
+			}
+			writeEnvelope(w, all)
+		case method == "POST" && path == "/api/v1/files":
+			// Multipart upload. Parse form and stash one File per request.
+			r2 := r
+			r2.Body = io.NopCloser(strings.NewReader(string(body)))
+			if err := r2.ParseMultipartForm(1 << 20); err != nil {
+				w.WriteHeader(400)
+				_, _ = w.Write([]byte(`{"success": false, "errors": "parse"}`))
+				return
+			}
+			var cid int
+			_, _ = fmt.Sscanf(r2.FormValue("challenge_id"), "%d", &cid)
+			fhs := r2.MultipartForm.File["file"]
+			if len(fhs) == 0 {
+				w.WriteHeader(400)
+				_, _ = w.Write([]byte(`{"success": false, "errors": "no file"}`))
+				return
+			}
+			f := File{
+				ID:          int(atomic.AddInt32(&state.nextID, 1)),
+				Type:        "challenge",
+				Location:    fmt.Sprintf("uploads/%d/%s", state.nextID, fhs[0].Filename),
+				ChallengeID: cid,
+			}
+			state.files[cid] = append(state.files[cid], f)
+			writeEnvelope(w, []File{f})
 		default:
 			t.Logf("fake: unhandled %s %s", method, path)
 			writeEnvelope(w, map[string]any{})

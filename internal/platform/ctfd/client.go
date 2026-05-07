@@ -11,7 +11,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -64,6 +66,24 @@ type Tag struct {
 	ID          int    `json:"id,omitempty"`
 	ChallengeID int    `json:"challenge_id,omitempty"`
 	Value       string `json:"value"`
+}
+
+// File is one CTFd-side file attachment. CTFd stores files at
+// "uploads/<sha>/<basename>"; we match local-vs-remote by Basename.
+type File struct {
+	ID          int    `json:"id,omitempty"`
+	Type        string `json:"type"`              // "challenge"
+	Location    string `json:"location,omitempty"` // server-set
+	ChallengeID int    `json:"challenge_id,omitempty"`
+}
+
+// Basename returns the filename portion of File.Location, used as the
+// stable identity for diffing against local assets/.
+func (f File) Basename() string {
+	if i := strings.LastIndex(f.Location, "/"); i >= 0 {
+		return f.Location[i+1:]
+	}
+	return f.Location
 }
 
 // Hint is one cost-tiered CTFd hint.
@@ -195,6 +215,100 @@ func (c *Client) AddHint(ctx context.Context, challengeID, cost int, content str
 // DeleteHint removes a hint by id.
 func (c *Client) DeleteHint(ctx context.Context, hintID int) error {
 	return c.do(ctx, "DELETE", fmt.Sprintf("/api/v1/hints/%d", hintID), nil, nil)
+}
+
+// ListFiles returns files attached to a challenge.
+//
+// CTFd's GET /api/v1/files returns *all* files; we filter
+// client-side by ChallengeID to keep the API surface narrow.
+func (c *Client) ListFiles(ctx context.Context, challengeID int) ([]File, error) {
+	var env envelope[[]File]
+	if err := c.do(ctx, "GET", "/api/v1/files?type=challenge", nil, &env); err != nil {
+		return nil, err
+	}
+	var out []File
+	for _, f := range env.Data {
+		if f.ChallengeID == challengeID {
+			out = append(out, f)
+		}
+	}
+	return out, nil
+}
+
+// UploadFile attaches a single file to challengeID. content is read
+// and streamed into a multipart body; CTFd takes care of hashing and
+// dedup on its side.
+//
+// CTFd's POST /api/v1/files returns an array under data (because the
+// API supports batch uploads); we always send one file and unwrap.
+func (c *Client) UploadFile(ctx context.Context, challengeID int, name string, content io.Reader) (*File, error) {
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	if err := mw.WriteField("challenge_id", strconv.Itoa(challengeID)); err != nil {
+		return nil, err
+	}
+	if err := mw.WriteField("type", "challenge"); err != nil {
+		return nil, err
+	}
+	part, err := mw.CreateFormFile("file", name)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := io.Copy(part, content); err != nil {
+		return nil, fmt.Errorf("copy file body: %w", err)
+	}
+	if err := mw.Close(); err != nil {
+		return nil, err
+	}
+
+	url := c.BaseURL + "/api/v1/files"
+	req, err := http.NewRequestWithContext(ctx, "POST", url, &body)
+	if err != nil {
+		return nil, err
+	}
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Token "+c.Token)
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("POST /api/v1/files: %w", err)
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return nil, &APIError{Status: resp.StatusCode, Method: "POST", Path: "/api/v1/files", Body: string(respBody)}
+	}
+	var env envelope[[]File]
+	if err := json.Unmarshal(respBody, &env); err != nil {
+		return nil, fmt.Errorf("decode upload response: %w (body: %s)", err, truncateForError(respBody))
+	}
+	if !envelopeOK(respBody) {
+		return nil, &APIError{Status: resp.StatusCode, Method: "POST", Path: "/api/v1/files", Body: string(respBody)}
+	}
+	if len(env.Data) == 0 {
+		return nil, fmt.Errorf("upload returned no file: %s", truncateForError(respBody))
+	}
+	out := env.Data[0]
+	return &out, nil
+}
+
+// DeleteFile removes a file by id.
+func (c *Client) DeleteFile(ctx context.Context, fileID int) error {
+	return c.do(ctx, "DELETE", fmt.Sprintf("/api/v1/files/%d", fileID), nil, nil)
+}
+
+// envelopeOK reports whether the CTFd response had success=true.
+func envelopeOK(body []byte) bool {
+	var sc struct {
+		Success *bool `json:"success"`
+	}
+	if err := json.Unmarshal(body, &sc); err != nil {
+		return false
+	}
+	return sc.Success == nil || *sc.Success
 }
 
 // do performs one HTTP round-trip and decodes the JSON response into out
