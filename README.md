@@ -71,6 +71,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 #### Inspection
 - **`mtcf list`** — table of every challenge in the event, with `--category` / `--archetype` / `--wave` / `--difficulty` filters; `--json` for scripting.
 - **`mtcf info <category>/<slug>`** — show derived facts for one challenge: archetype, ingress URL, image-tag template, flag, file inventory; `--json` for machine-readable output.
+- **`mtcf categories`** — show the active category catalog (core + extended + custom) with port ranges and deployable flag.
 - **`mtcf doctor`** — preflight checks: event config, challenge validation, docker binary/daemon/compose, git, registry creds, CTFd token; `--skip-env` and `--json` modes.
 
 #### Build
