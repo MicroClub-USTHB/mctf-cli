@@ -167,6 +167,17 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 	// SEC002–004, W006: privileged-mode policy, dangerous capabilities,
 	// pwn/jailbreak non-root user, asset-size limits.
 	SecurityChecks(r, cfg, c, eventRoot)
+
+	// W010 — description length sanity. CTFd's challenge description
+	// column tolerates ~4000 chars before truncating; long descriptions
+	// also hurt readability on the platform UI. Warn well below that.
+	if n := len(m.Challenge.Description); n > 4000 {
+		r.Errorf("W010", manifestPath,
+			"description is %d chars — CTFd truncates near 4000", n)
+	} else if n > 1500 {
+		r.Warnf("W010", manifestPath,
+			"description is %d chars — consider trimming for UX (hard cap at 4000)", n)
+	}
 }
 
 // checkUniqueness runs the event-wide cross checks (U001/U002/U003).
