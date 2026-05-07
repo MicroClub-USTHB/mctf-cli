@@ -1,0 +1,16 @@
+# MTCF working directory (never committed)
+.mtcf/
+
+# Local environment
+.env
+.env.local
+*.flag
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
