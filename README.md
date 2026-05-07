@@ -76,6 +76,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **`mtcf info <category>/<slug>`** — show derived facts for one challenge: archetype, ingress URL, image-tag template, flag, file inventory; `--json` for machine-readable output.
 - **`mtcf categories`** — show the active category catalog (core + extended + custom) with port ranges and deployable flag.
 - **`mtcf status`** — runtime state of every challenge: docker compose project, container state (running/exited/missing), uptime, ingress URL. Static and instanced archetypes report synthetic states. `--json` for dashboards.
+- **`mtcf event`** — one-screen event summary: name/slug/domain/profile/flag-prefix/wave settings, total challenges, breakdowns by category / archetype / difficulty / wave, total assets size, list of authors. `--json` for dashboards.
 - **`mtcf doctor`** — preflight checks: event config, challenge validation, docker binary/daemon/compose, git, registry creds, CTFd token, **host ports free for service-archetype challenges**; `--skip-env` and `--json` modes.
 
 #### Build
