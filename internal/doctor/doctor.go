@@ -11,8 +11,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -71,6 +73,9 @@ func Run(dir string, opts Options) []Check {
 		checks = append(checks, checkGit())
 		checks = append(checks, checkRegistryCreds())
 		checks = append(checks, checkCTFdToken())
+		if len(challs) > 0 {
+			checks = append(checks, checkPortsFree(challs))
+		}
 	}
 
 	return checks
@@ -229,6 +234,71 @@ func checkCTFdToken() Check {
 		Status: StatusWarn, Detail: "MTCF_CTFD_TOKEN not set",
 		Suggest: "required for `mtcf deploy` (CTFd registration)",
 	}
+}
+
+// checkPortsFree probes every service-archetype challenge's host port
+// to verify nothing else is already bound. Doesn't try to identify the
+// holder — operators can run lsof / ss themselves.
+func checkPortsFree(challs []*challenge.Challenge) Check {
+	type binding struct {
+		port int
+		slug string
+	}
+	var bindings []binding
+	for _, c := range challs {
+		if c.Archetype != challenge.ArchetypeService {
+			continue
+		}
+		if c.Manifest.Deploy == nil || c.Manifest.Deploy.Port == nil {
+			continue
+		}
+		bindings = append(bindings, binding{
+			port: *c.Manifest.Deploy.Port,
+			slug: c.CategoryDir + "/" + c.Slug,
+		})
+	}
+	if len(bindings) == 0 {
+		return Check{
+			ID: "D030", Name: "host ports free",
+			Status: StatusSkip, Detail: "no service-archetype challenges to probe",
+		}
+	}
+
+	var busy []string
+	for _, b := range bindings {
+		if !portFree(b.port) {
+			busy = append(busy, fmt.Sprintf("%d (%s)", b.port, b.slug))
+		}
+	}
+	sort.Strings(busy)
+	if len(busy) == 0 {
+		return Check{
+			ID: "D030", Name: "host ports free",
+			Status: StatusOK,
+			Detail: fmt.Sprintf("%d service port(s) checked, all free", len(bindings)),
+		}
+	}
+	return Check{
+		ID: "D030", Name: "host ports free",
+		Status: StatusWarn,
+		Detail: fmt.Sprintf("port(s) already in use: %s", strings.Join(busy, ", ")),
+		Suggest: "stop the process holding the port (lsof -i :<port>) or change deploy.port",
+	}
+}
+
+// portFree reports whether tcp/<port> on 127.0.0.1 can be bound.
+//
+// We bind to 127.0.0.1 (not 0.0.0.0) because some ports may be in use
+// by macOS-only services on the loopback even when they're free
+// externally — and the docker compose mapping binds host-side too.
+func portFree(port int) bool {
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		return false
+	}
+	_ = l.Close()
+	return true
 }
 
 // Counts breaks down the result set by status.

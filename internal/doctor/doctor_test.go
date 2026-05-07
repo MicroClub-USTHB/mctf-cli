@@ -2,10 +2,13 @@ package doctor
 
 import (
 	"encoding/json"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 )
 
 const minimalConfig = `version: 1
@@ -108,6 +111,74 @@ func TestJSON_RoundTrips(t *testing.T) {
 	if len(got) != 1 || got[0].ID != "D001" {
 		t.Errorf("round-tripped: %+v", got)
 	}
+}
+
+func TestCheckPortsFree_AllFree(t *testing.T) {
+	port := pickFreePort(t)
+	challs := []*challenge.Challenge{
+		{
+			Slug: "x", CategoryDir: "misc",
+			Manifest: challenge.Manifest{
+				Schema: 1,
+				Challenge: challenge.ChallengeBlock{Name: "x", Category: "misc", NeedDeploy: true},
+				Deploy:    &challenge.DeployBlock{Port: &port},
+			},
+			Archetype: challenge.ArchetypeService,
+		},
+	}
+	got := checkPortsFree(challs)
+	if got.Status != StatusOK {
+		t.Errorf("port should be free: %+v", got)
+	}
+}
+
+func TestCheckPortsFree_InUse(t *testing.T) {
+	// Bind a port to make sure the doctor sees it as in use.
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	port := l.Addr().(*net.TCPAddr).Port
+
+	challs := []*challenge.Challenge{
+		{
+			Slug: "busy", CategoryDir: "misc",
+			Manifest: challenge.Manifest{
+				Schema: 1,
+				Challenge: challenge.ChallengeBlock{Name: "x", Category: "misc", NeedDeploy: true},
+				Deploy:    &challenge.DeployBlock{Port: &port},
+			},
+			Archetype: challenge.ArchetypeService,
+		},
+	}
+	got := checkPortsFree(challs)
+	if got.Status != StatusWarn {
+		t.Errorf("port should be reported in use: %+v", got)
+	}
+	if !strings.Contains(got.Detail, "misc/busy") {
+		t.Errorf("detail should mention the slug: %q", got.Detail)
+	}
+}
+
+func TestCheckPortsFree_Skip(t *testing.T) {
+	got := checkPortsFree([]*challenge.Challenge{
+		{Archetype: challenge.ArchetypeStatic},
+	})
+	if got.Status != StatusSkip {
+		t.Errorf("static-only event should skip: %+v", got)
+	}
+}
+
+func pickFreePort(t *testing.T) int {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
+	return port
 }
 
 func byID(cs []Check) map[string]Check {
