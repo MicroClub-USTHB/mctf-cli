@@ -177,11 +177,13 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 
 | Version | Focus |
 |---|---|
-| **v0 (alpha, current)** | Phase 0 spec + Traefik ingress generation + every command above (`init` / `validate` / `generate` / `info` / `list` / `categories` / `doctor` / `build` / `deploy` / `down` / `logs` / `platform sync`). |
-| **v0.1** | Dev mode with hot reload, image-leak guard hardening, native instancer. |
-| **v0.2** | SSH deploy, native instancer, Discord notifications, plugin system, dynamic flags. |
-| **v0.3** | Kubernetes deploy, Terraform infra wrapper, Prometheus + Grafana, `pro` profile fully wired. |
-| **v0.4** | rCTF + generic-webhook platform integrations, read-only web dashboard, goreleaser distribution. |
+| **v0 (alpha, current)** | Phase 0 spec + Traefik ingress + native instancer (CLI + daemon) + Discord notifications + image-leak post-build scan + every command in the feature list. |
+| **v0.1** | golangci-lint, goreleaser + Homebrew, K8s deploy, image-tag pinning + rollback, validate W003/W011/I001, docs refresh. |
+| **v0.2** | SSH deploy, plugin system, dynamic flags, per-team auth on instancer, rCTF platform target. |
+| **v0.3** | Terraform infra wrapper, Prometheus + Grafana, `pro` profile fully wired, image vulnerability scanning. |
+| **v0.4** | Read-only web dashboard, generic-webhook platform target, additional cloud provisioning templates. |
+
+See [`docs/BACKLOG.md`](docs/BACKLOG.md) for the full sized backlog with suggested wave-1 issues.
 
 ## How the contract works
 
@@ -208,6 +210,7 @@ challenges/<cat>/<slug>/                       ← author edits these four folde
 - **[Derived files](docs/spec/derived-files.md)** — exact format of generated artifacts.
 - **[Validation](docs/spec/validation.md)** — every rule with rationale.
 - **[CHANGELOG](docs/spec/CHANGELOG.md)** — schema version history.
+- **[Backlog](docs/BACKLOG.md)** — open work, sized and grouped by impact.
 
 ## Contributing
 
