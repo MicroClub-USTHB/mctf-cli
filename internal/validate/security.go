@@ -1,11 +1,13 @@
 package validate
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"sigs.k8s.io/yaml"
@@ -13,6 +15,55 @@ import (
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 )
+
+// UnmarshalJSON handles compose's polymorphic ports entries: string
+// shorthand ("14000:8000", "${PORT_8000:-8000}:8000", "8000") or
+// object form ({published, target}).
+func (p *composePort) UnmarshalJSON(b []byte) error {
+	if len(b) > 0 && b[0] == '"' {
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		p.Raw = s
+		host, container := splitPortString(s)
+		p.Host = host
+		p.Container = container
+		return nil
+	}
+	var obj struct {
+		Target    int `json:"target"`
+		Published any `json:"published"`
+	}
+	if err := json.Unmarshal(b, &obj); err != nil {
+		return err
+	}
+	p.Container = obj.Target
+	switch v := obj.Published.(type) {
+	case string:
+		p.Host = v
+		p.Raw = fmt.Sprintf("%s:%d", v, obj.Target)
+	case float64:
+		p.Host = strconv.Itoa(int(v))
+		p.Raw = fmt.Sprintf("%d:%d", int(v), obj.Target)
+	}
+	return nil
+}
+
+// splitPortString splits "<host>:<container>" or just "<container>".
+// host comes back as the verbatim text (so callers can detect env-var
+// patterns); container is parsed as int. Bind-address forms like
+// "127.0.0.1:14000:8000" are flattened to host="127.0.0.1:14000".
+func splitPortString(s string) (host string, container int) {
+	s = strings.TrimSpace(s)
+	if i := strings.LastIndex(s, ":"); i >= 0 {
+		host = strings.TrimSpace(s[:i])
+		container, _ = strconv.Atoi(strings.TrimSpace(s[i+1:]))
+		return
+	}
+	container, _ = strconv.Atoi(s)
+	return
+}
 
 // dangerousCaps are Linux capabilities whose presence in `cap_add`
 // effectively undoes most container isolation. They warrant an
@@ -36,9 +87,20 @@ type composeShape struct {
 }
 
 type composeService struct {
-	Privileged bool     `json:"privileged"`
-	CapAdd     []string `json:"cap_add"`
-	User       string   `json:"user"`
+	Privileged bool          `json:"privileged"`
+	CapAdd     []string      `json:"cap_add"`
+	User       string        `json:"user"`
+	Ports      []composePort `json:"ports"`
+}
+
+// composePort is the polymorphic compose ports shape. The compose
+// spec accepts either a "host:container" string ("14000:8000") or
+// an object ({published: 14000, target: 8000}). UnmarshalJSON below
+// handles both.
+type composePort struct {
+	Raw       string // verbatim string when the entry was a string
+	Host      string // empty if not pinned ("8000:" -> "")
+	Container int
 }
 
 // SecurityChecks runs Dockerfile + docker-compose.yml security rules
@@ -55,10 +117,67 @@ func SecurityChecks(r *Report, cfg *config.Config, c *challenge.Challenge, event
 	if compose, ok := loadCompose(composePath); ok {
 		checkPrivileged(r, cfg, compose, manifestPath)
 		checkCapabilities(r, cfg, compose, manifestPath)
+		checkComposePorts(r, c, compose, manifestPath)
 	}
 
 	checkNonRootForPwn(r, cfg, c, manifestPath)
 	checkAssetSize(r, cfg, c, eventRoot)
+}
+
+// checkComposePorts emits D001-D003: the compose ports must agree with
+// the manifest's deploy.port / deploy.internal_port, and instanced
+// challenges must use the ${PORT_N:-N} env-var convention so the
+// instancer can fill in per-team host ports.
+func checkComposePorts(r *Report, c *challenge.Challenge, compose *composeShape, manifestPath string) {
+	if c.Manifest.Deploy == nil {
+		return
+	}
+	d := c.Manifest.Deploy
+	for _, svc := range compose.Services {
+		for _, port := range svc.Ports {
+			if port.Container == 0 {
+				continue
+			}
+			if c.Archetype == challenge.ArchetypeService {
+				// D002 — container port must equal internal_port (if set).
+				if d.InternalPort != nil && *d.InternalPort != 0 && port.Container != *d.InternalPort {
+					r.Errorf("D002", manifestPath,
+						"compose maps container port %d but deploy.internal_port is %d",
+						port.Container, *d.InternalPort)
+				}
+				// D001 — host side must match deploy.port literally.
+				if d.Port != nil {
+					hostInt, _ := strconv.Atoi(port.Host)
+					if hostInt != *d.Port {
+						r.Errorf("D001", manifestPath,
+							"compose maps host %q -> %d but deploy.port is %d",
+							port.Host, port.Container, *d.Port)
+					}
+				}
+			}
+			if c.Archetype == challenge.ArchetypeInstanced {
+				// D002 (container port match) still applies.
+				if d.InternalPort != nil && *d.InternalPort != 0 && port.Container != *d.InternalPort {
+					r.Errorf("D002", manifestPath,
+						"compose maps container port %d but deploy.internal_port is %d",
+						port.Container, *d.InternalPort)
+				}
+				// D003 — host side must use ${PORT_<container>:-...} pattern.
+				if !isInstancerPortPattern(port.Host, port.Container) {
+					r.Errorf("D003", manifestPath,
+						"instanced compose ports[%q] must use ${PORT_%d:-%d} so the instancer can override the host port",
+						port.Raw, port.Container, port.Container)
+				}
+			}
+		}
+	}
+}
+
+// isInstancerPortPattern reports whether the compose host side is the
+// expected ${PORT_<container>:-...} form (with any default value).
+func isInstancerPortPattern(host string, container int) bool {
+	want := fmt.Sprintf("${PORT_%d", container)
+	return strings.HasPrefix(host, want)
 }
 
 // SEC002 — privileged: true. Always warn; fail under the pro profile.

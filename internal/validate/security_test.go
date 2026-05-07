@@ -194,6 +194,119 @@ func TestD008_FailsUnderPro(t *testing.T) {
 	}
 }
 
+func TestD001_ServiceHostPortMismatchFails(t *testing.T) {
+	root := t.TempDir()
+	port := 14000
+	internal := 8000
+	c := makeChallenge(t, root, "misc", "x", "FROM scratch\nUSER ctf\n",
+		`services:
+  app:
+    ports:
+      - "9999:8000"
+`)
+	c.Manifest.Deploy = &challenge.DeployBlock{Port: &port, InternalPort: &internal}
+	c.Archetype = challenge.ArchetypeService
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if !hasRule(r, "D001", SeverityError) {
+		t.Errorf("D001 should fail when host port differs from deploy.port: %s", r.String())
+	}
+}
+
+func TestD002_ServiceContainerPortMismatchFails(t *testing.T) {
+	root := t.TempDir()
+	port := 14000
+	internal := 8000
+	c := makeChallenge(t, root, "misc", "x", "FROM scratch\nUSER ctf\n",
+		`services:
+  app:
+    ports:
+      - "14000:9999"
+`)
+	c.Manifest.Deploy = &challenge.DeployBlock{Port: &port, InternalPort: &internal}
+	c.Archetype = challenge.ArchetypeService
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if !hasRule(r, "D002", SeverityError) {
+		t.Errorf("D002 should fail when container port differs from internal_port: %s", r.String())
+	}
+}
+
+func TestD001_ServiceMatchingPortsClean(t *testing.T) {
+	root := t.TempDir()
+	port := 14000
+	internal := 8000
+	c := makeChallenge(t, root, "misc", "x", "FROM scratch\nUSER ctf\n",
+		`services:
+  app:
+    ports:
+      - "14000:8000"
+`)
+	c.Manifest.Deploy = &challenge.DeployBlock{Port: &port, InternalPort: &internal}
+	c.Archetype = challenge.ArchetypeService
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if hasRule(r, "D001", SeverityError) || hasRule(r, "D002", SeverityError) {
+		t.Errorf("matching ports should not fire D001/D002: %s", r.String())
+	}
+}
+
+func TestD003_InstancedRequiresEnvVarPattern(t *testing.T) {
+	root := t.TempDir()
+	internal := 8000
+	c := makeChallenge(t, root, "web", "x", "FROM scratch\n",
+		`services:
+  app:
+    ports:
+      - "8000:8000"
+`)
+	c.Manifest.Deploy = &challenge.DeployBlock{InternalPort: &internal, DynamicInstances: true}
+	c.Archetype = challenge.ArchetypeInstanced
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if !hasRule(r, "D003", SeverityError) {
+		t.Errorf("D003 should fail when instanced compose lacks ${PORT_N:-N}: %s", r.String())
+	}
+}
+
+func TestD003_InstancedWithEnvPatternClean(t *testing.T) {
+	root := t.TempDir()
+	internal := 8000
+	c := makeChallenge(t, root, "web", "x", "FROM scratch\n",
+		`services:
+  app:
+    ports:
+      - "${PORT_8000:-8000}:8000"
+`)
+	c.Manifest.Deploy = &challenge.DeployBlock{InternalPort: &internal, DynamicInstances: true}
+	c.Archetype = challenge.ArchetypeInstanced
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if hasRule(r, "D003", SeverityError) {
+		t.Errorf("instanced with env-var pattern should not fire D003: %s", r.String())
+	}
+}
+
+func TestSplitPortString(t *testing.T) {
+	cases := []struct {
+		in           string
+		wantHost     string
+		wantContainer int
+	}{
+		{"14000:8000", "14000", 8000},
+		{"${PORT_8000:-8000}:8000", "${PORT_8000:-8000}", 8000},
+		{"127.0.0.1:14000:8000", "127.0.0.1:14000", 8000},
+		{"8000", "", 8000},
+	}
+	for _, c := range cases {
+		host, container := splitPortString(c.in)
+		if host != c.wantHost || container != c.wantContainer {
+			t.Errorf("splitPortString(%q) = (%q, %d), want (%q, %d)",
+				c.in, host, container, c.wantHost, c.wantContainer)
+		}
+	}
+}
+
 func TestSecurityChecks_StaticChallengesSkipped(t *testing.T) {
 	root := t.TempDir()
 	c := makeChallenge(t, root, "crypto", "static", "", "")
