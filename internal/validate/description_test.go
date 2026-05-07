@@ -70,3 +70,32 @@ func TestW010_VeryLongDescriptionFails(t *testing.T) {
 		t.Errorf("W010 should hard-fail at >4000 chars: %s", r.String())
 	}
 }
+
+func TestW006_MissingHintsWarns(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if !hasRule(r, "W006", SeverityWarn) {
+		t.Errorf("W006 should warn when no hints exist: %s", r.String())
+	}
+}
+
+func TestW006_HintsFromManifestSatisfies(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	c.Manifest.Challenge.Hints = []challenge.Hint{{Cost: 0, Content: "free hint"}}
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if hasRule(r, "W006", SeverityWarn) {
+		t.Errorf("W006 should not warn when challenge.hints[] is non-empty: %s", r.String())
+	}
+}
+
+func TestW007_HighWaveWarns(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	c.Manifest.Challenge.Wave = 7
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf", WavesNumber: 9}}, root, []*challenge.Challenge{c}, nil)
+	if !hasRule(r, "W007", SeverityWarn) {
+		t.Errorf("W007 should warn at wave > 5: %s", r.String())
+	}
+}

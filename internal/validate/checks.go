@@ -178,6 +178,39 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 		r.Warnf("W010", manifestPath,
 			"description is %d chars — consider trimming for UX (hard cap at 4000)", n)
 	}
+
+	// W006 — challenge has no hints in either supported form.
+	hintsFile := filepath.Join(c.SolutionDir, "hints.md")
+	hasHintsFile := fileExistsNonEmpty(hintsFile)
+	if !hasHintsFile && len(m.Challenge.Hints) == 0 {
+		r.Warnf("W006", manifestPath,
+			"no hints declared — players may struggle without a structured nudge (set challenge.hints[] or write solution/hints.md)")
+	}
+
+	// W007 — wave value beyond a plausible event size.
+	if m.Challenge.Wave > 5 {
+		r.Warnf("W007", manifestPath,
+			"wave %d is unusually high — typo? events rarely run more than 5 waves", m.Challenge.Wave)
+	}
+
+	// W008 — deployable challenge with no healthcheck of any kind.
+	// (D004 escalates this to hard-fail for instanced specifically;
+	// W008 covers service archetype for any profile.)
+	if archetype == challenge.ArchetypeService {
+		hasHC := (m.Deploy != nil && m.Deploy.Healthcheck != nil) || hasDockerfileHealthcheck(c.ChallengeDir)
+		if !hasHC {
+			r.Warnf("W008", manifestPath,
+				"service-archetype challenge has no healthcheck — failures will surface as 502s to players (set deploy.healthcheck or add HEALTHCHECK to Dockerfile)")
+		}
+	}
+}
+
+func fileExistsNonEmpty(path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return fi.Size() > 0
 }
 
 // checkUniqueness runs the event-wide cross checks (U001/U002/U003).
