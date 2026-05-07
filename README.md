@@ -78,6 +78,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 #### Deploy (Docker mode)
 - **`mtcf deploy`** — `docker compose up -d` for every service-archetype challenge; per-challenge project name `mtcf-<event>-<cat>-<slug>`; auto-stamps `PORT_<internal>` env so the compose's `${PORT_N:-N}` convention picks the right host port; instanced challenges are skipped (the instancer owns those at game time).
 - **`mtcf down`** — symmetric teardown in reverse-deploy order; `--volumes` to also drop named volumes.
+- **`mtcf logs <category>/<slug>`** — stream logs from a deployed challenge's compose project; `-f` to follow, `--tail N` for the tail.
 
 #### Distribution
 - **Single static Go binary**, cross-platform.
