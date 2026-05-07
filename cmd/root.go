@@ -1,8 +1,25 @@
 package cmd
 
 import (
+	"path/filepath"
+
 	"github.com/spf13/cobra"
 )
+
+// relPath renders p relative to base for human display, falling back
+// gracefully when p and base aren't in compatible forms (one absolute,
+// the other relative). Always returns a non-empty string.
+func relPath(base, p string) string {
+	absP, err := filepath.Abs(p)
+	if err != nil {
+		return p
+	}
+	rel, err := filepath.Rel(base, absP)
+	if err != nil {
+		return absP
+	}
+	return rel
+}
 
 var (
 	flagVerbose bool

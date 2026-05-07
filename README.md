@@ -46,6 +46,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 
 #### Scaffolding
 - **`mtcf init`** — scaffold a new event repo from embedded templates (config, README, CI workflow, gitignore, starter challenge template).
+- **`mtcf init challenge <category>/<slug>`** — scaffold a single challenge from the event-local template (with embedded fallback); rewrites name, category, difficulty, and author in place.
 
 #### Core contract
 - **CTF-as-Infrastructure-as-Code** — every event is one declarative repo.
@@ -109,7 +110,6 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **Pluggable platform integration** — CTFd first-class; rCTF and generic-webhook platforms via plugin.
 
 #### DX & ops
-- **`mtcf init challenge <category>/<slug>`** — scaffold a single challenge from a local template.
 - **`mtcf doctor`** — preflight: docker daemon, registry auth, CTFd token, ports free, disk, DNS.
 - **Local dev mode** — full stack on a laptop with hot reload.
 - **Per-challenge log streaming**.
@@ -131,8 +131,8 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 
 | Version | Focus |
 |---|---|
-| **v0 (alpha, current)** | Phase 0 spec + `validate` + `generate` + `init`. |
-| **v0.1** | `mtcf init challenge`, `mtcf build`, `mtcf deploy` (Docker mode), CTFd integration, `mtcf doctor`, log streaming, dev mode, safe teardown. |
+| **v0 (alpha, current)** | Phase 0 spec + `validate` + `generate` + `init` + `init challenge`. |
+| **v0.1** | `mtcf build`, `mtcf deploy` (Docker mode), CTFd integration, `mtcf doctor`, log streaming, dev mode, safe teardown. |
 | **v0.2** | SSH deploy, native instancer, Discord notifications, plugin system, dynamic flags. |
 | **v0.3** | Kubernetes deploy, Terraform infra wrapper, Prometheus + Grafana, `pro` profile fully wired. |
 | **v0.4** | rCTF + generic-webhook platform integrations, read-only web dashboard, goreleaser distribution. |

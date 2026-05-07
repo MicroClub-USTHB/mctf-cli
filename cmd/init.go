@@ -71,12 +71,10 @@ var initCmd = &cobra.Command{
 		}
 
 		for _, p := range res.Written {
-			rel, _ := filepath.Rel(abs, p)
-			fmt.Printf("  wrote   %s\n", rel)
+			fmt.Printf("  wrote   %s\n", relPath(abs, p))
 		}
 		for _, p := range res.Skipped {
-			rel, _ := filepath.Rel(abs, p)
-			fmt.Fprintf(os.Stderr, "  skipped %s (already exists; --force to overwrite)\n", rel)
+			fmt.Fprintf(os.Stderr, "  skipped %s (already exists; --force to overwrite)\n", relPath(abs, p))
 		}
 		fmt.Printf("\nevent %q scaffolded at %s\n", vars.EventName, abs)
 		fmt.Printf("next:\n")
