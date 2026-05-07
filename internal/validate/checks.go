@@ -163,6 +163,10 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 			}
 		}
 	}
+
+	// SEC002–004, W006: privileged-mode policy, dangerous capabilities,
+	// pwn/jailbreak non-root user, asset-size limits.
+	SecurityChecks(r, cfg, c, eventRoot)
 }
 
 // checkUniqueness runs the event-wide cross checks (U001/U002/U003).

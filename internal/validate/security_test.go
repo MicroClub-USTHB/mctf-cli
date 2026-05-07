@@ -1,0 +1,193 @@
+package validate
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+)
+
+func makeChallenge(t *testing.T, root, cat, slug string, dockerfile, compose string) *challenge.Challenge {
+	t.Helper()
+	chRoot := filepath.Join(root, cat, slug)
+	chDir := filepath.Join(chRoot, "challenge")
+	if err := os.MkdirAll(chDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if dockerfile != "" {
+		_ = os.WriteFile(filepath.Join(chDir, "Dockerfile"), []byte(dockerfile), 0o644)
+	}
+	if compose != "" {
+		_ = os.WriteFile(filepath.Join(chDir, "docker-compose.yml"), []byte(compose), 0o644)
+	}
+	return &challenge.Challenge{
+		Slug: slug, CategoryDir: cat, RootDir: chRoot, ChallengeDir: chDir,
+		AssetsDir: filepath.Join(chRoot, "assets"),
+		Manifest: challenge.Manifest{
+			Schema: 1,
+			Challenge: challenge.ChallengeBlock{
+				Name: slug, Category: cat, NeedDeploy: true,
+			},
+			Deploy: &challenge.DeployBlock{},
+		},
+		Archetype: challenge.ArchetypeService,
+	}
+}
+
+func TestSEC002_PrivilegedWarnsUnderSimple(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "pwn", "x", "FROM scratch\n",
+		`services:
+  app:
+    privileged: true
+`)
+	r := &Report{}
+	cfg := &config.Config{Profile: config.ProfileSimple}
+	SecurityChecks(r, cfg, c, root)
+
+	if !hasRule(r, "SEC002", SeverityWarn) {
+		t.Errorf("SEC002 should warn under simple profile: %s", r.String())
+	}
+}
+
+func TestSEC002_PrivilegedFailsUnderPro(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "pwn", "x", "FROM scratch\nUSER ctf\n",
+		`services:
+  app:
+    privileged: true
+`)
+	r := &Report{}
+	cfg := &config.Config{Profile: config.ProfilePro}
+	SecurityChecks(r, cfg, c, root)
+	if !hasRule(r, "SEC002", SeverityError) {
+		t.Errorf("SEC002 should fail under pro profile: %s", r.String())
+	}
+}
+
+func TestSEC003_PwnRequiresUserDirective(t *testing.T) {
+	root := t.TempDir()
+	noUser := makeChallenge(t, root, "pwn", "rootful", "FROM scratch\n", `services:
+  app: { image: x }
+`)
+	r := &Report{}
+	SecurityChecks(r, nil, noUser, root)
+	if !hasRule(r, "SEC003", SeverityWarn) {
+		t.Errorf("SEC003 should warn when pwn Dockerfile has no USER: %s", r.String())
+	}
+}
+
+func TestSEC003_PwnWithUserOK(t *testing.T) {
+	root := t.TempDir()
+	withUser := makeChallenge(t, root, "pwn", "polite", "FROM scratch\nUSER nobody\n", `services:
+  app: { image: x }
+`)
+	r := &Report{}
+	SecurityChecks(r, nil, withUser, root)
+	if hasRule(r, "SEC003", SeverityWarn) {
+		t.Errorf("SEC003 should not warn when USER is set: %s", r.String())
+	}
+}
+
+func TestSEC003_OnlyForPwnAndJailbreak(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "web", "no-user", "FROM scratch\n", `services:
+  app: { image: x }
+`)
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if hasRule(r, "SEC003", SeverityWarn) {
+		t.Errorf("SEC003 should not apply to web: %s", r.String())
+	}
+}
+
+func TestSEC003_EscalatesUnderPro(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "pwn", "rootful", "FROM scratch\n", `services:
+  app: { image: x }
+`)
+	r := &Report{}
+	SecurityChecks(r, &config.Config{Profile: config.ProfilePro}, c, root)
+	if !hasRule(r, "SEC003", SeverityError) {
+		t.Errorf("SEC003 should fail under pro profile: %s", r.String())
+	}
+}
+
+func TestSEC004_DangerousCapabilities(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "misc", "x", "FROM scratch\n",
+		`services:
+  app:
+    cap_add:
+      - SYS_ADMIN
+      - NET_RAW
+`)
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if !hasRule(r, "SEC004", SeverityWarn) {
+		t.Errorf("SEC004 should warn for SYS_ADMIN: %s", r.String())
+	}
+	// NET_RAW is not in our dangerous list — should not warn.
+	count := 0
+	for _, e := range r.Issues {
+		if e.Rule == "SEC004" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected 1 SEC004, got %d", count)
+	}
+}
+
+func TestD008_LargeFileWarns(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "misc", "huge", "", "")
+	if err := os.MkdirAll(c.AssetsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	big := make([]byte, 101*1024*1024)
+	if err := os.WriteFile(filepath.Join(c.AssetsDir, "huge.zip"), big, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if !hasRule(r, "D008", SeverityWarn) {
+		t.Errorf("D008 should warn for >100 MB file: %s", r.String())
+	}
+}
+
+func TestD008_FailsUnderPro(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "misc", "huge", "", "")
+	_ = os.MkdirAll(c.AssetsDir, 0o755)
+	big := make([]byte, 101*1024*1024)
+	_ = os.WriteFile(filepath.Join(c.AssetsDir, "huge.zip"), big, 0o644)
+	r := &Report{}
+	SecurityChecks(r, &config.Config{Profile: config.ProfilePro}, c, root)
+	if !hasRule(r, "D008", SeverityError) {
+		t.Errorf("D008 should fail under pro: %s", r.String())
+	}
+}
+
+func TestSecurityChecks_StaticChallengesSkipped(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "crypto", "static", "", "")
+	c.Manifest.Challenge.NeedDeploy = false
+	c.Archetype = challenge.ArchetypeStatic
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if len(r.Issues) != 0 {
+		t.Errorf("static challenges should produce no security entries, got %d", len(r.Issues))
+	}
+}
+
+func hasRule(r *Report, rule string, sev Severity) bool {
+	for _, e := range r.Issues {
+		if e.Rule == rule && e.Severity == sev {
+			return true
+		}
+	}
+	return false
+}
