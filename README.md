@@ -68,6 +68,9 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **Deterministic, idempotent** — same input → byte-identical output.
 - **`--check` mode** — exits non-zero on drift; the CI gate that keeps sources and derived files locked together.
 
+#### Inspection
+- **`mtcf info <category>/<slug>`** — show derived facts for one challenge: archetype, ingress URL, image-tag template, flag, file inventory; `--json` for machine-readable output.
+
 #### Distribution
 - **Single static Go binary**, cross-platform.
 - **GitHub Actions CI** runs Go build/test + schema sanity on every push and PR.
