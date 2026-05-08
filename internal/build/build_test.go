@@ -14,8 +14,8 @@ import (
 
 func sampleConfig() *config.Config {
 	return &config.Config{
-		Version: 1,
-		Event:   config.Event{Slug: "evt"},
+		Version:  1,
+		Event:    config.Event{Slug: "evt"},
 		Registry: &config.Registry{URL: "ghcr.io/example/"},
 	}
 }
@@ -190,7 +190,7 @@ func TestBuildArgs_LabelsSorted(t *testing.T) {
 	if first == -1 || mid == -1 || last == -1 {
 		t.Fatalf("labels missing: %s", got)
 	}
-	if !(first < mid && mid < last) {
+	if first >= mid || mid >= last {
 		t.Errorf("labels not sorted: %s", got)
 	}
 }

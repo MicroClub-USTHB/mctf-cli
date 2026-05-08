@@ -56,7 +56,7 @@ func ScanReader(r io.Reader, flags []string) ([]ScanHit, error) {
 		if err != nil {
 			return hits, fmt.Errorf("read tar: %w", err)
 		}
-		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA {
+		if hdr.Typeflag != tar.TypeReg {
 			continue
 		}
 		if hdr.Size <= 0 || hdr.Size > MaxScanFileSize {
@@ -93,10 +93,7 @@ func isExempt(p string) bool {
 			return true
 		}
 	}
-	if strings.HasSuffix(p, ".flag") {
-		return true
-	}
-	return false
+	return strings.HasSuffix(p, ".flag")
 }
 
 // ScanImage runs `docker create <tag>` to produce an ephemeral

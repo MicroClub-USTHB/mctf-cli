@@ -23,7 +23,7 @@ type Reaper struct {
 	Logger io.Writer
 }
 
-// Run blocks until ctx is cancelled, ticking every Interval. Returns
+// Run blocks until ctx is canceled, ticking every Interval. Returns
 // ctx.Err() on shutdown.
 func (r *Reaper) Run(ctx context.Context) error {
 	if r.Interval <= 0 {

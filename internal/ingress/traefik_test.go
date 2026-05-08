@@ -147,7 +147,7 @@ func TestTraefikDynamic_StableOrder(t *testing.T) {
 	pa := strings.Index(out, "    a:")
 	pm := strings.Index(out, "    m:")
 	pz := strings.Index(out, "    z:")
-	if !(pa < pm && pm < pz) {
+	if pa >= pm || pm >= pz {
 		t.Errorf("not sorted: a=%d m=%d z=%d\n%s", pa, pm, pz, out)
 	}
 }
@@ -163,7 +163,7 @@ func TestTraefikDynamic_HTTPAndTCPSplit(t *testing.T) {
 	if httpAt < 0 || tcpAt < 0 {
 		t.Fatalf("missing sections:\n%s", out)
 	}
-	if !(httpAt < tcpAt) {
+	if httpAt >= tcpAt {
 		t.Errorf("http should come before tcp")
 	}
 }

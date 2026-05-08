@@ -42,9 +42,7 @@ func (d *DockerRunner) Down(ctx context.Context, u Unit, volumes bool) error {
 
 func mergeEnv(extra map[string]string) []string {
 	env := os.Environ()
-	for _, kv := range EnvSlice(extra) {
-		env = append(env, kv)
-	}
+	env = append(env, EnvSlice(extra)...)
 	return env
 }
 

@@ -58,8 +58,8 @@ func sampleConfig() *config.Config {
 	return &config.Config{
 		Version: 1,
 		Event: config.Event{
-			Slug:   "evt",
-			Domain: "ctf.example.com",
+			Slug:    "evt",
+			Domain:  "ctf.example.com",
 			Scoring: &config.Scoring{Type: "dynamic", Initial: 500, Decay: 10, Minimum: 100},
 		},
 		Instancer: &config.Instancer{URL: "https://instancer.example.com"},
@@ -370,7 +370,7 @@ type syncFake struct {
 	state *syncFakeState
 }
 
-func (s *syncFake) close() { s.Server.Close() }
+func (s *syncFake) close() { s.Close() }
 
 func (s *syncFake) snapshot() syncFakeState {
 	// Returned by value; sufficient for read-after-write inspection.
