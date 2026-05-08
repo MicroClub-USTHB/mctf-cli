@@ -22,7 +22,7 @@ type Server struct {
 	runner  Runner
 	tokens  map[string]struct{}
 	chalIdx map[string]*challenge.Challenge // "<cat>/<slug>" -> challenge
-	mu      sync.Mutex                       // serializes Spawn for the same (team, slug)
+	mu      sync.Mutex                      // serializes Spawn for the same (team, slug)
 }
 
 // Options configures the Server.

@@ -21,19 +21,19 @@ type indexDoc struct {
 }
 
 type indexEntry struct {
-	Category   string             `json:"category"`
-	Slug       string             `json:"slug"`
-	Name       string             `json:"name"`
-	Author     string             `json:"author"`
-	Difficulty string             `json:"difficulty"`
-	Wave       int                `json:"wave"`
+	Category   string              `json:"category"`
+	Slug       string              `json:"slug"`
+	Name       string              `json:"name"`
+	Author     string              `json:"author"`
+	Difficulty string              `json:"difficulty"`
+	Wave       int                 `json:"wave"`
 	Archetype  challenge.Archetype `json:"archetype"`
-	Deploy     *indexDeploy       `json:"deploy,omitempty"`
-	Image      string             `json:"image,omitempty"`
-	FlagCount  int                `json:"flag_count"`
-	HasWriteup bool               `json:"has_writeup"`
-	HasHints   bool               `json:"has_hints"`
-	AssetCount int                `json:"asset_count"`
+	Deploy     *indexDeploy        `json:"deploy,omitempty"`
+	Image      string              `json:"image,omitempty"`
+	FlagCount  int                 `json:"flag_count"`
+	HasWriteup bool                `json:"has_writeup"`
+	HasHints   bool                `json:"has_hints"`
+	AssetCount int                 `json:"asset_count"`
 }
 
 type indexDeploy struct {

@@ -224,7 +224,7 @@ func fileExistsNonEmpty(path string) bool {
 
 // checkUniqueness runs the event-wide cross checks (U001/U002/U003).
 func checkUniqueness(r *Report, challs []*challenge.Challenge) {
-	seenPort := map[int]string{}      // port -> first challenge slug
+	seenPort := map[int]string{} // port -> first challenge slug
 	seenSubdomain := map[string]string{}
 	seenFlag := map[string]string{}
 

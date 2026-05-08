@@ -45,9 +45,9 @@ type Inspector interface {
 // container, separated by newlines (not a JSON array).
 type composeContainer struct {
 	Name    string `json:"Name"`
-	State   string `json:"State"`   // running, exited, ...
+	State   string `json:"State"` // running, exited, ...
 	Image   string `json:"Image"`
-	Status  string `json:"Status"`  // "Up 5 minutes" / "Exited (0) 2 hours ago"
+	Status  string `json:"Status"` // "Up 5 minutes" / "Exited (0) 2 hours ago"
 	Service string `json:"Service"`
 }
 

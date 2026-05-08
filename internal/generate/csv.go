@@ -25,7 +25,7 @@ func CSV(challs []*challenge.Challenge) ([]byte, error) {
 	for _, c := range challs {
 		m := c.Manifest
 		hasHints := len(m.Challenge.Hints) > 0 ||
-			fileExists(c.SolutionDir + "/hints.md")
+			fileExists(c.SolutionDir+"/hints.md")
 		row := []string{
 			m.Challenge.Category,
 			c.Slug,

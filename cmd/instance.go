@@ -27,9 +27,9 @@ var instanceCmd = &cobra.Command{
 }
 
 var (
-	flagInstSpawnTeam   string
-	flagInstSpawnFlag   string
-	flagInstSpawnRange  string
+	flagInstSpawnTeam  string
+	flagInstSpawnFlag  string
+	flagInstSpawnRange string
 )
 
 var instanceSpawnCmd = &cobra.Command{

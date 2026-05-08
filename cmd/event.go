@@ -49,20 +49,20 @@ var eventCmd = &cobra.Command{
 }
 
 type eventSummary struct {
-	Name           string         `json:"name"`
-	Slug           string         `json:"slug"`
-	Domain         string         `json:"domain,omitempty"`
-	Profile        string         `json:"profile"`
-	FlagPrefix     string         `json:"flag_prefix"`
-	Waves          int            `json:"waves"`
-	CurrentWave    int            `json:"current_wave,omitempty"`
-	TotalChallenges int           `json:"total_challenges"`
-	ByCategory     map[string]int `json:"by_category"`
-	ByArchetype    map[string]int `json:"by_archetype"`
-	ByDifficulty   map[string]int `json:"by_difficulty"`
-	ByWave         map[int]int    `json:"by_wave"`
-	AssetsBytes    int64          `json:"assets_bytes"`
-	Authors        []string       `json:"authors"`
+	Name            string         `json:"name"`
+	Slug            string         `json:"slug"`
+	Domain          string         `json:"domain,omitempty"`
+	Profile         string         `json:"profile"`
+	FlagPrefix      string         `json:"flag_prefix"`
+	Waves           int            `json:"waves"`
+	CurrentWave     int            `json:"current_wave,omitempty"`
+	TotalChallenges int            `json:"total_challenges"`
+	ByCategory      map[string]int `json:"by_category"`
+	ByArchetype     map[string]int `json:"by_archetype"`
+	ByDifficulty    map[string]int `json:"by_difficulty"`
+	ByWave          map[int]int    `json:"by_wave"`
+	AssetsBytes     int64          `json:"assets_bytes"`
+	Authors         []string       `json:"authors"`
 }
 
 func buildEventSummary(cfg *config.Config, challs []*challenge.Challenge) eventSummary {

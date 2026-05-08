@@ -15,14 +15,14 @@ import (
 // SpawnSpec is the resolved blueprint for one spawn — pure data,
 // produced by PlanSpawn before any docker call.
 type SpawnSpec struct {
-	ID           string            // unique handle (= compose project)
-	ChallengeSlug string           // <category>/<slug>
-	TeamID       string
-	Cwd          string            // challenge/ directory (compose context)
-	ComposeFile  string            // absolute path to docker-compose.yml
-	Env          map[string]string // PORT_<n>, FLAG, TEAM_ID, INSTANCE_ID
-	Ports        map[int]int       // internal -> host (for store.Put)
-	ExpiresAt    time.Time
+	ID            string // unique handle (= compose project)
+	ChallengeSlug string // <category>/<slug>
+	TeamID        string
+	Cwd           string            // challenge/ directory (compose context)
+	ComposeFile   string            // absolute path to docker-compose.yml
+	Env           map[string]string // PORT_<n>, FLAG, TEAM_ID, INSTANCE_ID
+	Ports         map[int]int       // internal -> host (for store.Put)
+	ExpiresAt     time.Time
 }
 
 // SpawnOptions configures a spawn.

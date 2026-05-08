@@ -56,9 +56,9 @@ type Challenge struct {
 type Flag struct {
 	ID          int    `json:"id,omitempty"`
 	ChallengeID int    `json:"challenge_id,omitempty"`
-	Type        string `json:"type"`            // "static"
+	Type        string `json:"type"` // "static"
 	Content     string `json:"content"`
-	Data        string `json:"data,omitempty"`  // "case_sensitive" | "" (CTFd convention)
+	Data        string `json:"data,omitempty"` // "case_sensitive" | "" (CTFd convention)
 }
 
 // Tag is one CTFd tag.
@@ -72,7 +72,7 @@ type Tag struct {
 // "uploads/<sha>/<basename>"; we match local-vs-remote by Basename.
 type File struct {
 	ID          int    `json:"id,omitempty"`
-	Type        string `json:"type"`              // "challenge"
+	Type        string `json:"type"`               // "challenge"
 	Location    string `json:"location,omitempty"` // server-set
 	ChallengeID int    `json:"challenge_id,omitempty"`
 }
@@ -97,10 +97,10 @@ type Hint struct {
 
 // envelope is CTFd's standard response wrapper.
 type envelope[T any] struct {
-	Success bool          `json:"success"`
-	Data    T             `json:"data"`
-	Errors  any           `json:"errors,omitempty"`
-	Message string        `json:"message,omitempty"`
+	Success bool   `json:"success"`
+	Data    T      `json:"data"`
+	Errors  any    `json:"errors,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 // ListChallenges returns every challenge visible to the token (admin view).
@@ -369,10 +369,10 @@ func (c *Client) do(ctx context.Context, method, path string, body any, out any)
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {
 		return &APIError{
-			Status:  resp.StatusCode,
-			Method:  method,
-			Path:    path,
-			Body:    string(respBody),
+			Status: resp.StatusCode,
+			Method: method,
+			Path:   path,
+			Body:   string(respBody),
 		}
 	}
 	if out == nil || len(respBody) == 0 {

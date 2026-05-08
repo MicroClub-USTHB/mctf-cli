@@ -12,8 +12,8 @@ import (
 func instancedChall(slug, cat string, internalPort int) *challenge.Challenge {
 	ip := internalPort
 	return &challenge.Challenge{
-		Slug:        slug,
-		CategoryDir: cat,
+		Slug:         slug,
+		CategoryDir:  cat,
 		ChallengeDir: "/event/challenges/" + cat + "/" + slug + "/challenge",
 		Manifest: challenge.Manifest{
 			Schema: 1,
@@ -170,13 +170,13 @@ func TestPlanSpawn_IDIsUniquePerCall(t *testing.T) {
 
 func TestSanitize(t *testing.T) {
 	cases := map[string]string{
-		"Hello World":  "hello-world",
-		"A_B/C":        "a-b-c",
-		"---x---":      "x",
-		"12_34":        "12-34",
-		"":             "x",
-		"mctf6.0":      "mctf60", // dots are dropped (version-style slugs)
-		"x  y":         "x-y",    // collapsed dashes
+		"Hello World": "hello-world",
+		"A_B/C":       "a-b-c",
+		"---x---":     "x",
+		"12_34":       "12-34",
+		"":            "x",
+		"mctf6.0":     "mctf60", // dots are dropped (version-style slugs)
+		"x  y":        "x-y",    // collapsed dashes
 	}
 	for in, want := range cases {
 		if got := sanitize(in); got != want {

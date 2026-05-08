@@ -24,15 +24,15 @@ const (
 
 // Item is one challenge's planned action.
 type Item struct {
-	Slug     string    // <category>/<slug>
-	Action   Action
-	Reason   string    // human-readable why
-	Payload  Challenge // CTFd-side challenge payload
-	Flags    []FlagDelta
-	Tags     []TagDelta
-	Hints    []HintDelta
-	Files    []FileDelta
-	ExistingID int     // non-zero on update
+	Slug       string // <category>/<slug>
+	Action     Action
+	Reason     string    // human-readable why
+	Payload    Challenge // CTFd-side challenge payload
+	Flags      []FlagDelta
+	Tags       []TagDelta
+	Hints      []HintDelta
+	Files      []FileDelta
+	ExistingID int // non-zero on update
 
 	// challengePtr threads the source challenge through to Apply so
 	// it can resolve absolute paths for file uploads.
@@ -204,11 +204,11 @@ func Diff(ctx context.Context, c *Client, cfg *config.Config, challs []*challeng
 		if ec, ok := byKey[key]; ok {
 			if !opts.AllowUpdate {
 				items = append(items, Item{
-					Slug:    ch.CategoryDir + "/" + ch.Slug,
-					Action:  ActionSkip,
-					Reason:  fmt.Sprintf("already exists (id=%d) — re-run with --update to reconcile", ec.ID),
-					Payload: payload,
-					ExistingID: ec.ID,
+					Slug:         ch.CategoryDir + "/" + ch.Slug,
+					Action:       ActionSkip,
+					Reason:       fmt.Sprintf("already exists (id=%d) — re-run with --update to reconcile", ec.ID),
+					Payload:      payload,
+					ExistingID:   ec.ID,
 					challengePtr: ch,
 				})
 				continue
@@ -219,27 +219,27 @@ func Diff(ctx context.Context, c *Client, cfg *config.Config, challs []*challeng
 				return nil, err
 			}
 			items = append(items, Item{
-				Slug:       ch.CategoryDir + "/" + ch.Slug,
-				Action:     ActionUpdate,
-				Reason:     "exists; reconciling fields and child resources",
-				Payload:    payload,
-				ExistingID: ec.ID,
-				Flags:      flagDeltas,
-				Tags:       tagDeltas,
-				Hints:      hintDeltas,
-				Files:      fileDeltas,
+				Slug:         ch.CategoryDir + "/" + ch.Slug,
+				Action:       ActionUpdate,
+				Reason:       "exists; reconciling fields and child resources",
+				Payload:      payload,
+				ExistingID:   ec.ID,
+				Flags:        flagDeltas,
+				Tags:         tagDeltas,
+				Hints:        hintDeltas,
+				Files:        fileDeltas,
 				challengePtr: ch,
 			})
 		} else {
 			items = append(items, Item{
-				Slug:    ch.CategoryDir + "/" + ch.Slug,
-				Action:  ActionCreate,
-				Reason:  "missing on platform",
-				Payload: payload,
-				Flags:   wantFlagDeltas(PayloadFlags(ch)),
-				Tags:    wantTagDeltas(PayloadTags(ch)),
-				Hints:   wantHintDeltas(PayloadHints(ch)),
-				Files:   PayloadFiles(ch),
+				Slug:         ch.CategoryDir + "/" + ch.Slug,
+				Action:       ActionCreate,
+				Reason:       "missing on platform",
+				Payload:      payload,
+				Flags:        wantFlagDeltas(PayloadFlags(ch)),
+				Tags:         wantTagDeltas(PayloadTags(ch)),
+				Hints:        wantHintDeltas(PayloadHints(ch)),
+				Files:        PayloadFiles(ch),
 				challengePtr: ch,
 			})
 		}

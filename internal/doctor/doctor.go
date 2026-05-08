@@ -159,8 +159,8 @@ func checkValidate(cfg *config.Config, dir string, challs []*challenge.Challenge
 	case e > 0:
 		return Check{
 			ID: "D003", Name: "challenge validation",
-			Status: StatusFail,
-			Detail: fmt.Sprintf("%d error(s), %d warning(s)", e, w),
+			Status:  StatusFail,
+			Detail:  fmt.Sprintf("%d error(s), %d warning(s)", e, w),
 			Suggest: "run `mtcf validate` for details",
 		}
 	case w > 0:
@@ -314,8 +314,8 @@ func checkPortsFree(challs []*challenge.Challenge) Check {
 	}
 	return Check{
 		ID: "D030", Name: "host ports free",
-		Status: StatusWarn,
-		Detail: fmt.Sprintf("port(s) already in use: %s", strings.Join(busy, ", ")),
+		Status:  StatusWarn,
+		Detail:  fmt.Sprintf("port(s) already in use: %s", strings.Join(busy, ", ")),
 		Suggest: "stop the process holding the port (lsof -i :<port>) or change deploy.port",
 	}
 }

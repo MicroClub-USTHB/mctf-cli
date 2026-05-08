@@ -21,7 +21,7 @@ import (
 
 // ImageSpec is what the builder needs to produce one image.
 type ImageSpec struct {
-	Challenge  string            // <category>/<slug>
+	Challenge  string // <category>/<slug>
 	Category   string
 	Slug       string
 	Context    string            // absolute path to challenge/ folder

@@ -28,8 +28,8 @@ func (f fakeInspector) Inspect(_ context.Context, project, _ string) ([]composeC
 
 func cfg() *config.Config {
 	return &config.Config{
-		Version: 1,
-		Event:   config.Event{Slug: "evt", Domain: "ctf.example.com"},
+		Version:   1,
+		Event:     config.Event{Slug: "evt", Domain: "ctf.example.com"},
 		Instancer: &config.Instancer{URL: "https://instancer.example.com"},
 	}
 }
@@ -46,7 +46,7 @@ func challs() []*challenge.Challenge {
 		{
 			Slug: "welcome", CategoryDir: "misc", ChallengeDir: "/x",
 			Manifest: challenge.Manifest{
-				Schema: 1,
+				Schema:    1,
 				Challenge: challenge.ChallengeBlock{Name: "Welcome", NeedDeploy: true},
 				Deploy:    &challenge.DeployBlock{Subdomain: "welcome", Port: &port, InternalPort: &internal},
 			},
@@ -55,7 +55,7 @@ func challs() []*challenge.Challenge {
 		{
 			Slug: "cub3", CategoryDir: "web",
 			Manifest: challenge.Manifest{
-				Schema: 1,
+				Schema:    1,
 				Challenge: challenge.ChallengeBlock{Name: "CUB3", NeedDeploy: true},
 				Deploy:    &challenge.DeployBlock{Subdomain: "cub3", InternalPort: &internal, DynamicInstances: true},
 			},
@@ -122,11 +122,11 @@ func TestRun_ServiceMissingComposeReportsNotDeployed(t *testing.T) {
 
 func TestParseUptime(t *testing.T) {
 	cases := map[string]string{
-		"Up 5 minutes":             "5 minutes",
-		"Up About a minute":        "About a minute",
-		"Up 2 hours (healthy)":     "2 hours",
-		"Exited (0) 2 hours ago":   "",
-		"":                         "",
+		"Up 5 minutes":           "5 minutes",
+		"Up About a minute":      "About a minute",
+		"Up 2 hours (healthy)":   "2 hours",
+		"Exited (0) 2 hours ago": "",
+		"":                       "",
 	}
 	for in, want := range cases {
 		if got := parseUptime(in); got != want {

@@ -52,13 +52,13 @@ var listCmd = &cobra.Command{
 }
 
 type listRow struct {
-	Category   string `json:"category"`
-	Slug       string `json:"slug"`
-	Name       string `json:"name"`
-	Archetype  string `json:"archetype"`
-	Difficulty string `json:"difficulty"`
-	Wave       int    `json:"wave"`
-	Author     string `json:"author"`
+	Category   string   `json:"category"`
+	Slug       string   `json:"slug"`
+	Name       string   `json:"name"`
+	Archetype  string   `json:"archetype"`
+	Difficulty string   `json:"difficulty"`
+	Wave       int      `json:"wave"`
+	Author     string   `json:"author"`
 	Tags       []string `json:"tags,omitempty"`
 }
 

@@ -219,4 +219,3 @@ func composeServiceName(path string) (string, error) {
 	}
 	return names[0], nil
 }
-

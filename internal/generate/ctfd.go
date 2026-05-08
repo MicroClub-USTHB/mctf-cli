@@ -14,19 +14,19 @@ import (
 // ctfdManifest mirrors the shape of schema/ctfd-manifest.schema.json.
 // Field order is the rendered order — yaml.v3 honors struct field order.
 type ctfdManifest struct {
-	Name           string         `yaml:"name"`
-	Description    string         `yaml:"description"`
-	Author         string         `yaml:"author"`
-	Category       string         `yaml:"category"`
-	Value          *int           `yaml:"value"`
-	Type           string         `yaml:"type"`
-	Extra          *ctfdExtra     `yaml:"extra,omitempty"`
-	Flags          []ctfdFlag     `yaml:"flags"`
-	Tags           []string       `yaml:"tags,omitempty"`
-	Hints          []ctfdHint     `yaml:"hints,omitempty"`
-	ConnectionInfo *string        `yaml:"connection_info"`
-	Files          []string       `yaml:"files"`
-	State          string         `yaml:"state"`
+	Name           string     `yaml:"name"`
+	Description    string     `yaml:"description"`
+	Author         string     `yaml:"author"`
+	Category       string     `yaml:"category"`
+	Value          *int       `yaml:"value"`
+	Type           string     `yaml:"type"`
+	Extra          *ctfdExtra `yaml:"extra,omitempty"`
+	Flags          []ctfdFlag `yaml:"flags"`
+	Tags           []string   `yaml:"tags,omitempty"`
+	Hints          []ctfdHint `yaml:"hints,omitempty"`
+	ConnectionInfo *string    `yaml:"connection_info"`
+	Files          []string   `yaml:"files"`
+	State          string     `yaml:"state"`
 }
 
 type ctfdExtra struct {

@@ -289,8 +289,8 @@ func TestD003_InstancedWithEnvPatternClean(t *testing.T) {
 
 func TestSplitPortString(t *testing.T) {
 	cases := []struct {
-		in           string
-		wantHost     string
+		in            string
+		wantHost      string
 		wantContainer int
 	}{
 		{"14000:8000", "14000", 8000},

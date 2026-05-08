@@ -19,10 +19,10 @@ var platformCmd = &cobra.Command{
 }
 
 var (
-	flagSyncDryRun  bool
-	flagSyncCat     string
-	flagSyncSlug    string
-	flagSyncUpdate  bool
+	flagSyncDryRun bool
+	flagSyncCat    string
+	flagSyncSlug   string
+	flagSyncUpdate bool
 )
 
 var platformSyncCmd = &cobra.Command{

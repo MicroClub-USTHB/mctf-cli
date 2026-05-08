@@ -27,7 +27,7 @@ func makeTar(entries map[string]string) []byte {
 
 func TestScanReader_CleanImage(t *testing.T) {
 	body := makeTar(map[string]string{
-		"app/main.py": "print('hello')",
+		"app/main.py":  "print('hello')",
 		"etc/hostname": "container",
 	})
 	hits, err := ScanReader(bytes.NewReader(body), []string{"mctf{leak}"})
@@ -41,8 +41,8 @@ func TestScanReader_CleanImage(t *testing.T) {
 
 func TestScanReader_FindsFlag(t *testing.T) {
 	body := makeTar(map[string]string{
-		"app/main.py":  "print('mctf{leak}')",
-		"app/safe.py":  "print('hello')",
+		"app/main.py": "print('mctf{leak}')",
+		"app/safe.py": "print('hello')",
 	})
 	hits, err := ScanReader(bytes.NewReader(body), []string{"mctf{leak}"})
 	if err != nil {
@@ -58,10 +58,10 @@ func TestScanReader_FindsFlag(t *testing.T) {
 
 func TestScanReader_ExemptFiles(t *testing.T) {
 	body := makeTar(map[string]string{
-		"flag.txt":     "mctf{leak}",
-		"app/FLAG":     "mctf{leak}",
-		"app/x.flag":   "mctf{leak}",
-		"app/main.py":  "import flag\nprint('hello')",
+		"flag.txt":    "mctf{leak}",
+		"app/FLAG":    "mctf{leak}",
+		"app/x.flag":  "mctf{leak}",
+		"app/main.py": "import flag\nprint('hello')",
 	})
 	hits, err := ScanReader(bytes.NewReader(body), []string{"mctf{leak}"})
 	if err != nil {
@@ -115,15 +115,15 @@ func TestScanReader_EmptyFlagsNoOp(t *testing.T) {
 
 func TestIsExempt(t *testing.T) {
 	cases := map[string]bool{
-		"flag.txt":         true,
-		"app/flag.txt":     true,
-		"FLAG":             true,
-		"deep/path/FLAG":   true,
-		"x.flag":           true,
-		"app/secret.flag":  true,
-		"flag":             true,
-		"main.py":          false,
-		"flag-not-exempt":  false,
+		"flag.txt":        true,
+		"app/flag.txt":    true,
+		"FLAG":            true,
+		"deep/path/FLAG":  true,
+		"x.flag":          true,
+		"app/secret.flag": true,
+		"flag":            true,
+		"main.py":         false,
+		"flag-not-exempt": false,
 	}
 	for in, want := range cases {
 		if got := isExempt(in); got != want {

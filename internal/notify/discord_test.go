@@ -22,8 +22,8 @@ func TestDiscord_Disabled_NoOps(t *testing.T) {
 
 func TestDiscord_PostsEmbed(t *testing.T) {
 	var got struct {
-		Username string                   `json:"username"`
-		Embeds   []map[string]any         `json:"embeds"`
+		Username string           `json:"username"`
+		Embeds   []map[string]any `json:"embeds"`
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" || r.Header.Get("Content-Type") != "application/json" {

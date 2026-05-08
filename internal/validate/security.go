@@ -70,13 +70,13 @@ func splitPortString(s string) (host string, container int) {
 // explicit author acknowledgement (we warn so authors can justify
 // each one in code review).
 var dangerousCaps = map[string]struct{}{
-	"SYS_ADMIN":  {},
-	"NET_ADMIN":  {},
-	"SYS_PTRACE": {},
-	"SYS_MODULE": {},
-	"SYS_RAWIO":  {},
+	"SYS_ADMIN":       {},
+	"NET_ADMIN":       {},
+	"SYS_PTRACE":      {},
+	"SYS_MODULE":      {},
+	"SYS_RAWIO":       {},
 	"DAC_READ_SEARCH": {},
-	"ALL":        {},
+	"ALL":             {},
 }
 
 // composeShape is the minimal subset of docker-compose.yml we need to

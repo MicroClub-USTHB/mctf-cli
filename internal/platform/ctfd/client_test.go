@@ -15,10 +15,10 @@ import (
 // fakeServer is a minimal in-memory CTFd stand-in. It records requests
 // and responds with the canned envelopes the tests expect.
 type fakeServer struct {
-	t          *testing.T
-	requests   []*http.Request
-	bodies     [][]byte
-	handler    func(w http.ResponseWriter, r *http.Request)
+	t        *testing.T
+	requests []*http.Request
+	bodies   [][]byte
+	handler  func(w http.ResponseWriter, r *http.Request)
 }
 
 func newFake(t *testing.T) (*fakeServer, *Client, func()) {

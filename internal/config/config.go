@@ -6,9 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"sigs.k8s.io/yaml"
+
 	"github.com/MicroClub-USTHB/mctf-cli/internal/jsonschema"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/schemas"
-	"sigs.k8s.io/yaml"
 )
 
 // FileName is the conventional config filename at the event repo root.
@@ -56,7 +57,7 @@ type Event struct {
 	FlagPrefix  string   `json:"flag_prefix,omitempty"`
 	WavesNumber int      `json:"waves_number,omitempty"`
 	CurrentWave *int     `json:"current_wave,omitempty"`
-	Scoring    *Scoring `json:"scoring,omitempty"`
+	Scoring     *Scoring `json:"scoring,omitempty"`
 }
 
 // Scoring describes how points are awarded. Used as the per-event default
@@ -77,10 +78,10 @@ type Categories struct {
 
 // CustomCategory is a per-event extension declared in mtcf.config.yml.
 type CustomCategory struct {
-	Slug       string      `json:"slug"`
-	Name       string      `json:"name"`
-	Deployable bool        `json:"deployable,omitempty"`
-	PortRange  *PortRange  `json:"port_range,omitempty"`
+	Slug       string     `json:"slug"`
+	Name       string     `json:"name"`
+	Deployable bool       `json:"deployable,omitempty"`
+	PortRange  *PortRange `json:"port_range,omitempty"`
 }
 
 // PortRange is an inclusive [Min, Max] interval.
@@ -130,8 +131,8 @@ type Platform struct {
 
 // Instancer holds defaults consumed by the per-team instancer.
 type Instancer struct {
-	URL              string `json:"url,omitempty"`
-	DefaultTimeout   int    `json:"default_timeout,omitempty"`
+	URL               string `json:"url,omitempty"`
+	DefaultTimeout    int    `json:"default_timeout,omitempty"`
 	DefaultExtendTime int    `json:"default_extend_time,omitempty"`
 }
 

@@ -121,7 +121,7 @@ func TestCheckPortsFree_AllFree(t *testing.T) {
 		{
 			Slug: "x", CategoryDir: "misc",
 			Manifest: challenge.Manifest{
-				Schema: 1,
+				Schema:    1,
 				Challenge: challenge.ChallengeBlock{Name: "x", Category: "misc", NeedDeploy: true},
 				Deploy:    &challenge.DeployBlock{Port: &port},
 			},
@@ -147,7 +147,7 @@ func TestCheckPortsFree_InUse(t *testing.T) {
 		{
 			Slug: "busy", CategoryDir: "misc",
 			Manifest: challenge.Manifest{
-				Schema: 1,
+				Schema:    1,
 				Challenge: challenge.ChallengeBlock{Name: "x", Category: "misc", NeedDeploy: true},
 				Deploy:    &challenge.DeployBlock{Port: &port},
 			},

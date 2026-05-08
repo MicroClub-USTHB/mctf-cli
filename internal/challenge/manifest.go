@@ -8,9 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"sigs.k8s.io/yaml"
+
 	"github.com/MicroClub-USTHB/mctf-cli/internal/jsonschema"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/schemas"
-	"sigs.k8s.io/yaml"
 )
 
 // Archetype is one of the three runtime shapes a challenge can take.
@@ -24,7 +25,7 @@ const (
 
 // Manifest is the typed view of challenge/challenge.yml.
 type Manifest struct {
-	Schema    int        `json:"schema,omitempty"`
+	Schema    int            `json:"schema,omitempty"`
 	Challenge ChallengeBlock `json:"challenge"`
 	Deploy    *DeployBlock   `json:"deploy,omitempty"`
 }
@@ -69,16 +70,16 @@ type Scoring struct {
 
 // DeployBlock is required when ChallengeBlock.NeedDeploy is true.
 type DeployBlock struct {
-	Subdomain        string         `json:"subdomain"`
-	Port             *int           `json:"port"`
-	InternalPort     *int           `json:"internal_port"`
-	DynamicInstances bool           `json:"dynamic_instances"`
-	TCP              bool           `json:"tcp,omitempty"`
-	NoSSL            bool           `json:"noSsl,omitempty"`
-	Resources        *Resources     `json:"resources,omitempty"`
-	Healthcheck      *Healthcheck   `json:"healthcheck,omitempty"`
-	Instance         *InstanceCfg   `json:"instance,omitempty"`
-	SecurityOpts     *SecurityOpts  `json:"security_opts,omitempty"`
+	Subdomain        string        `json:"subdomain"`
+	Port             *int          `json:"port"`
+	InternalPort     *int          `json:"internal_port"`
+	DynamicInstances bool          `json:"dynamic_instances"`
+	TCP              bool          `json:"tcp,omitempty"`
+	NoSSL            bool          `json:"noSsl,omitempty"`
+	Resources        *Resources    `json:"resources,omitempty"`
+	Healthcheck      *Healthcheck  `json:"healthcheck,omitempty"`
+	Instance         *InstanceCfg  `json:"instance,omitempty"`
+	SecurityOpts     *SecurityOpts `json:"security_opts,omitempty"`
 }
 
 // Resources caps a challenge's runtime footprint.
@@ -114,15 +115,15 @@ type SecurityOpts struct {
 
 // Challenge is a manifest plus discovered filesystem context.
 type Challenge struct {
-	Manifest      Manifest
-	Slug          string    // directory name under <category>/
-	CategoryDir   string    // directory name under challenges/ (must match Manifest.Challenge.Category)
-	RootDir       string    // absolute path to the challenge root (parent of challenge/, solution/, ...)
-	ChallengeDir  string    // absolute path to <root>/challenge/
-	SolutionDir   string    // absolute path to <root>/solution/
-	AssetsDir     string    // absolute path to <root>/assets/
-	OtherDir      string    // absolute path to <root>/other/
-	Archetype     Archetype // derived
+	Manifest     Manifest
+	Slug         string    // directory name under <category>/
+	CategoryDir  string    // directory name under challenges/ (must match Manifest.Challenge.Category)
+	RootDir      string    // absolute path to the challenge root (parent of challenge/, solution/, ...)
+	ChallengeDir string    // absolute path to <root>/challenge/
+	SolutionDir  string    // absolute path to <root>/solution/
+	AssetsDir    string    // absolute path to <root>/assets/
+	OtherDir     string    // absolute path to <root>/other/
+	Archetype    Archetype // derived
 }
 
 // ManifestPath returns the path to challenge/challenge.yml.
@@ -131,7 +132,9 @@ func (c *Challenge) ManifestPath() string {
 }
 
 // HasDockerfile reports whether challenge/Dockerfile exists.
-func (c *Challenge) HasDockerfile() bool { return fileExists(filepath.Join(c.ChallengeDir, "Dockerfile")) }
+func (c *Challenge) HasDockerfile() bool {
+	return fileExists(filepath.Join(c.ChallengeDir, "Dockerfile"))
+}
 
 // HasCompose reports whether challenge/docker-compose.yml exists.
 func (c *Challenge) HasCompose() bool {

@@ -146,7 +146,7 @@ func TestChallenge_ServiceArchetypeWritesDeployBlock(t *testing.T) {
 		`need_deploy: true`,
 		`deploy:`,
 		`subdomain: "welcome"`,
-		`port: 14500`,                  // misc category default
+		`port: 14500`, // misc category default
 		`internal_port: 8000`,
 		`dynamic_instances: false`,
 		`healthcheck:`,

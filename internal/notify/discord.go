@@ -40,8 +40,8 @@ type Message struct {
 // Webhooks are typically created at Server Settings → Integrations →
 // Webhooks; the URL contains a secret, so treat it as a credential.
 type Discord struct {
-	URL    string
-	HTTP   *http.Client
+	URL  string
+	HTTP *http.Client
 }
 
 // NewDiscord returns a Discord notifier with a 10s timeout. URL of ""

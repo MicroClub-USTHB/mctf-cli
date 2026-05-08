@@ -7,8 +7,8 @@
 // strips files starting with "." or "_" from directory listings only
 // for "." prefixes; we use "_" for clarity):
 //
-//   _gitignore   -> .gitignore
-//   _env.example -> .env.example
+//	_gitignore   -> .gitignore
+//	_env.example -> .env.example
 package scaffold
 
 import "embed"

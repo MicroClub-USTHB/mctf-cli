@@ -10,11 +10,11 @@ import (
 
 func TestSlugify(t *testing.T) {
 	cases := map[string]string{
-		"MCTF 6.0":                "mctf-6-0",
-		"  Hello   World!  ":      "hello-world",
-		"":                        "event",
-		"already-good":            "already-good",
-		"Mixed_Case_Stuff/Slash":  "mixed-case-stuff-slash",
+		"MCTF 6.0":               "mctf-6-0",
+		"  Hello   World!  ":     "hello-world",
+		"":                       "event",
+		"already-good":           "already-good",
+		"Mixed_Case_Stuff/Slash": "mixed-case-stuff-slash",
 	}
 	for in, want := range cases {
 		if got := Slugify(in); got != want {
