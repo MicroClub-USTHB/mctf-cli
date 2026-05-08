@@ -221,6 +221,43 @@ var instanceExtendCmd = &cobra.Command{
 	},
 }
 
+var instanceFlagCmd = &cobra.Command{
+	Use:   "flag <instance-id>",
+	Short: "Print the flag for a live instance",
+	Long: "Reads the per-team flag captured when the instance was spawned\n" +
+		"(`--flag` override or the manifest's static flag). Falls back to\n" +
+		"the manifest if the store record predates the flag field.",
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, err := openStore()
+		if err != nil {
+			return err
+		}
+		inst, ok := store.Get(args[0])
+		if !ok {
+			return fmt.Errorf("no instance with id %q", args[0])
+		}
+		if inst.Flag != "" {
+			fmt.Println(inst.Flag)
+			return nil
+		}
+		// Pre-flag-field record (or never set). Recover from the manifest.
+		category, slug, ok := splitCategorySlug(inst.ChallengeSlug)
+		if !ok {
+			return fmt.Errorf("instance %q has malformed challenge slug %q", inst.ID, inst.ChallengeSlug)
+		}
+		_, ch, err := loadInstanced(category, slug)
+		if err != nil {
+			return err
+		}
+		if len(ch.Manifest.Challenge.Flags) == 0 {
+			return fmt.Errorf("%s has no flag in its manifest", inst.ChallengeSlug)
+		}
+		fmt.Println(ch.Manifest.Challenge.Flags[0].Flag)
+		return nil
+	},
+}
+
 var instanceReapCmd = &cobra.Command{
 	Use:   "reap",
 	Short: "Destroy expired instances (manual cleanup; daemon does this automatically once it lands)",
@@ -359,6 +396,7 @@ func init() {
 	instanceCmd.AddCommand(instanceExtendCmd)
 
 	instanceCmd.AddCommand(instanceReapCmd)
+	instanceCmd.AddCommand(instanceFlagCmd)
 
 	rootCmd.AddCommand(instanceCmd)
 }
