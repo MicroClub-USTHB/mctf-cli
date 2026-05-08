@@ -35,14 +35,16 @@ func Run(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, lo
 	return r
 }
 
-// assetMentionRe matches `filename.ext` or [text](filename.ext) in markdown descriptions.
-var assetMentionRe = regexp.MustCompile("`([^`\\s]+\\.[a-zA-Z0-9]+)`" + `|` + `\\[[^\\]]+\\]\\(([^\\)\\s]+\\.[a-zA-Z0-9]+)\\)`)
+// assetMentionRe matches `filename` or [text](filename) in markdown descriptions.
+// Group 1: backtick-delimited content, Group 2: markdown link URL
+var assetMentionRe = regexp.MustCompile("(`[^`]+`)|" + "(\\]\\(([^)]+)\\))")
 
 // mutableStateRe matches keywords that suggest a challenge has mutable state (DB, sessions, etc.)
 var mutableStateRe = regexp.MustCompile(`(?i)\b(database|sql|login|register|account|session|admin|password)\b`)
 
 // rateLimitRe matches keywords related to rate-limiting or proof-of-work.
-var rateLimitRe = regexp.MustCompile(`(?i)(rate[ -]?limit|pow|proof[ -]of[ -]work|captcha|seconds|delay)`)
+// Use word boundary \b for "pow" to avoid matching "power", "powerful", etc.
+var rateLimitRe = regexp.MustCompile(`(?i)(rate[ -]?limit|\bpow\b|proof[ -]of[ -]work|captcha|\d+\s*s(ecs?|econds)?|time.{0,2}delay)`)
 
 // checkOne runs the per-challenge rules (those that don't need event-wide context).
 func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *challenge.Challenge, eventRoot string) {
@@ -192,21 +194,39 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 	matches := assetMentionRe.FindAllStringSubmatch(m.Challenge.Description, -1)
 	if len(matches) > 0 {
 		assetsOnDisk := make(map[string]bool)
-		entries, err := os.ReadDir(c.AssetsDir)
-		if err == nil {
-			for _, e := range entries {
-				if !e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
-					assetsOnDisk[e.Name()] = true
-				}
+		// Walk recursively through assets/ to collect all file basenames
+		if err := filepath.WalkDir(c.AssetsDir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
 			}
+			if strings.HasPrefix(d.Name(), ".") {
+				return nil
+			}
+			assetsOnDisk[d.Name()] = true
+			return nil
+		}); err != nil && !os.IsNotExist(err) {
+			// Only report if error is not "directory doesn't exist"
 		}
 
 		for _, match := range matches {
-			fileName := match[1]
-			if fileName == "" {
-				fileName = match[2]
+			var fileName string
+
+			// Group 1 is backtick-delimited (`filename`), group 3 is URL from [text](url)
+			if match[1] != "" {
+				// Backtick match: group 1 is `filename`
+				fileName = strings.Trim(match[1], "`")
+			} else if len(match) > 3 && match[3] != "" {
+				// Markdown link match: group 3 is the URL
+				fileName = match[3]
+			} else {
+				continue
 			}
-			
+
+			// Skip URLs and absolute paths — these aren't asset references
+			if strings.Contains(fileName, "://") || strings.HasPrefix(fileName, "/") ||
+				strings.HasPrefix(fileName, "mailto:") {
+				continue
+			}
 			fileName = filepath.Base(fileName)
 
 			if fileName != "" && !assetsOnDisk[fileName] {
@@ -217,10 +237,11 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 		}
 	}
 
-	// W003 — web archetype service but description hints at mutable state
+	// W002 — web archetype service but description hints at mutable state
+	// (instanced archetype is preferred to avoid shared state issues)
 	if m.Challenge.Category == "web" && archetype == challenge.ArchetypeService {
 		if mutableStateRe.MatchString(m.Challenge.Description) {
-			r.Warnf("W003", manifestPath,
+			r.Warnf("W002", manifestPath,
 				"web challenge is 'service' archetype but description hints at mutable state; consider 'instanced' to avoid player interference")
 		}
 	}
@@ -229,7 +250,7 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 	if m.Challenge.Category == "crypto" && archetype == challenge.ArchetypeService {
 		if !rateLimitRe.MatchString(m.Challenge.Description) {
 			r.Warnf("W009", manifestPath,
-				"crypto challenge is 'service' archetype but description has no rate-limit hint (POW, delay, etc.); players might brute-force your oracle")
+				"crypto challenge is 'service' archetype but description has no rate-limit hint (rate-limit, POW, proof-of-work, captcha, or time-based delay); players might brute-force your oracle")
 		}
 	}
 
@@ -278,7 +299,7 @@ func fileExistsNonEmpty(path string) bool {
 
 // checkUniqueness runs the event-wide cross checks (U001/U002/U003).
 func checkUniqueness(r *Report, challs []*challenge.Challenge) {
-	seenPort := map[int]string{}      // port -> first challenge slug
+	seenPort := map[int]string{} // port -> first challenge slug
 	seenSubdomain := map[string]string{}
 	seenFlag := map[string]string{}
 

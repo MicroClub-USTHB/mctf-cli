@@ -85,13 +85,13 @@ Every rule MTCF enforces, with rationale and severity. Hard-fails block the buil
 |---|---|
 | `W001` | `pwn` challenge without `deploy.resources.pids` |
 | `W002` | `web` archetype `service` but description hints at mutable state — suggests `instanced` |
-| `W003` | Service archetype without healthcheck (under `simple` profile) |
+| `W003` | Dropped (use W008 for healthchecks) |
 | `W004` | Static archetype with empty `assets/` |
 | `W005` | Slug-vs-name case-only mismatch (e.g. dir `cub3` / name `CUB3`) |
 | `W006` | Missing `solution/hints.md` and `challenge.hints[]` empty |
 | `W007` | `challenge.wave` > 5 (likely typo, since events rarely run that many waves) |
 | `W008` | Dockerfile lacks `HEALTHCHECK` and manifest has no `deploy.healthcheck` |
-| `W009` | `crypto` service-archetype challenge with no rate-limit hint in description |
+| `W009` | Crypto service-archetype challenge with no rate-limit hint in description |
 | `W010` | `challenge.description` exceeds 1500 chars (UX warning; hard-fail at 4000) |
 | `W011` | Asset path missing in `assets/` but referenced from `description` (broken handout link) |
 | `W012` | Schema version field omitted from manifest (defaults to 1) |

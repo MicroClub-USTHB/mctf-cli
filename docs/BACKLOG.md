@@ -26,7 +26,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 ## Small wins (~half-day each)
 
-- **W003** — `web` archetype `service` but description hints at mutable state → suggest `instanced` (regex-heuristic).
+- **W002** — `web` archetype `service` but description hints at mutable state → suggest `instanced` (regex-heuristic).
 - **W009** — `crypto` service-archetype with no rate-limit hint.
 - **W011** — asset filename referenced in description but missing from `assets/` (broken handout link).
 - **W012** — schema field omitted from manifest (warn; default-filled to 1).
@@ -79,7 +79,7 @@ Highest leverage, smallest blast radius — pick from these to start:
 2. **goreleaser + Homebrew tap** — unlock distribution.
 3. **K8s deploy mode** — biggest deployment-flexibility win.
 4. **Image-tag pinning in deploy + rollback** — operational safety.
-5. **W003 / W011 / I001 batch** — cheap validate improvements.
+5. **W002 / W011 / I001 batch** — cheap validate improvements.
 6. **`docs/spec/` refresh** — backfill what shipped this session.
 
 ## Conventions for new tasks
