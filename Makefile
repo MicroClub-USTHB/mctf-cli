@@ -23,6 +23,8 @@ test:
 
 lint:
 	go vet ./...
+	@command -v golangci-lint >/dev/null || { echo "golangci-lint not installed; see https://golangci-lint.run/welcome/install/"; exit 1; }
+	golangci-lint run ./...
 
 tidy:
 	go mod tidy
