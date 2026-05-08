@@ -285,7 +285,7 @@ func loadInstanced(category, slug string) (*config.Config, *challenge.Challenge,
 			return cfg, c, nil
 		}
 	}
-	return nil, nil, fmt.Errorf("no challenge at %s/%s", category, slug)
+	return nil, nil, fmt.Errorf("no challenge at %s/%s%s", category, slug, didYouMean(challs, category+"/"+slug))
 }
 
 func composeFileForSlug(slug string) (string, error) {

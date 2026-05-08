@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/scaffold"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/validate"
@@ -105,6 +106,22 @@ func splitCategorySlug(s string) (category, slug string, ok bool) {
 		return "", "", false
 	}
 	return s[:i], s[i+1:], true
+}
+
+// didYouMean returns a "\ndid you mean: …" block when query is close to
+// one or more known challenges, or "" if there are no near matches.
+// Use as a suffix on a "no challenge at <key>" error message.
+func didYouMean(challs []*challenge.Challenge, query string) string {
+	near := challenge.Suggest(challs, query)
+	if len(near) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("\ndid you mean:\n")
+	for _, k := range near {
+		fmt.Fprintf(&sb, "  %s\n", k)
+	}
+	return sb.String()
 }
 
 // isValidSlug enforces the same shape as the spec (DNS-label-ish but

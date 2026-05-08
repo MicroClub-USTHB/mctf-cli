@@ -60,7 +60,7 @@ func runInfoOne(cfg *config.Config, arg string, challs []*challenge.Challenge, l
 		}
 	}
 	if found == nil {
-		return fmt.Errorf("no challenge at %s/%s\n%s", category, slug, suggest(challs))
+		return fmt.Errorf("no challenge at %s/%s\n%s", category, slug, suggest(challs, arg))
 	}
 	if loadErr, ok := loadErrs[found.ManifestPath()]; ok {
 		return fmt.Errorf("manifest failed to parse: %w", loadErr)
@@ -107,9 +107,12 @@ func runInfoAll(cfg *config.Config, challs []*challenge.Challenge, loadErrs map[
 	return nil
 }
 
-func suggest(challs []*challenge.Challenge) string {
+func suggest(challs []*challenge.Challenge, query string) string {
 	if len(challs) == 0 {
 		return "(no challenges discovered)"
+	}
+	if hint := didYouMean(challs, query); hint != "" {
+		return strings.TrimPrefix(hint, "\n")
 	}
 	var sb strings.Builder
 	sb.WriteString("known challenges:\n")

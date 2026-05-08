@@ -74,7 +74,7 @@ var solveCmd = &cobra.Command{
 				}
 			}
 			if len(targets) == 0 {
-				return fmt.Errorf("no challenge at %s/%s", category, slug)
+				return fmt.Errorf("no challenge at %s/%s%s", category, slug, didYouMean(challs, args[0]))
 			}
 		default:
 			return fmt.Errorf("either pass <category>/<slug> or use --all")

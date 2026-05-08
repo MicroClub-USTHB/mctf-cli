@@ -54,7 +54,7 @@ var logsCmd = &cobra.Command{
 			}
 		}
 		if found == nil {
-			return fmt.Errorf("no challenge at %s/%s", category, slug)
+			return fmt.Errorf("no challenge at %s/%s%s", category, slug, didYouMean(challs, args[0]))
 		}
 		if !found.Manifest.Challenge.NeedDeploy {
 			return fmt.Errorf("%s/%s is a static challenge — nothing to log", category, slug)
