@@ -195,7 +195,7 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 	if len(matches) > 0 {
 		assetsOnDisk := make(map[string]bool)
 		// Walk recursively through assets/ to collect all file basenames
-		if err := filepath.WalkDir(c.AssetsDir, func(p string, d fs.DirEntry, err error) error {
+		_ = filepath.WalkDir(c.AssetsDir, func(p string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return nil
 			}
@@ -204,9 +204,7 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 			}
 			assetsOnDisk[d.Name()] = true
 			return nil
-		}); err != nil && !os.IsNotExist(err) {
-			// Only report if error is not "directory doesn't exist"
-		}
+		})
 
 		for _, match := range matches {
 			var fileName string
