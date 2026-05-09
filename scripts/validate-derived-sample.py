@@ -5,6 +5,7 @@ and validate them against the derived-file schemas.
 This proves the schemas are mutually self-consistent — when the future Go CLI
 generates these files, they'll have a known-good shape to target.
 """
+
 import json
 import sys
 from pathlib import Path
@@ -31,7 +32,7 @@ def validate(label: str, instance, schema_path: Path) -> int:
     return 1
 
 
-# Derived CTFd manifest for cub3-clone (what `mtcf generate` would emit)
+# Derived CTFd manifest for cub3-clone (what `mctf generate` would emit)
 ctfd_manifest = {
     "name": "cub3-clone",
     "description": (

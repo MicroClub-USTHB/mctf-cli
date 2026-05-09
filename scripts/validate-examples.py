@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Validate every example challenge.yml against schema/challenge.schema.json,
-and the sample mtcf.config.yml against schema/mtcf-config.schema.json.
+and the sample mctf.config.yml against schema/mtcf-config.schema.json.
 
-This is a Phase-0 sanity check — once the Go CLI ships, `mtcf validate` will
+This is a Phase-0 sanity check — once the Go CLI ships, `mctf validate` will
 do the same thing (and more, including event-wide cross-checks).
 """
+
 import json
 import sys
 from pathlib import Path
@@ -41,10 +42,10 @@ def main() -> int:
     challenge_schema = SCHEMA_DIR / "challenge.schema.json"
     config_schema = SCHEMA_DIR / "mtcf-config.schema.json"
 
-    print("# mtcf.config.yml")
+    print("# mctf.config.yml")
     rc |= validate(
-        "examples/sample-event/mtcf.config.yml",
-        load(EXAMPLES / "mtcf.config.yml"),
+        "examples/sample-event/mctf.config.yml",
+        load(EXAMPLES / "mctf.config.yml"),
         config_schema,
     )
 
