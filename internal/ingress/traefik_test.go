@@ -79,13 +79,13 @@ func TestPlanEntries_HTTPEntryShape(t *testing.T) {
 		t.Fatalf("want 1 entry, got %d", len(got))
 	}
 	e := got[0]
-	if e.Name != "mtcf-evt-misc-welcome" {
+	if e.Name != "mctf-evt-misc-welcome" {
 		t.Errorf("name = %q", e.Name)
 	}
 	if e.HostRule != "Host(`welcome.ctf.example.com`)" {
 		t.Errorf("host rule = %q", e.HostRule)
 	}
-	if e.Backend != "http://mtcf-evt-misc-welcome-app-1:8000" {
+	if e.Backend != "http://mctf-evt-misc-welcome-app-1:8000" {
 		t.Errorf("backend = %q", e.Backend)
 	}
 	if e.EntryPt != "websecure" {
@@ -104,7 +104,7 @@ func TestPlanEntries_TCPEntryShape(t *testing.T) {
 	if !strings.HasPrefix(e.HostRule, "HostSNI(") {
 		t.Errorf("tcp router should use HostSNI: %q", e.HostRule)
 	}
-	if e.Backend != "mtcf-evt-pwn-baby-app-1:5000" {
+	if e.Backend != "mctf-evt-pwn-baby-app-1:5000" {
 		t.Errorf("backend = %q (no scheme for TCP)", e.Backend)
 	}
 	if e.EntryPt != "tcp" {

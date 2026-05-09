@@ -36,7 +36,7 @@ func TestEvent_WritesExpectedTree(t *testing.T) {
 	}
 
 	wantFiles := []string{
-		"mtcf.config.yml",
+		"mctf.config.yml",
 		"README.md",
 		".gitignore",
 		".env.example",
@@ -58,7 +58,7 @@ func TestEvent_WritesExpectedTree(t *testing.T) {
 		}
 	}
 
-	cfg, err := os.ReadFile(filepath.Join(dir, "mtcf.config.yml"))
+	cfg, err := os.ReadFile(filepath.Join(dir, "mctf.config.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestEvent_WritesExpectedTree(t *testing.T) {
 
 func TestEvent_RefusesIfInitialized(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "mtcf.config.yml"), []byte("version: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "mctf.config.yml"), []byte("version: 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_, err := Event(dir, NewEventVars("Existing"), EventOptions{})
@@ -87,7 +87,7 @@ func TestEvent_RefusesIfInitialized(t *testing.T) {
 
 func TestEvent_ForceOverwrites(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "mtcf.config.yml"), []byte("stale\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "mctf.config.yml"), []byte("stale\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	res, err := Event(dir, NewEventVars("New"), EventOptions{Force: true})
@@ -97,7 +97,7 @@ func TestEvent_ForceOverwrites(t *testing.T) {
 	if len(res.Written) == 0 {
 		t.Fatalf("no files written under --force")
 	}
-	body, err := os.ReadFile(filepath.Join(dir, "mtcf.config.yml"))
+	body, err := os.ReadFile(filepath.Join(dir, "mctf.config.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}

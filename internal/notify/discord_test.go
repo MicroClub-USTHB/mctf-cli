@@ -43,7 +43,7 @@ func TestDiscord_PostsEmbed(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if got.Username != "MTCF" {
+	if got.Username != "MCTF" {
 		t.Errorf("username = %q", got.Username)
 	}
 	if len(got.Embeds) != 1 {

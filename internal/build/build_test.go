@@ -155,7 +155,7 @@ func TestBuildArgs_Shape(t *testing.T) {
 		Context:    "/repo/web/x/challenge",
 		Dockerfile: "/repo/web/x/challenge/Dockerfile",
 		Tags:       []string{"reg/x:abc", "reg/x:latest"},
-		Labels:     map[string]string{"mtcf.event": "evt", "mtcf.category": "web"},
+		Labels:     map[string]string{"mctf.event": "evt", "mctf.category": "web"},
 	}
 	args := BuildArgs(spec, Options{NoCache: true})
 	got := strings.Join(args, " ")
@@ -164,8 +164,8 @@ func TestBuildArgs_Shape(t *testing.T) {
 		"--no-cache",
 		"-t reg/x:abc",
 		"-t reg/x:latest",
-		"--label mtcf.category=web",
-		"--label mtcf.event=evt",
+		"--label mctf.category=web",
+		"--label mctf.event=evt",
 		"-f /repo/web/x/challenge/Dockerfile",
 		"/repo/web/x/challenge",
 	} {

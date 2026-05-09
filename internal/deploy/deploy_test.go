@@ -102,7 +102,7 @@ func TestPlan_ProjectName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan[0].ProjectName != "mtcf-evt-misc-welcome" {
+	if plan[0].ProjectName != "mctf-evt-misc-welcome" {
 		t.Errorf("project name = %q", plan[0].ProjectName)
 	}
 }
@@ -147,9 +147,9 @@ func TestPlan_MissingComposeErrors(t *testing.T) {
 }
 
 func TestUpArgs_Shape(t *testing.T) {
-	u := Unit{ProjectName: "mtcf-evt-misc-welcome", ComposeFile: "/abs/docker-compose.yml"}
+	u := Unit{ProjectName: "mctf-evt-misc-welcome", ComposeFile: "/abs/docker-compose.yml"}
 	got := strings.Join(UpArgs(u), " ")
-	want := "compose -p mtcf-evt-misc-welcome -f /abs/docker-compose.yml up -d"
+	want := "compose -p mctf-evt-misc-welcome -f /abs/docker-compose.yml up -d"
 	if got != want {
 		t.Errorf("UpArgs = %q, want %q", got, want)
 	}
