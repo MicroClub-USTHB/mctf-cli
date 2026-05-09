@@ -21,6 +21,14 @@ func cfgDocker() *config.Config {
 	}
 }
 
+func cfgSSH() *config.Config {
+	return &config.Config{
+		Version: 1,
+		Event: config.Event{Slug: "evt"},
+		Deploy: &config.Deploy{Mode: "ssh"},
+	}
+}
+
 func newChall(t *testing.T, root, cat, slug string, arch challenge.Archetype, withCompose bool, port, internal int) *challenge.Challenge {
 	t.Helper()
 	chRoot := filepath.Join(root, cat, slug)
@@ -55,13 +63,25 @@ func newChall(t *testing.T, root, cat, slug string, arch challenge.Archetype, wi
 	return c
 }
 
-func TestPlan_DockerOnly(t *testing.T) {
-	cfg := &config.Config{Version: 1, Event: config.Event{Slug: "evt"}, Deploy: &config.Deploy{Mode: "ssh"}}
-	_, err := Plan(cfg, "/tmp", nil, Options{})
-	if err == nil || !strings.Contains(err.Error(), "deploy.mode must be 'docker'") {
-		t.Errorf("expected docker-mode error, got %v", err)
+func TestPlan_AcceptsSSHMode(t *testing.T) {
+	_, err := Plan(cfgSSH(), "/tmp", nil, Options{})
+	if err != nil {
+		t.Fatalf("expected ssh mode to be accepted, got %v", err)
 	}
 }
+
+func TestPlan_RejectsUnsupportedMode(t *testing.T) {
+	cfg := &config.Config{
+		Version: 1,
+		Event:   config.Event{Slug: "evt"},
+		Deploy:  &config.Deploy{Mode: "kubernetes"},
+	}
+	_, err := Plan(cfg, "/tmp", nil, Options{})
+	if err == nil || !strings.Contains(err.Error(), "deploy.mode must be 'docker' or 'ssh'") {
+		t.Errorf("expected unsupported-mode error, got %v", err)
+	}
+}
+
 
 func TestPlan_SkipsStaticAndInstanced(t *testing.T) {
 	root := t.TempDir()
