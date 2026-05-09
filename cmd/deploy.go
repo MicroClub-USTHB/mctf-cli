@@ -37,7 +37,7 @@ var deployCmd = &cobra.Command{
 		"  mtcf deploy --category misc\n" +
 		"  mtcf deploy --slug welcome",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		plan, _, err := planDeploy()
+		plan, cfg, err := planDeploy()
 		if err != nil {
 			return err
 		}
@@ -48,12 +48,10 @@ var deployCmd = &cobra.Command{
 
 		printPlan("up", plan)
 
-		var runner deploy.Runner
-		if flagDeployDryRun {
-			runner = deploy.NewDryRunner()
-		} else {
-			runner = deploy.NewDockerRunner()
-		}
+		runner, err := newDeployRunner(cfg, flagDeployDryRun)
+		if err != nil {
+				return err
+			}
 		ctx := context.Background()
 		if err := deploy.ApplyUp(ctx, runner, plan); err != nil {
 			notifyDiscord(ctx, "deploy failed", "error",
@@ -112,7 +110,7 @@ var downCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Reuse the deploy planner with the down-specific filters.
 		flagDeployCat, flagDeploySlug = flagDownCat, flagDownSlug
-		plan, _, err := planDeploy()
+		plan, cfg, err := planDeploy()
 		if err != nil {
 			return err
 		}
@@ -123,12 +121,11 @@ var downCmd = &cobra.Command{
 
 		printPlan("down", plan)
 
-		var runner deploy.Runner
-		if flagDownDryRun {
-			runner = deploy.NewDryRunner()
-		} else {
-			runner = deploy.NewDockerRunner()
+		runner, err := newDeployRunner(cfg, flagDownDryRun)
+		if err != nil {
+			return err
 		}
+
 		ctx := context.Background()
 		if err := deploy.ApplyDown(ctx, runner, plan, flagDownVolumes); err != nil {
 			notifyDiscord(ctx, "teardown failed", "error",
@@ -159,6 +156,25 @@ func planDeploy() ([]deploy.Unit, *config.Config, error) {
 	})
 	return plan, cfg, err
 }
+
+func newDeployRunner(cfg *config.Config, dryRun bool) (deploy.Runner, error) {
+	if dryRun {
+		return deploy.NewDryRunner(), nil
+	}
+	if cfg == nil || cfg.Deploy == nil {
+		return nil, fmt.Errorf("deploy config is missing")
+	}
+
+	switch cfg.Deploy.Mode {
+	case "docker":
+		return deploy.NewDockerRunner(), nil
+	case "ssh":
+		return deploy.NewSSHRunner(), nil
+	default:
+		return nil, fmt.Errorf("unsupported deploy mode %q", cfg.Deploy.Mode)
+	}
+}
+
 
 func printPlan(verb string, plan []deploy.Unit) {
 	abs, _ := filepath.Abs(flagDir)

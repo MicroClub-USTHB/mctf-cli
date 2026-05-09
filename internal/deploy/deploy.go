@@ -40,8 +40,8 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, o
 	if cfg == nil {
 		return nil, fmt.Errorf("nil config")
 	}
-	if cfg.Deploy == nil || cfg.Deploy.Mode != "docker" {
-		return nil, fmt.Errorf("deploy.mode must be 'docker' (got %q) — other modes ship in later releases",
+	if cfg.Deploy == nil || cfg.Deploy.Mode != "docker" && cfg.Deploy.Mode != "ssh" {
+		return nil, fmt.Errorf("deploy.mode must be 'docker' or 'ssh' (got %q) — other modes ship in later releases",
 			deployMode(cfg))
 	}
 
