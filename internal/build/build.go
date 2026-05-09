@@ -62,7 +62,7 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, o
 		registry = strings.TrimRight(cfg.Registry.URL, "/")
 	}
 	if registry == "" {
-		return nil, fmt.Errorf("registry.url not set in mtcf.config.yml — required for build")
+		return nil, fmt.Errorf("registry.url not set in mctf.config.yml — required for build")
 	}
 	sha := opts.SHA
 	if sha == "" {
@@ -99,10 +99,10 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, o
 			Dockerfile: filepath.Join(ctxPath, "Dockerfile"),
 			Tags:       []string{base + ":" + sha, base + ":latest"},
 			Labels: map[string]string{
-				"mtcf.event":     cfg.Event.Slug,
-				"mtcf.category":  c.CategoryDir,
-				"mtcf.challenge": c.Slug,
-				"mtcf.archetype": string(c.Archetype),
+				"mctf.event":     cfg.Event.Slug,
+				"mctf.category":  c.CategoryDir,
+				"mctf.challenge": c.Slug,
+				"mctf.archetype": string(c.Archetype),
 			},
 			FlagValues: flagVals,
 		})

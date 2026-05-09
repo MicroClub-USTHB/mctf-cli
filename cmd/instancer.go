@@ -36,7 +36,7 @@ var instancerServeCmd = &cobra.Command{
 	Long: "Starts an HTTP daemon that exposes the spawn / destroy / extend\n" +
 		"endpoints used by the platform integration. A background\n" +
 		"reaper goroutine cleans up expired instances on every tick.\n\n" +
-		"Auth: bearer tokens read from MTCF_INSTANCER_TOKEN (one or more,\n" +
+		"Auth: bearer tokens read from MCTF_INSTANCER_TOKEN (one or more,\n" +
 		"comma-separated). The platform integration includes one of these\n" +
 		"in `Authorization: Bearer <token>` headers.\n\n" +
 		"Routes:\n" +
@@ -47,9 +47,9 @@ var instancerServeCmd = &cobra.Command{
 		"  POST /destroy/{id}                tear down + remove from store\n" +
 		"  POST /extend/{id}                 {by_seconds: N} (default 900)\n\n" +
 		"Examples:\n" +
-		"  export MTCF_INSTANCER_TOKEN=my-secret\n" +
-		"  mtcf instancer serve --addr :8080\n" +
-		"  mtcf instancer serve --addr 127.0.0.1:8080 --reap-interval 10s",
+		"  export MCTF_INSTANCER_TOKEN=my-secret\n" +
+		"  mctf instancer serve --addr :8080\n" +
+		"  mctf instancer serve --addr 127.0.0.1:8080 --reap-interval 10s",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(flagDir)
 		if err != nil {
@@ -60,13 +60,13 @@ var instancerServeCmd = &cobra.Command{
 			return err
 		}
 
-		tokens := splitTokens(os.Getenv("MTCF_INSTANCER_TOKEN"))
+		tokens := splitTokens(os.Getenv("MCTF_INSTANCER_TOKEN"))
 		if len(tokens) == 0 {
-			return errors.New("MTCF_INSTANCER_TOKEN is empty — set at least one bearer token before serving")
+			return errors.New("MCTF_INSTANCER_TOKEN is empty — set at least one bearer token before serving")
 		}
 
 		abs, _ := filepath.Abs(flagDir)
-		store, err := instancer.NewStore(filepath.Join(abs, ".mtcf", "instances.json"))
+		store, err := instancer.NewStore(filepath.Join(abs, ".mctf", "instances.json"))
 		if err != nil {
 			return err
 		}
@@ -130,7 +130,7 @@ var instancerServeCmd = &cobra.Command{
 	},
 }
 
-// splitTokens parses MTCF_INSTANCER_TOKEN into a list. Commas separate
+// splitTokens parses MCTF_INSTANCER_TOKEN into a list. Commas separate
 // multiple tokens so operators can rotate without a restart.
 func splitTokens(raw string) []string {
 	var out []string

@@ -67,7 +67,7 @@ func (r *Reaper) Tick(ctx context.Context) {
 		if err != nil {
 			r.logf("reaper: %s — down failed: %v\n", inst.ID, err)
 			// Leave the record in the store so the next tick retries
-			// (or an operator can run `mtcf instance destroy --force`).
+			// (or an operator can run `mctf instance destroy --force`).
 			continue
 		}
 		if err := r.Store.Delete(inst.ID); err != nil {

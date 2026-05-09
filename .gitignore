@@ -1,5 +1,5 @@
-# MTCF working directory (never committed)
-.mtcf/
+# MCTF working directory (never committed)
+.mctf/
 
 # Local environment
 .env
@@ -17,7 +17,7 @@ Thumbs.db
 *.swp
 
 # Go (Phase 1)
-/mtcf
+/mctf
 /dist/
 *.test
 *.out

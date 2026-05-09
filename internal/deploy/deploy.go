@@ -21,7 +21,7 @@ type Unit struct {
 	Challenge   string // <category>/<slug>
 	Category    string
 	Slug        string
-	ProjectName string            // mtcf-<event>-<cat>-<slug>
+	ProjectName string            // mctf-<event>-<cat>-<slug>
 	Cwd         string            // working dir for `docker compose` (the challenge/ folder)
 	ComposeFile string            // absolute path to docker-compose.yml
 	Env         map[string]string // env passed to docker compose (PORT_<n>, etc.)
@@ -80,11 +80,11 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, o
 
 // ProjectName builds the docker compose project name for one challenge.
 //
-// Format: mtcf-<event-slug>-<category>-<slug>. The compose project name
+// Format: mctf-<event-slug>-<category>-<slug>. The compose project name
 // is the visible identity for `docker compose ls`, so making it stable
 // and self-describing matters.
 func ProjectName(cfg *config.Config, c *challenge.Challenge) string {
-	return fmt.Sprintf("mtcf-%s-%s-%s", cfg.Event.Slug, c.CategoryDir, c.Slug)
+	return fmt.Sprintf("mctf-%s-%s-%s", cfg.Event.Slug, c.CategoryDir, c.Slug)
 }
 
 // envForUnit derives the env vars the compose run needs. For service

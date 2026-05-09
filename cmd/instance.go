@@ -21,7 +21,7 @@ var instanceCmd = &cobra.Command{
 	Use:   "instance",
 	Short: "Manage per-team challenge instances (native instancer)",
 	Long: "Spawn / destroy / list per-team instances of dynamic-instance\n" +
-		"challenges. The store lives at .mtcf/instances.json.\n\n" +
+		"challenges. The store lives at .mctf/instances.json.\n\n" +
 		"For v0 the subcommands shell out directly to `docker compose`;\n" +
 		"a daemon mode that exposes these as HTTP endpoints lands later.",
 }
@@ -302,7 +302,7 @@ func openStore() (*instancer.Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return instancer.NewStore(filepath.Join(abs, ".mtcf", "instances.json"))
+	return instancer.NewStore(filepath.Join(abs, ".mctf", "instances.json"))
 }
 
 func loadInstanced(category, slug string) (*config.Config, *challenge.Challenge, error) {

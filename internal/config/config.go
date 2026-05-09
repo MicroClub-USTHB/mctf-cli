@@ -1,4 +1,4 @@
-// Package config loads and validates an MTCF event's mtcf.config.yml.
+// Package config loads and validates an MCTF event's mctf.config.yml.
 package config
 
 import (
@@ -13,7 +13,7 @@ import (
 )
 
 // FileName is the conventional config filename at the event repo root.
-const FileName = "mtcf.config.yml"
+const FileName = "mctf.config.yml"
 
 // Profile is one of the curated presets.
 type Profile string
@@ -24,7 +24,7 @@ const (
 	ProfilePro       Profile = "pro"
 )
 
-// Config is the typed view of mtcf.config.yml.
+// Config is the typed view of mctf.config.yml.
 //
 // Field names use JSON tags (the loader goes YAML -> JSON -> Go) so the
 // public schema/mtcf-config.schema.json drives validation; this struct
@@ -76,7 +76,7 @@ type Categories struct {
 	Custom   []CustomCategory `json:"custom,omitempty"`
 }
 
-// CustomCategory is a per-event extension declared in mtcf.config.yml.
+// CustomCategory is a per-event extension declared in mctf.config.yml.
 type CustomCategory struct {
 	Slug       string     `json:"slug"`
 	Name       string     `json:"name"`
@@ -136,15 +136,15 @@ type Instancer struct {
 	DefaultExtendTime int    `json:"default_extend_time,omitempty"`
 }
 
-// Load reads, schema-validates, and decodes mtcf.config.yml from dir.
+// Load reads, schema-validates, and decodes mctf.config.yml from dir.
 //
-// dir is the event repo root; the file is expected at <dir>/mtcf.config.yml.
+// dir is the event repo root; the file is expected at <dir>/mctf.config.yml.
 func Load(dir string) (*Config, error) {
 	path := filepath.Join(dir, FileName)
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("no %s found in %s — run `mtcf init` to scaffold one", FileName, dir)
+			return nil, fmt.Errorf("no %s found in %s — run `mctf init` to scaffold one", FileName, dir)
 		}
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}

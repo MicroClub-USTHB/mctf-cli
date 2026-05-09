@@ -1,7 +1,7 @@
 // Package ingress generates routing config for the deploy mode's
 // chosen ingress (Traefik in v0).
 //
-// Output is byte-deterministic so `mtcf generate --check` covers it.
+// Output is byte-deterministic so `mctf generate --check` covers it.
 // Only service-archetype, deployable challenges produce ingress
 // entries; instanced challenges are handled by the instancer at game
 // time, not by the event-deploy ingress.
@@ -35,7 +35,7 @@ type composeService struct {
 // the YAML emitter and tests.
 type Entry struct {
 	Challenge string // <category>/<slug>
-	Name      string // traefik router/service id (mtcf-<event>-<cat>-<slug>)
+	Name      string // traefik router/service id (mctf-<event>-<cat>-<slug>)
 	HostRule  string // Host(`<sub>.<domain>`) or HostSNI(`<sub>.<domain>`)
 	TCP       bool
 	NoSSL     bool
@@ -79,7 +79,7 @@ func PlanEntries(cfg *config.Config, challs []*challenge.Challenge) ([]Entry, er
 
 		entry := Entry{
 			Challenge: c.CategoryDir + "/" + c.Slug,
-			Name:      fmt.Sprintf("mtcf-%s-%s-%s", cfg.Event.Slug, c.CategoryDir, c.Slug),
+			Name:      fmt.Sprintf("mctf-%s-%s-%s", cfg.Event.Slug, c.CategoryDir, c.Slug),
 			Subdomain: d.Subdomain,
 			Domain:    domain,
 			TCP:       d.TCP,
@@ -186,7 +186,7 @@ func TraefikStatic(cfg *config.Config) []byte {
 }
 
 func projectName(cfg *config.Config, c *challenge.Challenge) string {
-	return fmt.Sprintf("mtcf-%s-%s-%s", cfg.Event.Slug, c.CategoryDir, c.Slug)
+	return fmt.Sprintf("mctf-%s-%s-%s", cfg.Event.Slug, c.CategoryDir, c.Slug)
 }
 
 // composeServiceName returns the first service name from the compose
