@@ -50,8 +50,8 @@ var deployCmd = &cobra.Command{
 
 		runner, err := newDeployRunner(cfg, flagDeployDryRun)
 		if err != nil {
-				return err
-			}
+			return err
+		}
 		ctx := context.Background()
 		if err := deploy.ApplyUp(ctx, runner, plan); err != nil {
 			notifyDiscord(ctx, "deploy failed", "error",
@@ -174,7 +174,6 @@ func newDeployRunner(cfg *config.Config, dryRun bool) (deploy.Runner, error) {
 		return nil, fmt.Errorf("unsupported deploy mode %q", cfg.Deploy.Mode)
 	}
 }
-
 
 func printPlan(verb string, plan []deploy.Unit) {
 	abs, _ := filepath.Abs(flagDir)

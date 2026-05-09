@@ -18,7 +18,7 @@ import (
 
 // Unit is one compose project corresponding to one challenge.
 type Unit struct {
-	Challenge   string            // <category>/<slug>
+	Challenge   string // <category>/<slug>
 	Category    string
 	Slug        string
 	ProjectName string            // mtcf-<event>-<cat>-<slug>
@@ -29,8 +29,8 @@ type Unit struct {
 
 // Options narrow or alter the plan.
 type Options struct {
-	CategoryFilter string
-	SlugFilter     string
+	CategoryFilter   string
+	SlugFilter       string
 	IncludeInstanced bool // override v0 default (skip instanced)
 }
 
