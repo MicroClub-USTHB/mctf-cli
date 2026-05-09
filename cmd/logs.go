@@ -25,11 +25,11 @@ var logsCmd = &cobra.Command{
 	Use:   "logs <category>/<slug>",
 	Short: "Stream logs from a deployed challenge's compose project",
 	Long: "Thin wrapper around `docker compose logs` for the project that\n" +
-		"`mtcf deploy` brought up.\n\n" +
+		"`mctf deploy` brought up.\n\n" +
 		"Examples:\n" +
-		"  mtcf logs misc/welcome\n" +
-		"  mtcf logs misc/welcome -f\n" +
-		"  mtcf logs misc/welcome --tail 50",
+		"  mctf logs misc/welcome\n" +
+		"  mctf logs misc/welcome -f\n" +
+		"  mctf logs misc/welcome --tail 50",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		category, slug, ok := splitCategorySlug(args[0])

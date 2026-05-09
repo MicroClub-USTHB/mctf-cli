@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mtcf.dev/schema/v1/mtcf-config.schema.json",
-  "title": "MTCF Event Config",
-  "description": "Central event config (mtcf.config.yml). Replaces the hardcoded TypeScript Config module from MCTF 5.0.",
+  "$id": "https://mctf.dev/schema/v1/mtcf-config.schema.json",
+  "title": "MCTF Event Config",
+  "description": "Central event config (mctf.config.yml). Replaces the hardcoded TypeScript Config module from MCTF 5.0.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "event"],
@@ -125,7 +125,7 @@
       "properties": {
         "url": {
           "type": "string",
-          "description": "e.g. ghcr.io/myorg or docker.io/myuser. Auth via MTCF_REGISTRY_USER/MTCF_REGISTRY_TOKEN env vars."
+          "description": "e.g. ghcr.io/myorg or docker.io/myuser. Auth via MCTF_REGISTRY_USER/MCTF_REGISTRY_TOKEN env vars."
         }
       }
     },
@@ -161,7 +161,7 @@
           "additionalProperties": false,
           "properties": {
             "kubeconfig": { "type": "string" },
-            "namespace": { "type": "string", "default": "mtcf" },
+            "namespace": { "type": "string", "default": "mctf" },
             "ingress_class": { "type": "string", "default": "nginx" }
           }
         }

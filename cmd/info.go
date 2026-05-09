@@ -23,9 +23,9 @@ var infoCmd = &cobra.Command{
 		"single-shot review document. With --json, emits machine-readable\n" +
 		"output (an object for one challenge, an array under --all).\n\n" +
 		"Examples:\n" +
-		"  mtcf info crypto/rsa-baby\n" +
-		"  mtcf info web/cub3-clone --json\n" +
-		"  mtcf info --all --json",
+		"  mctf info crypto/rsa-baby\n" +
+		"  mctf info web/cub3-clone --json\n" +
+		"  mctf info --all --json",
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(flagDir)

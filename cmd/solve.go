@@ -33,9 +33,9 @@ var solveCmd = &cobra.Command{
 		"Instanced challenges receive INSTANCER_URL but not HOST/PORT —\n" +
 		"smoke-testing them requires spawning a per-team instance first.\n\n" +
 		"Examples:\n" +
-		"  mtcf solve misc/welcome\n" +
-		"  mtcf solve --all\n" +
-		"  mtcf solve --all --category web --timeout 30s",
+		"  mctf solve misc/welcome\n" +
+		"  mctf solve --all\n" +
+		"  mctf solve --all --category web --timeout 30s",
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(flagDir)

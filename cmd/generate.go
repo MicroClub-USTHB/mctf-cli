@@ -69,7 +69,7 @@ challenge that's no longer instanced).`,
 				rel, _ := filepath.Rel(flagDir, d.Path)
 				fmt.Printf("  %-8s %s\n", d.Reason, rel)
 			}
-			return fmt.Errorf("%d derived file(s) out of sync — run `mtcf generate`", len(drifts))
+			return fmt.Errorf("%d derived file(s) out of sync — run `mctf generate`", len(drifts))
 		}
 
 		written, _, err := out.Apply()

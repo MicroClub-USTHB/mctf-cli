@@ -27,7 +27,7 @@ const (
 // Config is the typed view of mctf.config.yml.
 //
 // Field names use JSON tags (the loader goes YAML -> JSON -> Go) so the
-// public schema/mtcf-config.schema.json drives validation; this struct
+// public schema/mctf-config.schema.json drives validation; this struct
 // only has to match shapes for fields the CLI actually consumes.
 type Config struct {
 	Version int     `json:"version"`
@@ -149,7 +149,7 @@ func Load(dir string) (*Config, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 
-	v, err := jsonschema.New("mtcf-config.schema.json", schemas.MTCFConfig)
+	v, err := jsonschema.New("mtcf-config.schema.json", schemas.MCTFConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -24,21 +24,21 @@ var (
 
 var initCmd = &cobra.Command{
 	Use:   "init [event-name]",
-	Short: "Scaffold a new MTCF event repository",
+	Short: "Scaffold a new MCTF event repository",
 	Long: "Creates a new event repo at the path given by -C (default: cwd):\n\n" +
-		"  mtcf.config.yml         # event config (filled with the name + slug)\n" +
+		"  mctf.config.yml         # event config (filled with the name + slug)\n" +
 		"  README.md               # internal handbook for the event repo\n" +
-		"  .gitignore              # MTCF working dir + secrets\n" +
+		"  .gitignore              # MCTF working dir + secrets\n" +
 		"  .env.example            # registry / CTFd / webhook env vars\n" +
-		"  .github/workflows/      # CI that runs `mtcf validate` + `generate --check`\n" +
+		"  .github/workflows/      # CI that runs `mctf validate` + `generate --check`\n" +
 		"  challenges/             # empty — drop your first challenge here\n" +
 		"  templates/challenge_name/   # local starter template\n\n" +
-		"Refuses to overwrite an existing mtcf.config.yml unless --force is set.\n\n" +
+		"Refuses to overwrite an existing mctf.config.yml unless --force is set.\n\n" +
 		"Examples:\n" +
-		"  mtcf init                              # uses dir name as event name\n" +
-		"  mtcf init \"MCTF 6.0\"                   # explicit name\n" +
-		"  mtcf init \"MCTF 6.0\" --domain mctf.microclub.info --profile instanced\n" +
-		"  mtcf init -C ./my-event \"MCTF 6.0\"",
+		"  mctf init                              # uses dir name as event name\n" +
+		"  mctf init \"MCTF 6.0\"                   # explicit name\n" +
+		"  mctf init \"MCTF 6.0\" --domain mctf.microclub.info --profile instanced\n" +
+		"  mctf init -C ./my-event \"MCTF 6.0\"",
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir := flagDir
@@ -106,7 +106,7 @@ var initCmd = &cobra.Command{
 		fmt.Printf("\nevent %q scaffolded at %s\n", vars.EventName, abs)
 		fmt.Printf("next:\n")
 		fmt.Printf("  cd %s\n", abs)
-		fmt.Printf("  mtcf validate\n")
+		fmt.Printf("  mctf validate\n")
 		fmt.Printf("  cp -r templates/challenge_name challenges/<category>/<your-slug>\n")
 		return nil
 	},

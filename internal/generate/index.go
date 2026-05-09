@@ -12,7 +12,7 @@ import (
 // indexDoc mirrors the public docs/spec/derived-files.md "index.json" shape.
 // Field order is the rendered order — encoding/json honors struct order.
 //
-// Note: the JSON document is intentionally timestamp-free so `mtcf generate`
+// Note: the JSON document is intentionally timestamp-free so `mctf generate`
 // is byte-deterministic across runs — this is what lets `--check` work in CI.
 type indexDoc struct {
 	Schema     int          `json:"schema"`

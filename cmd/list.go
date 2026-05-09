@@ -27,10 +27,10 @@ var listCmd = &cobra.Command{
 		"challenges that match both. With --json, emits a machine-readable\n" +
 		"array (same fields as challenges/index.json's per-challenge shape).\n\n" +
 		"Examples:\n" +
-		"  mtcf list\n" +
-		"  mtcf list --archetype instanced\n" +
-		"  mtcf list --category web --wave 2\n" +
-		"  mtcf list --json",
+		"  mctf list\n" +
+		"  mctf list --archetype instanced\n" +
+		"  mctf list --category web --wave 2\n" +
+		"  mctf list --json",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(flagDir)
 		if err != nil {

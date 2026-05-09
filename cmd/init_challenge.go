@@ -32,8 +32,8 @@ var initChallengeCmd = &cobra.Command{
 		"validates without further edits.\n\n" +
 		"Refuses if the target directory exists; pass --force to overwrite.\n\n" +
 		"Examples:\n" +
-		"  mtcf init challenge web/sql-101 --author $h3rL0ck\n" +
-		"  mtcf init challenge crypto/rsa-baby --name \"RSA Baby\" --difficulty medium",
+		"  mctf init challenge web/sql-101 --author $h3rL0ck\n" +
+		"  mctf init challenge crypto/rsa-baby --name \"RSA Baby\" --difficulty medium",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		category, slug, ok := splitCategorySlug(args[0])
@@ -51,7 +51,7 @@ var initChallengeCmd = &cobra.Command{
 
 		cats := validate.ResolveCategories(cfg)
 		if _, ok := cats[category]; !ok {
-			return fmt.Errorf("unknown category %q\nknown: %s\n(extend with mtcf.config.yml::categories.extended or .custom)",
+			return fmt.Errorf("unknown category %q\nknown: %s\n(extend with mctf.config.yml::categories.extended or .custom)",
 				category, strings.Join(sortedKeys(cats), ", "))
 		}
 
@@ -95,7 +95,7 @@ var initChallengeCmd = &cobra.Command{
 		fmt.Printf("\nchallenge %s/%s scaffolded\n", category, slug)
 		fmt.Printf("next:\n")
 		fmt.Printf("  edit %s/%s/%s/challenge/challenge.yml\n", cfg.ChallengesDir, category, slug)
-		fmt.Printf("  mtcf validate\n")
+		fmt.Printf("  mctf validate\n")
 		return nil
 	},
 }

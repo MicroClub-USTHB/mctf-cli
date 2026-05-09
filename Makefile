@@ -33,4 +33,4 @@ run:
 	go run -ldflags "$(LDFLAGS)" . $(ARGS)
 
 clean:
-	rm -f mtcf
+	rm -f mctf

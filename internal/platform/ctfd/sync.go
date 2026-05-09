@@ -566,7 +566,7 @@ func challengeKey(category, name string) string {
 }
 
 // descriptionWithAuthor matches the CTFd-manifest generator output so
-// the description sent over the wire equals what `mtcf generate`
+// the description sent over the wire equals what `mctf generate`
 // would have written.
 func descriptionWithAuthor(desc, author string) string {
 	desc = strings.TrimRight(desc, "\n")
