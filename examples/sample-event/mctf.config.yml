@@ -1,9 +1,9 @@
-# MTCF event config — sample event used as a reference for the spec.
+# MCTF event config — sample event used as a reference for the spec.
 # Schema: schema/mtcf-config.schema.json
 version: 1
 
 event:
-  name: "Sample MTCF Event"
+  name: "Sample MCTF Event"
   slug: "sample-event"
   domain: "ctf.example.com"
   flag_prefix: "mctf"
