@@ -1,6 +1,6 @@
 # Validation Rules (`mctf validate`)
 
-Every rule MTCF enforces, with rationale and severity. Hard-fails block the build/deploy; warnings inform. Profile column shows when a rule is escalated under stricter profiles.
+Every rule MCTF enforces, with rationale and severity. Hard-fails block the build/deploy; warnings inform. Profile column shows when a rule is escalated under stricter profiles.
 
 `mctf validate` is the entrypoint. It runs at three points:
 
@@ -121,8 +121,8 @@ The `validate.yml` workflow reports validation results as a job summary on the P
 
 Many rules are direct improvements over what MCTF 5.0's TypeScript validator catches today (see [CHANGELOG.md](./CHANGELOG.md) for the full list). The most consequential additions:
 
-- **`SEC001` (static-flag image-leak guard)** — the most common bug in CTF prep is shipping a `src/app.py` that hardcodes the flag, then publishing the image to a public registry. MCTF 5.0 has no check for this; MTCF makes it a hard-fail.
+- **`SEC001` (static-flag image-leak guard)** — the most common bug in CTF prep is shipping a `src/app.py` that hardcodes the flag, then publishing the image to a public registry. MCTF 5.0 has no check for this; MCTF makes it a hard-fail.
 - **`D004` (instanced healthcheck mandatory)** — without a healthcheck, the instancer can't tell when a spawn is ready. Players hit the URL too early, see HTTP 502, blame the organizers. Hard-failing at validation time avoids the live-event symptom.
-- **`D006` (port range enforcement)** — MCTF 5.0 designed per-category port ranges (10000–10999 for web, 11000–11999 for pwn, etc.) but disabled the validation. MTCF re-enables it.
-- **`U001`/`U002`/`U003` (uniqueness)** — duplicate ports cause silent deploy collisions; duplicate flags cause cross-solving. MCTF 5.0 doesn't check; MTCF does.
-- **`S005` (difficulty enum)** — MCTF 5.0 accepts any non-empty string for difficulty. MTCF locks it to four values so the CTFd UI is consistent.
+- **`D006` (port range enforcement)** — MCTF 5.0 designed per-category port ranges (10000–10999 for web, 11000–11999 for pwn, etc.) but disabled the validation. MCTF re-enables it.
+- **`U001`/`U002`/`U003` (uniqueness)** — duplicate ports cause silent deploy collisions; duplicate flags cause cross-solving. MCTF 5.0 doesn't check; MCTF does.
+- **`S005` (difficulty enum)** — MCTF 5.0 accepts any non-empty string for difficulty. MCTF locks it to four values so the CTFd UI is consistent.

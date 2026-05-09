@@ -1,4 +1,4 @@
-# MTCF CLI
+# MCTF CLI
 
 > **Modern CTF Framework** — opinionated, end-to-end CLI for running CTF competitions as reproducible infrastructure.
 
@@ -90,7 +90,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **`mctf solve <category>/<slug>`** — runs `solution/solve.sh` (or `solve.py` / `solve` binary) with `HOST` / `PORT` / `URL` / `FLAG_PREFIX` env, asserts the manifest flag appears in output. `--all` smoke-tests every solver; `--timeout` caps each run; `--json` for scripting.
 
 #### Notifications
-- **Discord webhook** — set `MTCF_DISCORD_WEBHOOK` and `mctf deploy` / `mctf down` post embedded status messages (success/failure with the challenge list). Best-effort — webhook errors warn but never block the deploy.
+- **Discord webhook** — set `MCTF_DISCORD_WEBHOOK` and `mctf deploy` / `mctf down` post embedded status messages (success/failure with the challenge list). Best-effort — webhook errors warn but never block the deploy.
 
 #### Native instancer (v0 — CLI mode)
 - **`mctf instance spawn <chall> --team <id>`** — bring up a per-team docker compose project for an instanced challenge with auto-allocated host ports (default range 30000–32999) and stamped `PORT_<n>` / `INSTANCE_ID` / `TEAM_ID` / `FLAG` env. Idempotent per (team, challenge): re-running returns the existing instance.
@@ -101,7 +101,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - State persists at `.mctf/instances.json` with atomic file rewrite + mutex protection.
 
 #### Native instancer (HTTP daemon)
-- **`mctf instancer serve --addr :8080`** — long-running daemon. Bearer-token auth via `MTCF_INSTANCER_TOKEN` (comma-separated for rotation). Routes:
+- **`mctf instancer serve --addr :8080`** — long-running daemon. Bearer-token auth via `MCTF_INSTANCER_TOKEN` (comma-separated for rotation). Routes:
   - `GET /healthz` — no-auth liveness probe
   - `GET /instances` / `GET /instances/{id}` — list / fetch
   - `POST /spawn` — `{team_id, challenge_slug, flag?}` (idempotent per team+chall)
@@ -112,7 +112,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - `--quiet` discards docker compose stdout/stderr (recommended in production).
 
 #### Platform integration (CTFd)
-- **`mctf platform sync`** — push challenges to the CTFd instance configured in `mctf.config.yml`. Diffs vs the platform's existing state, creates what's missing, attaches flags / tags / hints / **file uploads (assets/)**. `--update` reconciles existing challenges; `--dry-run` previews; `--category` / `--slug` filter; `--json` for scripting. Requires `MTCF_CTFD_TOKEN` env var.
+- **`mctf platform sync`** — push challenges to the CTFd instance configured in `mctf.config.yml`. Diffs vs the platform's existing state, creates what's missing, attaches flags / tags / hints / **file uploads (assets/)**. `--update` reconciles existing challenges; `--dry-run` previews; `--category` / `--slug` filter; `--json` for scripting. Requires `MCTF_CTFD_TOKEN` env var.
 - **`mctf platform configure`** — sync `ctf_name` from `event.name` to CTFd's `/api/v1/configs`. Theme settings are intentionally not synced (one-time UI setup). `--dry-run` previews.
 
 #### Distribution
@@ -227,7 +227,7 @@ go vet ./...
 
 ## Background
 
-MTCF is the spiritual successor to the tooling that grew up around the [MCTF 5.0 challenge repository](https://github.com/MicroClub-USTHB/MCTF-5.0-Challenges). The on-disk format works (50+ challenges, 10 categories, ran a real event), but the surrounding tooling fragmented into a Bun/TypeScript validator, a Windows `.bat` sync script calling Python `ctfcli`, hand-edited Traefik configs, and a separate "Whaley" instancer. **MTCF replaces all of it with one Go binary** that reads (almost) exactly the same on-disk format — challenge authors keep writing challenges the way they already do.
+MCTF is the spiritual successor to the tooling that grew up around the [MCTF 5.0 challenge repository](https://github.com/MicroClub-USTHB/MCTF-5.0-Challenges). The on-disk format works (50+ challenges, 10 categories, ran a real event), but the surrounding tooling fragmented into a Bun/TypeScript validator, a Windows `.bat` sync script calling Python `ctfcli`, hand-edited Traefik configs, and a separate "Whaley" instancer. **MCTF replaces all of it with one Go binary** that reads (almost) exactly the same on-disk format — challenge authors keep writing challenges the way they already do.
 
 ## License
 

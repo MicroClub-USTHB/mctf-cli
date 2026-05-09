@@ -1,12 +1,12 @@
 # Repository Layout
 
-> An MTCF event lives in its own git repository. This document defines the directory contract.
+> An MCTF event lives in its own git repository. This document defines the directory contract.
 
 ## At a glance
 
 ```
 my-event/                              # the event repo
-├── mctf.config.yml                    # central event config (NEW in MTCF)
+├── mctf.config.yml                    # central event config (NEW in MCTF)
 ├── .env.example                       # template for secrets (registry creds, CTFd token, webhooks)
 ├── .gitignore                         # ignores .mctf/, .env, *.flag
 ├── .github/workflows/
@@ -83,8 +83,8 @@ Each subdirectory under a challenge has a single, predictable purpose:
 | Profile | Deploy mode | Instancer | Monitoring | Hard-fails added |
 |---|---|---|---|---|
 | `simple` | Docker (compose, single host) | none | none | none |
-| `instanced` | Docker | native MTCF instancer | none | healthcheck required for instanced challenges |
-| `pro` | Kubernetes | native MTCF instancer (K8s mode) | Prometheus + Grafana | `privileged:true` blocked, capability allowlist enforced, resource limits required |
+| `instanced` | Docker | native MCTF instancer | none | healthcheck required for instanced challenges |
+| `pro` | Kubernetes | native MCTF instancer (K8s mode) | Prometheus + Grafana | `privileged:true` blocked, capability allowlist enforced, resource limits required |
 
 Profiles are *defaults* — anything in `mctf.config.yml` can override them.
 

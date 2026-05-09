@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mctf.dev/schema/v1/mtcf-config.schema.json",
+  "$id": "https://mctf.dev/schema/v1/mctf-config.schema.json",
   "title": "MCTF Event Config",
   "description": "Central event config (mctf.config.yml). Replaces the hardcoded TypeScript Config module from MCTF 5.0.",
   "type": "object",

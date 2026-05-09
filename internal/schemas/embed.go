@@ -10,7 +10,7 @@ import _ "embed"
 //go:embed challenge.schema.json
 var Challenge []byte
 
-//go:embed mtcf-config.schema.json
+//go:embed mctf-config.schema.json
 var MCTFConfig []byte
 
 //go:embed ctfd-manifest.schema.json

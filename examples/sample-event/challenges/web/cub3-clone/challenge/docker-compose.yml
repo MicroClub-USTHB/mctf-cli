@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      # Instanced challenge — host port is provided by the MTCF instancer
+      # Instanced challenge — host port is provided by the MCTF instancer
       # at spawn time via the PORT_<internal> env var. Default for local dev.
       - "${PORT_8000:-8000}:8000"
     environment:

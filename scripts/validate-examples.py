@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Validate every example challenge.yml against schema/challenge.schema.json,
-and the sample mctf.config.yml against schema/mtcf-config.schema.json.
+and the sample mctf.config.yml against schema/mctf-config.schema.json.
 
 This is a Phase-0 sanity check — once the Go CLI ships, `mctf validate` will
 do the same thing (and more, including event-wide cross-checks).
@@ -40,7 +40,7 @@ def validate(label: str, instance, schema_path: Path) -> int:
 def main() -> int:
     rc = 0
     challenge_schema = SCHEMA_DIR / "challenge.schema.json"
-    config_schema = SCHEMA_DIR / "mtcf-config.schema.json"
+    config_schema = SCHEMA_DIR / "mctf-config.schema.json"
 
     print("# mctf.config.yml")
     rc |= validate(

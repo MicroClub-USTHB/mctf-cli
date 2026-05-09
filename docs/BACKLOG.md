@@ -1,4 +1,4 @@
-# MTCF Backlog
+# MCTF Backlog
 
 Open work organized by size. Each line is intentionally GitHub-issue-shaped: title + 1–2 line scope. Pick from the **Suggested wave-1** list at the bottom for the highest-leverage starting set.
 
@@ -67,7 +67,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 - **SEC005: capability allowlist enforcement** — honor `deploy.security_opts.allow_caps` so SEC004 only fires on caps not in the allowlist.
 - **SEC006: image vulnerability scan** — opt-in `mctf build --scan-vulns` via trivy or similar.
-- **Secret hygiene** — git-history scan for `MTCF_*_TOKEN` patterns; warn under `mctf doctor`.
+- **Secret hygiene** — git-history scan for `MCTF_*_TOKEN` patterns; warn under `mctf doctor`.
 
 ---
 

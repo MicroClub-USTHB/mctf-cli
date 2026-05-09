@@ -1,4 +1,4 @@
-# MTCF Spec Changelog
+# MCTF Spec Changelog
 
 ## v1 — Phase 0 (initial spec)
 
@@ -7,8 +7,8 @@ First locked version of the on-disk contract. Status: **draft**, accepting feedb
 ### Scope
 
 - **Author manifest** (`challenge/challenge.yml`) shape inspired by [MCTF 5.0](https://github.com/MicroClub-USTHB/MCTF-5.0-Challenges); existing MCTF 5.0 challenges port over with zero changes.
-- **Auto-generated derived files** at the challenge root (`challenge.yml` for CTFd, `instance.toml` for the MTCF instancer).
-- **Event config** (`mctf.config.yml`) — new in MTCF.
+- **Auto-generated derived files** at the challenge root (`challenge.yml` for CTFd, `instance.toml` for the MCTF instancer).
+- **Event config** (`mctf.config.yml`) — new in MCTF.
 - **Profiles** — `simple`, `instanced`, `pro` (curated presets).
 - **Plugin lifecycle hooks** declared but not yet wired (delivered in v0.2 of the CLI).
 

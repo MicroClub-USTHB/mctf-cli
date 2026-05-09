@@ -149,7 +149,7 @@ func Load(dir string) (*Config, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 
-	v, err := jsonschema.New("mtcf-config.schema.json", schemas.MCTFConfig)
+	v, err := jsonschema.New("mctf-config.schema.json", schemas.MCTFConfig)
 	if err != nil {
 		return nil, err
 	}
