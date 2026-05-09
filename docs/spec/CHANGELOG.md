@@ -8,7 +8,7 @@ First locked version of the on-disk contract. Status: **draft**, accepting feedb
 
 - **Author manifest** (`challenge/challenge.yml`) shape inspired by [MCTF 5.0](https://github.com/MicroClub-USTHB/MCTF-5.0-Challenges); existing MCTF 5.0 challenges port over with zero changes.
 - **Auto-generated derived files** at the challenge root (`challenge.yml` for CTFd, `instance.toml` for the MTCF instancer).
-- **Event config** (`mtcf.config.yml`) — new in MTCF.
+- **Event config** (`mctf.config.yml`) — new in MTCF.
 - **Profiles** — `simple`, `instanced`, `pro` (curated presets).
 - **Plugin lifecycle hooks** declared but not yet wired (delivered in v0.2 of the CLI).
 
@@ -16,7 +16,7 @@ First locked version of the on-disk contract. Status: **draft**, accepting feedb
 
 - 10 core categories locked: `web`, `pwn`, `crypto`, `reverse`, `forensics`, `osint`, `misc`, `ai`, `hardware`, `jailbreak`.
 - 12 extended categories opt-in: `stego`, `mobile`, `blockchain`, `network`, `ppc`, `realistic`, `cloud`, `iot`, `sysadmin`, `defensive`, `welcome`, `quiz`.
-- Custom categories declarable per-event in `mtcf.config.yml`.
+- Custom categories declarable per-event in `mctf.config.yml`.
 
 ### Improvements over MCTF 5.0 conventions baked into v1
 

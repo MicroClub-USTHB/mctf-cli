@@ -4,25 +4,25 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 ## Big rocks (multi-day each)
 
-- **K8s deploy mode** — `mtcf deploy --mode kubernetes`. Generate K8s Deployment / Service / Ingress manifests from per-challenge compose, `kubectl apply -f`. Honor `cfg.Deploy.Kubernetes.{Kubeconfig, Namespace, IngressClass}`.
-- **SSH deploy mode** — `mtcf deploy --mode ssh`. scp the compose tree to the configured host, run `docker compose up -d` over ssh. Single-VPS workflow.
+- **K8s deploy mode** — `mctf deploy --mode kubernetes`. Generate K8s Deployment / Service / Ingress manifests from per-challenge compose, `kubectl apply -f`. Honor `cfg.Deploy.Kubernetes.{Kubeconfig, Namespace, IngressClass}`.
+- **SSH deploy mode** — `mctf deploy --mode ssh`. scp the compose tree to the configured host, run `docker compose up -d` over ssh. Single-VPS workflow.
 - **Plugin system** — subprocess + JSON-RPC over stdio (Terraform-style). Lifecycle hooks: `before_build`, `after_build`, `before_deploy`, `after_deploy`, `on_instance_spawn`, `on_health_failure`. Language-agnostic, crash-isolated.
 - **Per-team dynamic flags** — instancer mints per-team flags at spawn time (currently every team gets the manifest's static flag). Schema additions: `flags[].dynamic: true`, optional `flags[].generator`.
-- **Prometheus / Grafana wiring** — `mtcf monitoring up` brings up prom + grafana + cAdvisor with prebuilt dashboards. Generate scrape config from challenge labels.
-- **Terraform wrapper** — `mtcf infra plan|apply|destroy` for VPS, clusters, networking, DNS. Templates for DigitalOcean, Hetzner, DOKS, EKS, GKE.
+- **Prometheus / Grafana wiring** — `mctf monitoring up` brings up prom + grafana + cAdvisor with prebuilt dashboards. Generate scrape config from challenge labels.
+- **Terraform wrapper** — `mctf infra plan|apply|destroy` for VPS, clusters, networking, DNS. Templates for DigitalOcean, Hetzner, DOKS, EKS, GKE.
 
 ## Medium features (1–2 days each)
 
-- **Rollback support** — `.mtcf/state.json` snapshot before each deploy; `mtcf deploy --rollback` reverts. Prerequisite: compose must use `image: <reg>/<name>:<sha>` instead of `build:` so a previous SHA can be redeployed.
-- **Image-tag pinning in deploy** — `mtcf deploy` stamps `IMAGE_TAG` env so compose pulls the SHA from the last successful `mtcf build` (the rollback prerequisite).
+- **Rollback support** — `.mctf/state.json` snapshot before each deploy; `mctf deploy --rollback` reverts. Prerequisite: compose must use `image: <reg>/<name>:<sha>` instead of `build:` so a previous SHA can be redeployed.
+- **Image-tag pinning in deploy** — `mctf deploy` stamps `IMAGE_TAG` env so compose pulls the SHA from the last successful `mctf build` (the rollback prerequisite).
 - **rCTF + generic-webhook platforms** — second + third platform targets behind the existing platform interface, ideally via plugin once the system lands.
 - **Per-team auth on the instancer** — currently bearer tokens have full power; add team-scoped tokens (`POST /spawn` only allows the request when the token's team_id matches the body).
 - **CTFd file diff by content hash** — currently match by basename; switch to sha256 so updated handouts get re-uploaded.
-- **`mtcf solve --against-instance <id>`** — run a solver against a per-team spawned instance (current `solve` only targets static / pre-deployed services).
+- **`mctf solve --against-instance <id>`** — run a solver against a per-team spawned instance (current `solve` only targets static / pre-deployed services).
 - **Native instancer: docker-network isolation** — currently spawns share the event network; isolate each per-team instance to its own bridge.
-- **Better `mtcf doctor` checks** — D040 DNS resolves for `<sub>.<domain>`, D041 free disk space, D042 docker daemon storage driver.
-- **`mtcf platform configure` extensions** — sync `start` / `end` timestamps (needs schema addition `event.start_at` / `event.end_at`), `ctf_description`.
-- **`mtcf release`** — tag git, build via goreleaser, draft a release notes file from conventional-commits since last tag.
+- **Better `mctf doctor` checks** — D040 DNS resolves for `<sub>.<domain>`, D041 free disk space, D042 docker daemon storage driver.
+- **`mctf platform configure` extensions** — sync `start` / `end` timestamps (needs schema addition `event.start_at` / `event.end_at`), `ctf_description`.
+- **`mctf release`** — tag git, build via goreleaser, draft a release notes file from conventional-commits since last tag.
 
 ## Small wins (~half-day each)
 
@@ -31,12 +31,12 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 - **W011** — asset filename referenced in description but missing from `assets/` (broken handout link).
 - **W012** — schema field omitted from manifest (warn; default-filled to 1).
 - **I001** — category-typical sub-tag missing (e.g. `web` with no `sqli` / `xss` / `ssrf`).
-- **`mtcf generate --json`** — list of written / skipped / drift files for CI.
-- **`mtcf instance ps`** — live container state from docker (uptime, healthcheck status) for one instance ID.
-- **`mtcf instance flag <id>`** — print the per-team flag (read-only convenience).
-- **`mtcf platform unsync`** — remove a challenge from CTFd by category / slug.
+- **`mctf generate --json`** — list of written / skipped / drift files for CI.
+- **`mctf instance ps`** — live container state from docker (uptime, healthcheck status) for one instance ID.
+- **`mctf instance flag <id>`** — print the per-team flag (read-only convenience).
+- **`mctf platform unsync`** — remove a challenge from CTFd by category / slug.
 - **Drop W004** when `assets/.gitkeep` is the only file (currently fires on directories that contain only the placeholder).
-- **Fuzzy slug match** — `mtcf info crypto/rs` suggests `crypto/rsa-baby` instead of "no challenge".
+- **Fuzzy slug match** — `mctf info crypto/rs` suggests `crypto/rsa-baby` instead of "no challenge".
 - **Test coverage for `cmd/init` prompts** — `promptIn` is already injectable; just write the test.
 
 ## Polish & docs
@@ -54,7 +54,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 - **Homebrew tap** — formula in `MicroClub-USTHB/homebrew-tap`.
 - **Scoop bucket** — for Windows.
 - **`.deb` / `.rpm`** — via goreleaser.
-- **Docker image of `mtcf` itself** — `ghcr.io/microclub-usthb/mtcf:<version>` for CI use.
+- **Docker image of `mctf` itself** — `ghcr.io/microclub-usthb/mctf:<version>` for CI use.
 
 ## CI / quality
 
@@ -66,8 +66,8 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 ## Security
 
 - **SEC005: capability allowlist enforcement** — honor `deploy.security_opts.allow_caps` so SEC004 only fires on caps not in the allowlist.
-- **SEC006: image vulnerability scan** — opt-in `mtcf build --scan-vulns` via trivy or similar.
-- **Secret hygiene** — git-history scan for `MTCF_*_TOKEN` patterns; warn under `mtcf doctor`.
+- **SEC006: image vulnerability scan** — opt-in `mctf build --scan-vulns` via trivy or similar.
+- **Secret hygiene** — git-history scan for `MTCF_*_TOKEN` patterns; warn under `mctf doctor`.
 
 ---
 

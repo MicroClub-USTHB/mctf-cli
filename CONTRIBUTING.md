@@ -18,9 +18,9 @@ Anyone with write access to `MicroClub-USTHB/mctf-cli`. If you're a challenge au
 
 ```sh
 git clone git@github.com:MicroClub-USTHB/mctf-cli.git
-cd mtcf-cli
+cd mctf-cli
 make build
-./mtcf -C examples/sample-event validate
+./mctf -C examples/sample-event validate
 go test ./...
 ```
 
@@ -31,7 +31,7 @@ If `make build` fails on a fresh checkout, run `go mod download` first.
 | Path | What it's for |
 |---|---|
 | `cmd/` | Cobra command definitions. One file per command; flags live next to the command. |
-| `internal/config/` | `mtcf.config.yml` loader + typed `Config` struct. |
+| `internal/config/` | `mctf.config.yml` loader + typed `Config` struct. |
 | `internal/challenge/` | Per-challenge manifest loader, filesystem discovery, archetype derivation. |
 | `internal/validate/` | Cross-cutting checks beyond schema (uniqueness, leak guard, healthcheck rules). |
 | `internal/generate/` | Deterministic emitters for the four derived files. |
@@ -52,7 +52,7 @@ If `make build` fails on a fresh checkout, run `go mod download` first.
    - tests that exercise the new shape.
    PRs that update one without the others get bounced.
 3. **Don't edit `internal/schemas/*.json` directly.** Edit `schema/*.json` and run `make schemas`. The Makefile detects drift and CI catches it either way.
-4. **CI must be green.** Both the `go` and `schemas` jobs. `mtcf generate --check` on the sample event has to pass.
+4. **CI must be green.** Both the `go` and `schemas` jobs. `mctf generate --check` on the sample event has to pass.
 5. **No new commands without spec coverage.** Every new CLI verb lands with its semantics documented under `docs/spec/`. Internal helpers are exempt; user-facing commands are not.
 
 ## How to: add a validation rule
@@ -128,7 +128,7 @@ Common scopes: `validate`, `generate`, `config`, `challenge`, `cmd`, `schema`, `
 
 GitHub Actions runs two jobs on every push and PR:
 
-- **`go`** — `go vet`, `go test -race`, `make build`, `mtcf validate`, `mtcf generate --check` against the sample event.
+- **`go`** — `go vet`, `go test -race`, `make build`, `mctf validate`, `mctf generate --check` against the sample event.
 - **`schemas`** — Python sanity checks: source manifests vs `challenge.schema.json`, generated files vs their schemas.
 
 Both must be green. If you can't get them green locally, push the WIP branch and let CI tell you why — that's faster than guessing.
@@ -136,7 +136,7 @@ Both must be green. If you can't get them green locally, push the WIP branch and
 ## Reviewing PRs
 
 - Read the spec/doc changes first. The doc tells you what the code is supposed to do.
-- Pull the branch, run `make build && ./mtcf -C examples/sample-event validate && ./mtcf -C examples/sample-event generate --check`. If those don't pass, the PR isn't ready.
+- Pull the branch, run `make build && ./mctf -C examples/sample-event validate && ./mctf -C examples/sample-event generate --check`. If those don't pass, the PR isn't ready.
 - For new validation rules: think of three challenges that *shouldn't* trigger the rule. The rule should be specific enough to catch real bugs without false positives.
 - For new generators: think about what happens on a re-run. Output must be idempotent.
 

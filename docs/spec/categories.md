@@ -1,6 +1,6 @@
 # Challenge Categories
 
-MTCF defines two tiers of categories: a **core tier** (always available) and an **extended tier** (opt-in via `mtcf.config.yml::categories.extended`). Organizers can also declare entirely **custom** categories without forking the CLI.
+MTCF defines two tiers of categories: a **core tier** (always available) and an **extended tier** (opt-in via `mctf.config.yml::categories.extended`). Organizers can also declare entirely **custom** categories without forking the CLI.
 
 This separation keeps the default category set small (the core 10 cover what most events ship today, inspired by the MCTF 5.0 catalog) while letting events that need cloud, blockchain, or boot2root categories enable them with one line of config.
 
@@ -21,7 +21,7 @@ This separation keeps the default category set small (the core 10 cover what mos
 
 ## Extended tier — opt-in
 
-Enable in `mtcf.config.yml`:
+Enable in `mctf.config.yml`:
 
 ```yaml
 categories:
@@ -50,7 +50,7 @@ Each gets a 1000-port slice from the default range (17000+) on activation, alloc
 
 ## Custom categories
 
-For one-off or org-specific categories, declare them in `mtcf.config.yml`:
+For one-off or org-specific categories, declare them in `mctf.config.yml`:
 
 ```yaml
 categories:

@@ -1,12 +1,12 @@
-# Validation Rules (`mtcf validate`)
+# Validation Rules (`mctf validate`)
 
 Every rule MTCF enforces, with rationale and severity. Hard-fails block the build/deploy; warnings inform. Profile column shows when a rule is escalated under stricter profiles.
 
-`mtcf validate` is the entrypoint. It runs at three points:
+`mctf validate` is the entrypoint. It runs at three points:
 
 1. **CI** — on every push and PR via `.github/workflows/validate.yml`.
-2. **Local pre-commit** — when authors run `mtcf validate` themselves.
-3. **Implicit on deploy** — `mtcf deploy` runs validation first; failures abort.
+2. **Local pre-commit** — when authors run `mctf validate` themselves.
+3. **Implicit on deploy** — `mctf deploy` runs validation first; failures abort.
 
 ## Hard failures (exit code 1)
 
@@ -105,7 +105,7 @@ Every rule MTCF enforces, with rationale and severity. Hard-fails block the buil
 
 ## Disabling rules
 
-A challenge can opt out of specific warnings via a `# mtcf-disable: W001 W005` comment at the top of its `challenge.yml`. **Hard-fails cannot be disabled** — fix the issue or open a PR to change the rule.
+A challenge can opt out of specific warnings via a `# mctf-disable: W001 W005` comment at the top of its `challenge.yml`. **Hard-fails cannot be disabled** — fix the issue or open a PR to change the rule.
 
 ## CI integration
 

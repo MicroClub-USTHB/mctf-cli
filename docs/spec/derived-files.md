@@ -1,8 +1,8 @@
 # Derived (Auto-Generated) Files
 
-`mtcf generate` reads every author manifest (`challenges/<cat>/<name>/challenge/challenge.yml`) and produces these files. **Do not edit derived files by hand** — the next `mtcf generate` overwrites them.
+`mctf generate` reads every author manifest (`challenges/<cat>/<name>/challenge/challenge.yml`) and produces these files. **Do not edit derived files by hand** — the next `mctf generate` overwrites them.
 
-CI re-runs `mtcf generate` on every push and fails if the committed derived files differ from regenerated ones — this guarantees they're always in sync.
+CI re-runs `mctf generate` on every push and fails if the committed derived files differ from regenerated ones — this guarantees they're always in sync.
 
 ## 1. CTFd Manifest — `challenges/<cat>/<name>/challenge.yml`
 
@@ -44,7 +44,7 @@ state: visible                         # "hidden" if force_hidden=true
 - **static** — `null`.
 - **service** + `tcp: false` — `https://<subdomain>.<event-domain>` (or `http://` when `noSsl: true`).
 - **service** + `tcp: true` — `<event-domain>:<port>`.
-- **instanced** (any) — the instancer endpoint URL, configured at `mtcf.config.yml::instancer.url`. The instancer issues team-specific URLs/ports at spawn time; CTFd just shows the entry point.
+- **instanced** (any) — the instancer endpoint URL, configured at `mctf.config.yml::instancer.url`. The instancer issues team-specific URLs/ports at spawn time; CTFd just shows the entry point.
 
 ### Mapping rules from author manifest
 
@@ -81,7 +81,7 @@ timeout = 1800                         # = deploy.instance.timeout (default 1800
 extend_time = 900                      # = deploy.instance.extend_time (default 900)
 max_per_team = 1
 
-# Filled in by `mtcf generate` after `mtcf build` runs
+# Filled in by `mctf generate` after `mctf build` runs
 image = "ghcr.io/microclub/mctf-5-web-cub3:abc1234"
 
 [resources]
@@ -149,16 +149,16 @@ When `deploy.mode: docker` and `deploy.docker.ingress: traefik`, the CLI generat
 - `middlewares.yml` — TLS, rate-limit, and basic-auth middleware definitions.
 - `tls.yml` — certificate file paths.
 
-Static parts (`traefik.yml` itself — entrypoints, providers, log config) are scaffolded once by `mtcf init` and not regenerated unless missing.
+Static parts (`traefik.yml` itself — entrypoints, providers, log config) are scaffolded once by `mctf init` and not regenerated unless missing.
 
 For Kubernetes mode, equivalent Ingress / IngressRoute manifests are generated under `ingress/k8s/` instead.
 
 ## Determinism & idempotency
 
-`mtcf generate` is **deterministic**: identical inputs produce byte-identical outputs (stable struct-field order, stable line endings `\n`, no embedded timestamps). This is what lets `mtcf generate --check` compare committed vs regenerated derived files reliably in CI.
+`mctf generate` is **deterministic**: identical inputs produce byte-identical outputs (stable struct-field order, stable line endings `\n`, no embedded timestamps). This is what lets `mctf generate --check` compare committed vs regenerated derived files reliably in CI.
 
 Generation order:
-1. Parse all author manifests + `mtcf.config.yml`.
+1. Parse all author manifests + `mctf.config.yml`.
 2. Compute archetype, image tag, allocated port for each challenge.
 3. Validate (hard-fails block here).
 4. Render derived files in memory.
