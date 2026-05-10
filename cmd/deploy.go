@@ -169,7 +169,7 @@ func newDeployRunner(cfg *config.Config, dryRun bool) (deploy.Runner, error) {
 	case "docker":
 		return deploy.NewDockerRunner(), nil
 	case "ssh":
-		return deploy.NewSSHRunner(), nil
+		return deploy.NewSSHRunner(cfg.Deploy.SSH), nil
 	default:
 		return nil, fmt.Errorf("unsupported deploy mode %q", cfg.Deploy.Mode)
 	}
