@@ -26,8 +26,8 @@ registry:
   # Auth via env: MCTF_REGISTRY_USER / MCTF_REGISTRY_TOKEN
 
 deploy:
-  mode: docker
-  docker:
+  mode: docker # ssh
+  docker: # ssh  host: "example.com" user: "deploy" key_path: "~/.ssh/id_rsa"
     network: "sample-event-net"
     ingress: traefik
 

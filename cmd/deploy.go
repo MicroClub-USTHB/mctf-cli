@@ -158,18 +158,21 @@ func planDeploy() ([]deploy.Unit, *config.Config, error) {
 }
 
 func newDeployRunner(cfg *config.Config, dryRun bool) (deploy.Runner, error) {
-	if dryRun {
-		return deploy.NewDryRunner(), nil
-	}
 	if cfg == nil || cfg.Deploy == nil {
 		return nil, fmt.Errorf("deploy config is missing")
 	}
-
+	if cfg.Deploy.Mode == "ssh"{
+		return deploy.NewSSHRunner(cfg.Deploy.SSH, dryRun), nil
+	}
+	if dryRun {
+		return deploy.NewDryRunner(), nil
+	}
+	
 	switch cfg.Deploy.Mode {
 	case "docker":
 		return deploy.NewDockerRunner(), nil
 	case "ssh":
-		return deploy.NewSSHRunner(cfg.Deploy.SSH), nil
+		return deploy.NewSSHRunner(cfg.Deploy.SSH, dryRun), nil
 	default:
 		return nil, fmt.Errorf("unsupported deploy mode %q", cfg.Deploy.Mode)
 	}
