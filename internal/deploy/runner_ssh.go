@@ -20,15 +20,15 @@ type SSHRunner struct {
 	// /opt/mctf/<project-name>/challenge
 	// then runs `docker compose` remotely inside that directory.
 	// Up flow:
-    //   - validate SSH config
-    //   - check remote docker/docker compose
-    //   - create remote project dir
-    //   - copy challenge/ with scp
-    //   - run remote `docker compose up -d``
-    // Down flow:
-    //   - validate SSH config
-    //   - run remote `docker compose down` in the same directory
-    // With DryRun enabled, ssh/scp commands are printed instead of executed.
+	//   - validate SSH config
+	//   - check remote docker/docker compose
+	//   - create remote project dir
+	//   - copy challenge/ with scp
+	//   - run remote `docker compose up -d``
+	// Down flow:
+	//   - validate SSH config
+	//   - run remote `docker compose down` in the same directory
+	// With DryRun enabled, ssh/scp commands are printed instead of executed.
 
 	Host       string
 	User       string

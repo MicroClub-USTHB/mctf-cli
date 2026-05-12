@@ -24,8 +24,8 @@ func cfgDocker() *config.Config {
 func cfgSSH() *config.Config {
 	return &config.Config{
 		Version: 1,
-		Event: config.Event{Slug: "evt"},
-		Deploy: &config.Deploy{Mode: "ssh"},
+		Event:   config.Event{Slug: "evt"},
+		Deploy:  &config.Deploy{Mode: "ssh"},
 	}
 }
 
@@ -81,7 +81,6 @@ func TestPlan_RejectsUnsupportedMode(t *testing.T) {
 		t.Errorf("expected unsupported-mode error, got %v", err)
 	}
 }
-
 
 func TestPlan_SkipsStaticAndInstanced(t *testing.T) {
 	root := t.TempDir()
