@@ -27,7 +27,7 @@ registry:
 
 deploy:
   mode: docker # ssh
-  docker: # ssh  host: "example.com" user: "deploy" key_path: "~/.ssh/id_rsa"
+  docker: #ssh  host: "example.com" user: "deploy" key_path: "~/.ssh/id_rsa"
     network: "sample-event-net"
     ingress: traefik
 
