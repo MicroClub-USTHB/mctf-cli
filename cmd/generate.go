@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 
 	"github.com/spf13/cobra"
 
@@ -61,6 +63,17 @@ challenge that's no longer instanced).`,
 			if err != nil {
 				return err
 			}
+			if flagJSON {
+				body, err := generateCheckJSON(drifts, flagDir)
+				if err != nil {
+					return err
+				}
+				fmt.Println(string(body))
+				if len(drifts) > 0 {
+					return fmt.Errorf("%d derived file(s) out of sync — run `mctf generate`", len(drifts))
+				}
+				return nil
+			}
 			if len(drifts) == 0 {
 				fmt.Println("derived files are up to date")
 				return nil
@@ -83,6 +96,14 @@ challenge that's no longer instanced).`,
 				return err
 			}
 		}
+		if flagJSON {
+			body, err := generateApplyJSON(written, removed, flagDir)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(body))
+			return nil
+		}
 		for _, p := range written {
 			rel, _ := filepath.Rel(flagDir, p)
 			fmt.Printf("  wrote   %s\n", rel)
@@ -96,6 +117,46 @@ challenge that's no longer instanced).`,
 		}
 		return nil
 	},
+}
+
+// generateReport is the JSON shape for `mctf generate --json`. CI tooling
+// keys off `mode` and `in_sync`; the rest is informational.
+type generateReport struct {
+	Mode    string     `json:"mode"`              // "apply" | "check"
+	InSync  bool       `json:"in_sync"`           // false only in check mode when drift exists
+	Written []string   `json:"written,omitempty"` // apply mode
+	Removed []string   `json:"removed,omitempty"` // apply mode
+	Drift   []driftRow `json:"drift,omitempty"`   // check mode
+}
+
+type driftRow struct {
+	Path   string `json:"path"`
+	Reason string `json:"reason"`
+}
+
+func generateCheckJSON(drifts []generate.Drift, eventRoot string) ([]byte, error) {
+	rep := generateReport{Mode: "check", InSync: len(drifts) == 0}
+	for _, d := range drifts {
+		rel, _ := filepath.Rel(eventRoot, d.Path)
+		rep.Drift = append(rep.Drift, driftRow{Path: rel, Reason: d.Reason})
+	}
+	sort.Slice(rep.Drift, func(i, j int) bool { return rep.Drift[i].Path < rep.Drift[j].Path })
+	return json.MarshalIndent(rep, "", "  ")
+}
+
+func generateApplyJSON(written, removed []string, eventRoot string) ([]byte, error) {
+	rep := generateReport{Mode: "apply", InSync: true}
+	for _, p := range written {
+		rel, _ := filepath.Rel(eventRoot, p)
+		rep.Written = append(rep.Written, rel)
+	}
+	for _, p := range removed {
+		rel, _ := filepath.Rel(eventRoot, p)
+		rep.Removed = append(rep.Removed, rel)
+	}
+	sort.Strings(rep.Written)
+	sort.Strings(rep.Removed)
+	return json.MarshalIndent(rep, "", "  ")
 }
 
 func init() {
