@@ -331,7 +331,10 @@ var instancePsCmd = &cobra.Command{
 		if !ok {
 			return fmt.Errorf("no instance with id %q", args[0])
 		}
-		states, err := inspectContainersFn(cmd.Context(), inst.Containers)
+		// Bound the docker call: a hung daemon shouldn't hang `ps`.
+		ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
+		defer cancel()
+		states, err := inspectContainersFn(ctx, inst.Containers)
 		if err != nil {
 			return err
 		}
