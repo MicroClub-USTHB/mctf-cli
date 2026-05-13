@@ -26,10 +26,18 @@ registry:
   # Auth via env: MCTF_REGISTRY_USER / MCTF_REGISTRY_TOKEN
 
 deploy:
-  mode: docker # ssh
-  docker: #ssh  host: "example.com" user: "deploy" key_path: "~/.ssh/id_rsa"
+  mode: docker  # or: ssh
+  docker:
     network: "sample-event-net"
     ingress: traefik
+  # To switch this event to remote-host deploy, change `mode` to `ssh`
+  # and uncomment the block below.
+  # ssh:
+  #   host: "example.com"
+  #   port: 22            # optional; omit for default 22
+  #   user: "deploy"      # optional; defaults to root
+  #   key_path: "~/.ssh/id_rsa"
+  #   remote_root: "/opt/mctf"  # optional; where compose projects live on the remote
 
 platform:
   type: ctfd

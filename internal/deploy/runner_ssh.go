@@ -14,23 +14,20 @@ import (
 
 const defaultSSHRemoteRoot = "/opt/mctf"
 
+// SSHRunner implements deploy.Runner for single-host SSH deployments.
+//
+// It copies the local challenge/ directory to
+// <RemoteRoot>/<project-name>/challenge and runs `docker compose` remotely
+// inside that directory.
+//
+// Up flow:   validate → preflight (docker, compose) → mkdir → scp → compose up.
+// Down flow: validate → compose down. (No preflight: a partially-torn-down
+// remote should still accept compose-down.)
+//
+// With DryRun=true, ssh/scp commands are printed instead of executed.
 type SSHRunner struct {
-	/// SSHRunner implements deploy.Runner for single-host SSH deployments.
-	// It copies the local challenge/ directory to:
-	// /opt/mctf/<project-name>/challenge
-	// then runs `docker compose` remotely inside that directory.
-	// Up flow:
-	//   - validate SSH config
-	//   - check remote docker/docker compose
-	//   - create remote project dir
-	//   - copy challenge/ with scp
-	//   - run remote `docker compose up -d``
-	// Down flow:
-	//   - validate SSH config
-	//   - run remote `docker compose down` in the same directory
-	// With DryRun enabled, ssh/scp commands are printed instead of executed.
-
 	Host       string
+	Port       int
 	User       string
 	KeyPath    string
 	RemoteRoot string
@@ -52,11 +49,15 @@ func NewSSHRunner(cfg *config.SSHDeploy, dryRun bool) *SSHRunner {
 		return r
 	}
 	r.Host = cfg.Host
+	r.Port = cfg.Port
 	r.User = cfg.User
 	if r.User == "" {
 		r.User = "root"
 	}
 	r.KeyPath = expandUserPath(cfg.KeyPath)
+	if cfg.RemoteRoot != "" {
+		r.RemoteRoot = cfg.RemoteRoot
+	}
 	return r
 }
 
@@ -69,15 +70,12 @@ func (r *SSHRunner) Up(ctx context.Context, u Unit) error {
 	if err := r.preflight(ctx); err != nil {
 		return fmt.Errorf("%s: %w", u.Challenge, err)
 	}
-
 	if err := r.runSSH(ctx, "mkdir -p "+shellQuote(remoteProjectDir)); err != nil {
 		return fmt.Errorf("%s: create remote project dir: %w", u.Challenge, err)
 	}
-
 	if err := r.runSCP(ctx, u.Cwd, r.target()+":"+remoteProjectDir); err != nil {
 		return fmt.Errorf("%s: copy challenge tree: %w", u.Challenge, err)
 	}
-
 	if err := r.runSSH(ctx, r.remoteComposeCommand(u, "up", false)); err != nil {
 		return fmt.Errorf("%s: remote compose up: %w", u.Challenge, err)
 	}
@@ -117,14 +115,12 @@ func (r *SSHRunner) remoteComposeCommand(u Unit, action string, volumes bool) st
 	if action == "down" && volumes {
 		args = append(args, "-v")
 	}
-
 	composeCmd := strings.Join(args, " ")
 
-	env := EnvSlice(u.Env)
-	if len(env) > 0 {
+	if env := EnvSlice(u.Env); len(env) > 0 {
 		composeCmd = strings.Join(env, " ") + " " + composeCmd
 	}
-	return "cd " + dir + " && " + composeCmd
+	return "cd " + shellQuote(dir) + " && " + composeCmd
 }
 
 func (r *SSHRunner) target() string {
@@ -134,8 +130,22 @@ func (r *SSHRunner) target() string {
 	return r.User + "@" + r.Host
 }
 
+// sshOptions returns the common -o flags. Non-interactive by default so a
+// deploy from CI doesn't hang on a password prompt or first-time host-key
+// confirmation. accept-new pins the key on first use; subsequent key changes
+// still fail loudly.
+func sshOptions() []string {
+	return []string{
+		"-o", "BatchMode=yes",
+		"-o", "StrictHostKeyChecking=accept-new",
+	}
+}
+
 func (r *SSHRunner) sshBaseArgs() []string {
-	var args []string
+	args := sshOptions()
+	if r.Port > 0 {
+		args = append(args, "-p", fmt.Sprintf("%d", r.Port))
+	}
 	if r.KeyPath != "" {
 		args = append(args, "-i", r.KeyPath)
 	}
@@ -144,7 +154,11 @@ func (r *SSHRunner) sshBaseArgs() []string {
 }
 
 func (r *SSHRunner) scpBaseArgs() []string {
-	var args []string
+	// scp uses -P (capital) for port, unlike ssh's lowercase -p.
+	args := sshOptions()
+	if r.Port > 0 {
+		args = append(args, "-P", fmt.Sprintf("%d", r.Port))
+	}
 	if r.KeyPath != "" {
 		args = append(args, "-i", r.KeyPath)
 	}
@@ -153,22 +167,27 @@ func (r *SSHRunner) scpBaseArgs() []string {
 
 func (r *SSHRunner) preflight(ctx context.Context) error {
 	if err := r.runSSH(ctx, "command -v docker >/dev/null 2>&1"); err != nil {
-		return fmt.Errorf("docker not found on remote host")
+		return fmt.Errorf("remote docker check failed (host unreachable, key wrong, or docker missing): %w", err)
 	}
 	if err := r.runSSH(ctx, "docker compose version >/dev/null 2>&1"); err != nil {
-		return fmt.Errorf("docker compose not available on remote host")
+		return fmt.Errorf("remote docker compose check failed (need v2 plugin): %w", err)
 	}
 	return nil
 }
 
+// runSSH executes one remote shell command. The whole command must be
+// passed as a single ssh argument: ssh joins its trailing args with spaces
+// and ships that as one string to the remote sshd, which re-parses it.
+// Splitting it ourselves would corrupt embedded spaces in the command.
 func (r *SSHRunner) runSSH(ctx context.Context, remoteCmd string) error {
 	if r.runSSHFn != nil {
 		return r.runSSHFn(ctx, remoteCmd)
 	}
-	args := append(r.sshBaseArgs(), "sh", "-lc", remoteCmd)
+	args := append(r.sshBaseArgs(), remoteCmd)
 
 	if r.DryRun {
-		fmt.Fprintf(r.Stdout, "ssh %s sh -lc %q\n", strings.Join(r.sshBaseArgs(), " "), remoteCmd)
+		fmt.Fprintf(r.Stdout, "ssh %s %s\n",
+			strings.Join(r.sshBaseArgs(), " "), shellQuote(remoteCmd))
 		return nil
 	}
 
@@ -183,7 +202,8 @@ func (r *SSHRunner) runSCP(ctx context.Context, localPath, remotePath string) er
 	args := append(r.scpBaseArgs(), "-r", localPath, remotePath)
 
 	if r.DryRun {
-		fmt.Fprintf(r.Stdout, "scp %s -r %s %s\n", strings.Join(r.scpBaseArgs(), " "), localPath, remotePath)
+		fmt.Fprintf(r.Stdout, "scp %s -r %s %s\n",
+			strings.Join(r.scpBaseArgs(), " "), shellQuote(localPath), shellQuote(remotePath))
 		return nil
 	}
 

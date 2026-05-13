@@ -161,18 +161,15 @@ func newDeployRunner(cfg *config.Config, dryRun bool) (deploy.Runner, error) {
 	if cfg == nil || cfg.Deploy == nil {
 		return nil, fmt.Errorf("deploy config is missing")
 	}
-	if cfg.Deploy.Mode == "ssh" {
-		return deploy.NewSSHRunner(cfg.Deploy.SSH, dryRun), nil
-	}
-	if dryRun {
-		return deploy.NewDryRunner(), nil
-	}
-
 	switch cfg.Deploy.Mode {
-	case "docker":
-		return deploy.NewDockerRunner(), nil
 	case "ssh":
+		// SSHRunner owns its own DryRun behavior; no wrapper needed.
 		return deploy.NewSSHRunner(cfg.Deploy.SSH, dryRun), nil
+	case "docker":
+		if dryRun {
+			return deploy.NewDryRunner(), nil
+		}
+		return deploy.NewDockerRunner(), nil
 	default:
 		return nil, fmt.Errorf("unsupported deploy mode %q", cfg.Deploy.Mode)
 	}
