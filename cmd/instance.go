@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -258,6 +260,151 @@ var instanceFlagCmd = &cobra.Command{
 	},
 }
 
+// containerState is one row of `docker ps`-style state for a container
+// referenced by the store. Status is left empty when the container is
+// no longer on the daemon (e.g. destroyed out-of-band).
+type containerState struct {
+	ID     string `json:"id"`
+	Name   string `json:"name,omitempty"`
+	Status string `json:"status,omitempty"`
+	Image  string `json:"image,omitempty"`
+	Found  bool   `json:"found"`
+}
+
+// inspectContainersFn shells out to `docker ps -a` to fetch live state.
+// Overridable in tests so we don't need a real docker daemon.
+var inspectContainersFn = inspectContainersViaDocker
+
+func inspectContainersViaDocker(ctx context.Context, ids []string) ([]containerState, error) {
+	out := make([]containerState, 0, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	args := []string{"ps", "-a", "--no-trunc",
+		"--format", "{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Image}}",
+	}
+	for _, id := range ids {
+		args = append(args, "--filter", "id="+id)
+	}
+	raw, err := exec.CommandContext(ctx, "docker", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("docker ps: %w", err)
+	}
+	found := map[string]containerState{}
+	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\t", 4)
+		if len(parts) != 4 {
+			continue
+		}
+		found[parts[0]] = containerState{
+			ID: parts[0], Name: parts[1], Status: parts[2], Image: parts[3], Found: true,
+		}
+	}
+	// Preserve store order; mark unknown containers as not-found.
+	for _, id := range ids {
+		if cs, ok := found[id]; ok {
+			out = append(out, cs)
+			continue
+		}
+		out = append(out, containerState{ID: id, Status: "(gone)"})
+	}
+	return out, nil
+}
+
+var instancePsCmd = &cobra.Command{
+	Use:   "ps <instance-id>",
+	Short: "Show live docker state for an instance",
+	Long: "Looks up the instance in the store and queries `docker ps` for\n" +
+		"each container in it. Reports up-time / health status, image, and\n" +
+		"the host-port mapping captured at spawn.\n\n" +
+		"The flag is intentionally not printed — use `mctf instance flag <id>`.",
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, err := openStore()
+		if err != nil {
+			return err
+		}
+		inst, ok := store.Get(args[0])
+		if !ok {
+			return fmt.Errorf("no instance with id %q", args[0])
+		}
+		states, err := inspectContainersFn(cmd.Context(), inst.Containers)
+		if err != nil {
+			return err
+		}
+		if flagJSON {
+			payload := struct {
+				Instance   instancer.Instance `json:"instance"`
+				Containers []containerState   `json:"containers"`
+			}{Instance: scrubFlag(inst), Containers: states}
+			body, err := json.MarshalIndent(payload, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(body))
+			return nil
+		}
+		return printInstancePs(os.Stdout, inst, states)
+	},
+}
+
+// scrubFlag returns a copy of the instance with the Flag field cleared.
+// `ps` is meant for operational use (status / health); the flag has its
+// own dedicated subcommand.
+func scrubFlag(i instancer.Instance) instancer.Instance {
+	i.Flag = ""
+	return i
+}
+
+func printInstancePs(w io.Writer, inst instancer.Instance, states []containerState) error {
+	now := time.Now().UTC()
+	spawnedRel := now.Sub(inst.SpawnedAt).Round(time.Second).String()
+	var expiresRel string
+	switch {
+	case inst.ExpiresAt.IsZero():
+		expiresRel = "(none)"
+	case inst.ExpiresAt.Before(now):
+		expiresRel = "expired " + now.Sub(inst.ExpiresAt).Round(time.Second).String() + " ago"
+	default:
+		expiresRel = "in " + inst.ExpiresAt.Sub(now).Round(time.Second).String()
+	}
+
+	fmt.Fprintf(w, "id:        %s\n", inst.ID)
+	fmt.Fprintf(w, "challenge: %s\n", inst.ChallengeSlug)
+	fmt.Fprintf(w, "team:      %s\n", inst.TeamID)
+	fmt.Fprintf(w, "spawned:   %s (%s ago)\n", inst.SpawnedAt.Format(time.RFC3339), spawnedRel)
+	fmt.Fprintf(w, "expires:   %s (%s)\n", inst.ExpiresAt.Format(time.RFC3339), expiresRel)
+	if len(inst.Ports) > 0 {
+		fmt.Fprintf(w, "ports:     %s\n", portsString(inst.Ports))
+	}
+
+	if len(states) == 0 {
+		fmt.Fprintln(w, "\nno containers recorded on this instance")
+		return nil
+	}
+	fmt.Fprintln(w, "\ncontainers:")
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "  CONTAINER ID\tNAME\tSTATUS\tIMAGE")
+	for _, s := range states {
+		id := s.ID
+		if len(id) > 12 {
+			id = id[:12]
+		}
+		fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\n", id, dashIfEmpty(s.Name), dashIfEmpty(s.Status), dashIfEmpty(s.Image))
+	}
+	return tw.Flush()
+}
+
+func dashIfEmpty(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
+
 var instanceReapCmd = &cobra.Command{
 	Use:   "reap",
 	Short: "Destroy expired instances (manual cleanup; daemon does this automatically once it lands)",
@@ -397,6 +544,7 @@ func init() {
 
 	instanceCmd.AddCommand(instanceReapCmd)
 	instanceCmd.AddCommand(instanceFlagCmd)
+	instanceCmd.AddCommand(instancePsCmd)
 
 	rootCmd.AddCommand(instanceCmd)
 }
