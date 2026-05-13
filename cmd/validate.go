@@ -12,8 +12,8 @@ import (
 
 var validateCmd = &cobra.Command{
 	Use:   "validate",
-	Short: "Validate the event repo against the MTCF spec",
-	Long: `Walks the event repo, parses mtcf.config.yml and every challenge
+	Short: "Validate the event repo against the MCTF spec",
+	Long: `Walks the event repo, parses mctf.config.yml and every challenge
 manifest, then runs every hard-fail and warning rule from
 docs/spec/validation.md.
 

@@ -86,14 +86,14 @@ func Run(dir string, opts Options) []Check {
 	return checks
 }
 
-// checkExpiredInstances surfaces stale entries in .mtcf/instances.json
-// that the operator should reap with `mtcf instance reap`.
+// checkExpiredInstances surfaces stale entries in .mctf/instances.json
+// that the operator should reap with `mctf instance reap`.
 func checkExpiredInstances(dir string) Check {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return Check{ID: "D031", Name: "expired instances", Status: StatusSkip, Detail: err.Error()}
 	}
-	storePath := filepath.Join(abs, ".mtcf", "instances.json")
+	storePath := filepath.Join(abs, ".mctf", "instances.json")
 	if _, err := os.Stat(storePath); err != nil {
 		// Store doesn't exist yet — nothing to report.
 		return Check{ID: "D031", Name: "expired instances", Status: StatusSkip, Detail: "no instance store"}
@@ -111,7 +111,7 @@ func checkExpiredInstances(dir string) Check {
 		ID: "D031", Name: "expired instances",
 		Status:  StatusWarn,
 		Detail:  fmt.Sprintf("%d expired instance(s) need reaping", len(expired)),
-		Suggest: "run `mtcf instance reap`",
+		Suggest: "run `mctf instance reap`",
 	}
 }
 
@@ -121,12 +121,12 @@ func checkConfig(dir string) (*config.Config, Check) {
 		return nil, Check{
 			ID: "D001", Name: "event config",
 			Status: StatusFail, Detail: err.Error(),
-			Suggest: "run `mtcf init` to scaffold a new event, or fix mtcf.config.yml",
+			Suggest: "run `mctf init` to scaffold a new event, or fix mctf.config.yml",
 		}
 	}
 	return cfg, Check{
 		ID: "D001", Name: "event config",
-		Status: StatusOK, Detail: "mtcf.config.yml validates against schema v1",
+		Status: StatusOK, Detail: "mctf.config.yml validates against schema v1",
 	}
 }
 
@@ -136,14 +136,14 @@ func checkDiscover(dir string, cfg *config.Config) ([]*challenge.Challenge, map[
 		return nil, nil, Check{
 			ID: "D002", Name: "challenges directory",
 			Status: StatusFail, Detail: err.Error(),
-			Suggest: "create the directory or fix challenges_dir in mtcf.config.yml",
+			Suggest: "create the directory or fix challenges_dir in mctf.config.yml",
 		}
 	}
 	if len(challs) == 0 {
 		return challs, loadErrs, Check{
 			ID: "D002", Name: "challenges directory",
 			Status: StatusWarn, Detail: "no challenges discovered",
-			Suggest: "scaffold one with `mtcf init challenge <category>/<slug>`",
+			Suggest: "scaffold one with `mctf init challenge <category>/<slug>`",
 		}
 	}
 	return challs, loadErrs, Check{
@@ -161,7 +161,7 @@ func checkValidate(cfg *config.Config, dir string, challs []*challenge.Challenge
 			ID: "D003", Name: "challenge validation",
 			Status:  StatusFail,
 			Detail:  fmt.Sprintf("%d error(s), %d warning(s)", e, w),
-			Suggest: "run `mtcf validate` for details",
+			Suggest: "run `mctf validate` for details",
 		}
 	case w > 0:
 		return Check{
@@ -182,7 +182,7 @@ func checkDockerBinary() Check {
 		return Check{
 			ID: "D010", Name: "docker binary",
 			Status: StatusWarn, Detail: "`docker` not found in $PATH",
-			Suggest: "install Docker — required for `mtcf build` and `mtcf deploy`",
+			Suggest: "install Docker — required for `mctf build` and `mctf deploy`",
 		}
 	}
 	return Check{ID: "D010", Name: "docker binary", Status: StatusOK}
@@ -244,29 +244,29 @@ func checkGit() Check {
 }
 
 func checkRegistryCreds() Check {
-	user := os.Getenv("MTCF_REGISTRY_USER")
-	token := os.Getenv("MTCF_REGISTRY_TOKEN")
+	user := os.Getenv("MCTF_REGISTRY_USER")
+	token := os.Getenv("MCTF_REGISTRY_TOKEN")
 	if user != "" && token != "" {
 		return Check{
 			ID: "D020", Name: "registry credentials",
-			Status: StatusOK, Detail: "MTCF_REGISTRY_USER and MTCF_REGISTRY_TOKEN set",
+			Status: StatusOK, Detail: "MCTF_REGISTRY_USER and MCTF_REGISTRY_TOKEN set",
 		}
 	}
 	return Check{
 		ID: "D020", Name: "registry credentials",
-		Status: StatusWarn, Detail: "MTCF_REGISTRY_USER / MTCF_REGISTRY_TOKEN not set",
-		Suggest: "required for `mtcf build --push`",
+		Status: StatusWarn, Detail: "MCTF_REGISTRY_USER / MCTF_REGISTRY_TOKEN not set",
+		Suggest: "required for `mctf build --push`",
 	}
 }
 
 func checkCTFdToken() Check {
-	if os.Getenv("MTCF_CTFD_TOKEN") != "" {
+	if os.Getenv("MCTF_CTFD_TOKEN") != "" {
 		return Check{ID: "D021", Name: "CTFd token", Status: StatusOK}
 	}
 	return Check{
 		ID: "D021", Name: "CTFd token",
-		Status: StatusWarn, Detail: "MTCF_CTFD_TOKEN not set",
-		Suggest: "required for `mtcf deploy` (CTFd registration)",
+		Status: StatusWarn, Detail: "MCTF_CTFD_TOKEN not set",
+		Suggest: "required for `mctf deploy` (CTFd registration)",
 	}
 }
 

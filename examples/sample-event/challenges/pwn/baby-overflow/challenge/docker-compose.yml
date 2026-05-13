@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      # Instanced TCP — host port assigned by the MTCF instancer at spawn time.
+      # Instanced TCP — host port assigned by the MCTF instancer at spawn time.
       - "${PORT_5000:-5000}:5000"
     restart: unless-stopped
     mem_limit: 64m

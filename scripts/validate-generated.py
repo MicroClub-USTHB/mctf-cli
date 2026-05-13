@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Validate every derived file `mtcf generate` wrote into the sample event
+"""Validate every derived file `mctf generate` wrote into the sample event
 against its JSON Schema. This proves the Go generators produce schema-valid
 output — closes the loop on the contract.
 """
+
 import json
 import sys
 from pathlib import Path
@@ -51,7 +52,11 @@ def parse_toml(path: Path) -> dict:
             v = v[1:-1].encode().decode("unicode_escape")
         elif v.startswith("[") and v.endswith("]"):
             inner = v[1:-1].strip()
-            v = [int(x) if x.lstrip("-").isdigit() else x.strip('"') for x in inner.split(",") if x.strip()]
+            v = [
+                int(x) if x.lstrip("-").isdigit() else x.strip('"')
+                for x in inner.split(",")
+                if x.strip()
+            ]
         elif v.lstrip("-").isdigit():
             v = int(v)
         section[k] = v

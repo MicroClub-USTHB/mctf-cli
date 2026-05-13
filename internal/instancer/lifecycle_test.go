@@ -161,7 +161,7 @@ func TestPlanSpawn_IDIsUniquePerCall(t *testing.T) {
 	if a.ID == b.ID {
 		t.Errorf("two PlanSpawn calls produced the same ID: %s", a.ID)
 	}
-	for _, prefix := range []string{"mtcf-inst-x-team-"} {
+	for _, prefix := range []string{"mctf-inst-x-team-"} {
 		if !strings.HasPrefix(a.ID, prefix) {
 			t.Errorf("ID %q lacks expected prefix %q", a.ID, prefix)
 		}

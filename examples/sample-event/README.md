@@ -1,6 +1,6 @@
-# Sample MTCF Event
+# Sample MCTF Event
 
-A complete reference event covering one challenge per archetype. Used both as a documentation example and as the e2e fixture for the future MTCF CLI.
+A complete reference event covering one challenge per archetype. Used both as a documentation example and as the e2e fixture for the future MCTF CLI.
 
 ## What's here
 
@@ -16,20 +16,20 @@ Every challenge uses the four-folder layout: `challenge/`, `solution/`, `assets/
 
 ## Running with the future CLI
 
-Once the MTCF Go CLI is built (Phase 1):
+Once the MCTF Go CLI is built (Phase 1):
 
 ```sh
-mtcf validate                    # check all 5 challenges parse cleanly
-mtcf generate                    # produce the derived files (CTFd manifest + instance.toml + CSV + index.json)
-mtcf doctor                      # preflight: docker daemon, ctfd token, ports free
-mtcf build                       # build images for the 3 deployable challenges
-mtcf deploy                      # docker compose up + register in CTFd
-mtcf logs cub3-clone             # tail logs
-mtcf down                        # tear down
+mctf validate                    # check all 5 challenges parse cleanly
+mctf generate                    # produce the derived files (CTFd manifest + instance.toml + CSV + index.json)
+mctf doctor                      # preflight: docker daemon, ctfd token, ports free
+mctf build                       # build images for the 3 deployable challenges
+mctf deploy                      # docker compose up + register in CTFd
+mctf logs cub3-clone             # tail logs
+mctf down                        # tear down
 ```
 
 ## Status: derived files are not yet committed
 
 Phase 0 is the spec. The author manifests below all parse against `schema/challenge.schema.json`, but the auto-generated `challenge.yml` (CTFd format) and `instance.toml` files at each challenge root are intentionally **not yet present** — the CLI that produces them lands in Phase 1. Adding them now would commit handwritten "derived" files that drift from the future generator.
 
-When the CLI ships, `mtcf generate` will populate them, and CI will keep them in sync.
+When the CLI ships, `mctf generate` will populate them, and CI will keep them in sync.

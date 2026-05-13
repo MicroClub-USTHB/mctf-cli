@@ -8,19 +8,19 @@ import (
 
 var completionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh|fish|powershell]",
-	Short: "Generate shell completion scripts for mtcf",
+	Short: "Generate shell completion scripts for mctf",
 	Long: "Generate the auto-completion script for the named shell.\n\n" +
 		"bash:\n" +
-		"  source <(mtcf completion bash)\n" +
+		"  source <(mctf completion bash)\n" +
 		"  # or persist:\n" +
-		"  mtcf completion bash > /etc/bash_completion.d/mtcf\n\n" +
+		"  mctf completion bash > /etc/bash_completion.d/mctf\n\n" +
 		"zsh:\n" +
 		"  echo \"autoload -U compinit; compinit\" >> ~/.zshrc\n" +
-		"  mtcf completion zsh > \"${fpath[1]}/_mtcf\"\n\n" +
+		"  mctf completion zsh > \"${fpath[1]}/_mctf\"\n\n" +
 		"fish:\n" +
-		"  mtcf completion fish > ~/.config/fish/completions/mtcf.fish\n\n" +
+		"  mctf completion fish > ~/.config/fish/completions/mctf.fish\n\n" +
 		"powershell:\n" +
-		"  mtcf completion powershell > mtcf.ps1\n" +
+		"  mctf completion powershell > mctf.ps1\n" +
 		"  # then source it from your profile",
 	DisableFlagsInUseLine: true,
 	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},

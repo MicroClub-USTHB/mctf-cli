@@ -15,13 +15,13 @@ var (
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the MTCF CLI version",
+	Short: "Print the MCTF CLI version",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if flagJSON {
 			fmt.Printf(`{"version":%q,"commit":%q,"date":%q}`+"\n", version, commit, date)
 			return nil
 		}
-		fmt.Printf("mtcf %s (commit %s, built %s)\n", version, commit, date)
+		fmt.Printf("mctf %s (commit %s, built %s)\n", version, commit, date)
 		return nil
 	},
 }

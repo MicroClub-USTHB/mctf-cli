@@ -25,7 +25,7 @@ var doctorCmd = &cobra.Command{
 		"  D020  registry credentials env vars set\n" +
 		"  D021  CTFd token env var set\n" +
 		"  D030  host ports for service-archetype challenges are free\n" +
-		"  D031  no expired instances pending in .mtcf/instances.json\n\n" +
+		"  D031  no expired instances pending in .mctf/instances.json\n\n" +
 		"Exits non-zero only when at least one check has failed.\n" +
 		"Warnings are reported but never fail the run.",
 	RunE: func(cmd *cobra.Command, args []string) error {

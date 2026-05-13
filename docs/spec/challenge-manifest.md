@@ -15,7 +15,7 @@ challenge:
   description: |                       # REQUIRED — markdown, max 4000 chars
     Can you solve a randomly scrambled Rubik's cube?
     `nc {{host}} {{port}}` or visit `{{url}}`
-  wave: 1                              # REQUIRED — integer 1..waves_number from mtcf.config.yml
+  wave: 1                              # REQUIRED — integer 1..waves_number from mctf.config.yml
   force_hidden: false                  # OPTIONAL — when true, registered as hidden in CTFd
   flags:                               # REQUIRED — exactly one in v1
     - { flag: "mctf{l0g1n_byp4ss}", case_sensitive: true }
@@ -27,7 +27,7 @@ challenge:
       content: "Look at how the input is sanitized."
     - cost: 50
       content: "It's a UNION-based injection."
-  scoring:                             # OPTIONAL — overrides mtcf.config.yml::event.scoring
+  scoring:                             # OPTIONAL — overrides mctf.config.yml::event.scoring
     type: dynamic                      #   static | dynamic
     initial: 500
     decay: 10
@@ -162,7 +162,7 @@ deploy:
 
 ## Flag rules
 
-- **Format:** `<prefix>{...}` where `<prefix>` is `mtcf.config.yml::event.flag_prefix` (default `mctf`).
+- **Format:** `<prefix>{...}` where `<prefix>` is `mctf.config.yml::event.flag_prefix` (default `mctf`).
 - **Case sensitivity:** per-flag (default `true`). Case-insensitive flags use a hashed compare.
 - **One flag per challenge in v1.** Multi-flag deferred to v0.2.
 - **Static flags only in v1.** Per-team dynamic flags require the instancer + a plugin (v0.2+).
@@ -209,6 +209,6 @@ The CLI lints these patterns; mismatches between `deploy.port` / `deploy.interna
 - **`challenge/src/`** — application code copied by the Dockerfile. **Never put a static flag value here.** Use `flag.txt` (env-loaded at runtime) or an env var.
 - **`solution/writeup.md`** — required for review. Markdown, intended-solve walkthrough.
 - **`solution/hints.md`** — optional. Markdown headings `## Hint 1 (cost: 50)` are auto-converted into `challenge.hints[]` if not already declared.
-- **`solution/solve.{sh,py}`** — optional. When present, `mtcf doctor --smoke` runs each solver against the deployed challenge and verifies the flag is recovered.
+- **`solution/solve.{sh,py}`** — optional. When present, `mctf doctor --smoke` runs each solver against the deployed challenge and verifies the flag is recovered.
 - **`assets/`** — files uploaded to CTFd as downloadable handouts. Recommended to ship as zips.
 - **`other/`** — private. Flag generators, scratch notes, decoys not used in build.

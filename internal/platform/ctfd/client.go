@@ -1,7 +1,7 @@
 // Package ctfd is a thin, typed wrapper around the CTFd REST API.
 //
 // Scope is intentionally narrow: just the endpoints needed by
-// `mtcf platform sync` (challenges, flags, tags, hints). File upload
+// `mctf platform sync` (challenges, flags, tags, hints). File upload
 // and team/user APIs are not in v0; they ship as follow-ups.
 package ctfd
 

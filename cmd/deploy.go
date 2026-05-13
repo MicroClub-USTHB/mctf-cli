@@ -26,16 +26,16 @@ var deployCmd = &cobra.Command{
 	Short: "Bring up service-archetype challenges via docker compose",
 	Long: "Runs `docker compose up -d` for every deployable, service-archetype\n" +
 		"challenge in the event repo. Each challenge gets its own compose\n" +
-		"project named mtcf-<event>-<category>-<slug>.\n\n" +
+		"project named mctf-<event>-<category>-<slug>.\n\n" +
 		"Instanced challenges are intentionally skipped — they are spawned\n" +
 		"per-team at game time by the instancer, not at the event-deploy step.\n\n" +
 		"For service challenges with internal_port set, PORT_<internal> is\n" +
 		"stamped into the env so the compose's ${PORT_N:-N} convention picks\n" +
 		"the right host port.\n\n" +
 		"Examples:\n" +
-		"  mtcf deploy --dry-run\n" +
-		"  mtcf deploy --category misc\n" +
-		"  mtcf deploy --slug welcome",
+		"  mctf deploy --dry-run\n" +
+		"  mctf deploy --category misc\n" +
+		"  mctf deploy --slug welcome",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		plan, _, err := planDeploy()
 		if err != nil {
@@ -80,10 +80,10 @@ func planSlugs(plan []deploy.Unit) string {
 	return strings.Join(out, ", ")
 }
 
-// notifyDiscord posts to MTCF_DISCORD_WEBHOOK if set. Best-effort:
+// notifyDiscord posts to MCTF_DISCORD_WEBHOOK if set. Best-effort:
 // errors are surfaced on stderr but never fail the deploy.
 func notifyDiscord(ctx context.Context, title, level, body string) {
-	url := os.Getenv("MTCF_DISCORD_WEBHOOK")
+	url := os.Getenv("MCTF_DISCORD_WEBHOOK")
 	if url == "" {
 		return
 	}
@@ -103,12 +103,12 @@ var (
 var downCmd = &cobra.Command{
 	Use:   "down",
 	Short: "Tear down service-archetype challenges via docker compose",
-	Long: "Reverse of `mtcf deploy`. Runs `docker compose down` for every\n" +
+	Long: "Reverse of `mctf deploy`. Runs `docker compose down` for every\n" +
 		"deployable, service-archetype challenge in reverse-deploy order.\n\n" +
 		"With --volumes, also strips named volumes (passes -v to compose).\n\n" +
 		"Examples:\n" +
-		"  mtcf down --dry-run\n" +
-		"  mtcf down --volumes",
+		"  mctf down --dry-run\n" +
+		"  mctf down --volumes",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Reuse the deploy planner with the down-specific filters.
 		flagDeployCat, flagDeploySlug = flagDownCat, flagDownSlug

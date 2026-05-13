@@ -8,7 +8,7 @@ LDFLAGS := -X github.com/MicroClub-USTHB/mctf-cli/cmd.version=$(VERSION) \
 .PHONY: build test lint tidy run clean schemas
 
 build: schemas
-	go build -ldflags "$(LDFLAGS)" -o mtcf .
+	go build -ldflags "$(LDFLAGS)" -o mctf .
 
 # Sync the canonical /schema/ JSON files into the embed package so the
 # binary stays self-contained. Errors out if drift is detected after sync,
@@ -33,4 +33,4 @@ run:
 	go run -ldflags "$(LDFLAGS)" . $(ARGS)
 
 clean:
-	rm -f mtcf
+	rm -f mctf

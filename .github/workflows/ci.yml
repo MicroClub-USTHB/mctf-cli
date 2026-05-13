@@ -38,10 +38,10 @@ jobs:
       - run: make build
 
       - name: validate the sample event
-        run: ./mtcf -C examples/sample-event validate
+        run: ./mctf -C examples/sample-event validate
 
       - name: confirm derived files are in sync
-        run: ./mtcf -C examples/sample-event generate --check
+        run: ./mctf -C examples/sample-event generate --check
 
   schemas:
     name: schemas (python sanity check)

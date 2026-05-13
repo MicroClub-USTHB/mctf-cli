@@ -16,7 +16,7 @@ import (
 var categoriesCmd = &cobra.Command{
 	Use:   "categories",
 	Short: "List the active category catalog (core + extended + custom)",
-	Long: "Resolves the per-event category catalog using mtcf.config.yml's\n" +
+	Long: "Resolves the per-event category catalog using mctf.config.yml's\n" +
 		"categories.extended and categories.custom additions on top of the\n" +
 		"core 10 categories.\n\n" +
 		"With --json, emits a machine-readable view.",

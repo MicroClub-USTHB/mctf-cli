@@ -1,6 +1,6 @@
 # Challenge Categories
 
-MTCF defines two tiers of categories: a **core tier** (always available) and an **extended tier** (opt-in via `mtcf.config.yml::categories.extended`). Organizers can also declare entirely **custom** categories without forking the CLI.
+MCTF defines two tiers of categories: a **core tier** (always available) and an **extended tier** (opt-in via `mctf.config.yml::categories.extended`). Organizers can also declare entirely **custom** categories without forking the CLI.
 
 This separation keeps the default category set small (the core 10 cover what most events ship today, inspired by the MCTF 5.0 catalog) while letting events that need cloud, blockchain, or boot2root categories enable them with one line of config.
 
@@ -21,7 +21,7 @@ This separation keeps the default category set small (the core 10 cover what mos
 
 ## Extended tier — opt-in
 
-Enable in `mtcf.config.yml`:
+Enable in `mctf.config.yml`:
 
 ```yaml
 categories:
@@ -50,7 +50,7 @@ Each gets a 1000-port slice from the default range (17000+) on activation, alloc
 
 ## Custom categories
 
-For one-off or org-specific categories, declare them in `mtcf.config.yml`:
+For one-off or org-specific categories, declare them in `mctf.config.yml`:
 
 ```yaml
 categories:
@@ -90,7 +90,7 @@ Every challenge resolves to exactly one archetype, **derived** from `challenge.y
 
 - **`static`** — `need_deploy: false`. No runtime, no Dockerfile required. Only `assets/` are uploaded to CTFd.
 - **`service`** — `need_deploy: true`, `deploy.dynamic_instances: false`. One shared container; `deploy.port` exposed.
-- **`instanced`** — `need_deploy: true`, `deploy.dynamic_instances: true`. Per-team container/pod spawned by the MTCF instancer; `deploy.internal_port` is what the container listens on.
+- **`instanced`** — `need_deploy: true`, `deploy.dynamic_instances: true`. Per-team container/pod spawned by the MCTF instancer; `deploy.internal_port` is what the container listens on.
 
 ## Per-category lint rules (selected)
 

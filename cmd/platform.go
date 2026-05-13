@@ -28,20 +28,20 @@ var (
 var platformSyncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync the event's challenges to the configured CTF platform",
-	Long: "Reads platform.url from mtcf.config.yml and the API token from\n" +
-		"$MTCF_CTFD_TOKEN, then creates challenges that are missing on the\n" +
+	Long: "Reads platform.url from mctf.config.yml and the API token from\n" +
+		"$MCTF_CTFD_TOKEN, then creates challenges that are missing on the\n" +
 		"platform.\n\n" +
 		"By default, challenges that already exist are skipped — pass\n" +
 		"--update to reconcile their fields and child resources (flags, tags,\n" +
 		"hints). With --dry-run, prints the plan without making any\n" +
 		"network calls beyond the read-only diff.\n\n" +
-		"Token: export MTCF_CTFD_TOKEN=<your-token> before running.\n\n" +
+		"Token: export MCTF_CTFD_TOKEN=<your-token> before running.\n\n" +
 		"Examples:\n" +
-		"  mtcf platform sync --dry-run\n" +
-		"  mtcf platform sync\n" +
-		"  mtcf platform sync --update\n" +
-		"  mtcf platform sync --category web --update\n" +
-		"  mtcf platform sync --json",
+		"  mctf platform sync --dry-run\n" +
+		"  mctf platform sync\n" +
+		"  mctf platform sync --update\n" +
+		"  mctf platform sync --category web --update\n" +
+		"  mctf platform sync --json",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(flagDir)
 		if err != nil {
@@ -51,11 +51,11 @@ var platformSyncCmd = &cobra.Command{
 			return fmt.Errorf("platform.type must be 'ctfd' (got %q) — only CTFd is supported in v0", platformType(cfg))
 		}
 		if cfg.Platform.URL == "" {
-			return fmt.Errorf("platform.url is empty in mtcf.config.yml")
+			return fmt.Errorf("platform.url is empty in mctf.config.yml")
 		}
-		token := os.Getenv("MTCF_CTFD_TOKEN")
+		token := os.Getenv("MCTF_CTFD_TOKEN")
 		if token == "" {
-			return fmt.Errorf("MTCF_CTFD_TOKEN env var is empty — required to authenticate against %s", cfg.Platform.URL)
+			return fmt.Errorf("MCTF_CTFD_TOKEN env var is empty — required to authenticate against %s", cfg.Platform.URL)
 		}
 
 		challs, _, err := challenge.Discover(flagDir, cfg.ChallengesDir)
@@ -138,15 +138,15 @@ var (
 
 var platformConfigureCmd = &cobra.Command{
 	Use:   "configure",
-	Short: "Sync event-level CTFd config (ctf_name) from mtcf.config.yml",
+	Short: "Sync event-level CTFd config (ctf_name) from mctf.config.yml",
 	Long: "Pushes ctf_name to CTFd's /api/v1/configs from the loaded\n" +
 		"event config. Theme settings (theme_name, theme_color, custom\n" +
 		"HTML) are intentionally not synced — those are typically a one-\n" +
 		"time UI setup, not per-event automation.\n\n" +
-		"Token: export MTCF_CTFD_TOKEN=<your-token> before running.\n\n" +
+		"Token: export MCTF_CTFD_TOKEN=<your-token> before running.\n\n" +
 		"Examples:\n" +
-		"  mtcf platform configure --dry-run\n" +
-		"  mtcf platform configure",
+		"  mctf platform configure --dry-run\n" +
+		"  mctf platform configure",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(flagDir)
 		if err != nil {
@@ -156,14 +156,14 @@ var platformConfigureCmd = &cobra.Command{
 			return fmt.Errorf("platform.type must be 'ctfd' (got %q)", platformType(cfg))
 		}
 		if cfg.Platform.URL == "" {
-			return fmt.Errorf("platform.url is empty in mtcf.config.yml")
+			return fmt.Errorf("platform.url is empty in mctf.config.yml")
 		}
-		token := os.Getenv("MTCF_CTFD_TOKEN")
+		token := os.Getenv("MCTF_CTFD_TOKEN")
 		if token == "" {
-			return fmt.Errorf("MTCF_CTFD_TOKEN env var is empty")
+			return fmt.Errorf("MCTF_CTFD_TOKEN env var is empty")
 		}
 		if cfg.Event.Name == "" {
-			return fmt.Errorf("event.name is empty in mtcf.config.yml — nothing to push")
+			return fmt.Errorf("event.name is empty in mctf.config.yml — nothing to push")
 		}
 
 		fmt.Printf("planned config:\n")

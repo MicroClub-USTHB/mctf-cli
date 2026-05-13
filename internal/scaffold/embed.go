@@ -1,5 +1,5 @@
 // Package scaffold renders embedded templates onto the filesystem to
-// bootstrap a new MTCF event repository.
+// bootstrap a new MCTF event repository.
 //
 // Files are embedded under templates/event/. Names ending in ".tmpl" are
 // run through text/template; all other files are copied verbatim. Two

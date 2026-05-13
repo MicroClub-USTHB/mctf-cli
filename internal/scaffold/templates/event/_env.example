@@ -1,9 +1,9 @@
-# Container registry credentials (used by `mtcf build --push`)
-MTCF_REGISTRY_USER=
-MTCF_REGISTRY_TOKEN=
+# Container registry credentials (used by `mctf build --push`)
+MCTF_REGISTRY_USER=
+MCTF_REGISTRY_TOKEN=
 
-# CTFd API token (used by future `mtcf deploy` to register challenges)
-MTCF_CTFD_TOKEN=
+# CTFd API token (used by future `mctf deploy` to register challenges)
+MCTF_CTFD_TOKEN=
 
 # Optional Discord webhook for deploy notifications
-MTCF_DISCORD_WEBHOOK=
+MCTF_DISCORD_WEBHOOK=

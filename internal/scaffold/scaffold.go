@@ -52,7 +52,7 @@ func Slugify(name string) string {
 // EventOptions controls scaffold behavior.
 type EventOptions struct {
 	// Force allows scaffolding into a directory that already contains
-	// mtcf.config.yml; existing files are still skipped unless they
+	// mctf.config.yml; existing files are still skipped unless they
 	// would be overwritten and Force is true.
 	Force bool
 }
@@ -65,8 +65,8 @@ type Result struct {
 }
 
 // ErrAlreadyInitialized is returned when the target directory already
-// contains an mtcf.config.yml and Force is false.
-var ErrAlreadyInitialized = errors.New("event already initialized (mtcf.config.yml exists) — pass --force to overwrite")
+// contains an mctf.config.yml and Force is false.
+var ErrAlreadyInitialized = errors.New("event already initialized (mctf.config.yml exists) — pass --force to overwrite")
 
 // Event renders the embedded event template tree into dir, applying
 // vars to *.tmpl files. dir is created if missing.
@@ -75,7 +75,7 @@ func Event(dir string, vars EventVars, opts EventOptions) (*Result, error) {
 		return nil, fmt.Errorf("create %s: %w", dir, err)
 	}
 	if !opts.Force {
-		if _, err := os.Stat(filepath.Join(dir, "mtcf.config.yml")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, "mctf.config.yml")); err == nil {
 			return nil, ErrAlreadyInitialized
 		}
 	}

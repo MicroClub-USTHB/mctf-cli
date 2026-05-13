@@ -29,16 +29,16 @@ var buildCmd = &cobra.Command{
 	Long: "Builds one image per challenge whose need_deploy is true.\n\n" +
 		"Image tag format: <registry>/<event>-<category>-<slug>:<sha>\n" +
 		"Plus a parallel <...>:latest tag.\n\n" +
-		"Each image is labeled with mtcf.event, mtcf.category, mtcf.challenge,\n" +
-		"and mtcf.archetype so the runtime tooling can identify them later.\n\n" +
+		"Each image is labeled with mctf.event, mctf.category, mctf.challenge,\n" +
+		"and mctf.archetype so the runtime tooling can identify them later.\n\n" +
 		"With --dry-run, prints the planned `docker build` commands without\n" +
 		"executing them — useful for review before a real build, and for CI\n" +
 		"sanity checks.\n\n" +
 		"Examples:\n" +
-		"  mtcf build --dry-run\n" +
-		"  mtcf build --category web\n" +
-		"  mtcf build --slug cub3-clone --no-cache\n" +
-		"  mtcf build --push",
+		"  mctf build --dry-run\n" +
+		"  mctf build --category web\n" +
+		"  mctf build --slug cub3-clone --no-cache\n" +
+		"  mctf build --push",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(flagDir)
 		if err != nil {

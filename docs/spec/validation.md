@@ -1,12 +1,12 @@
-# Validation Rules (`mtcf validate`)
+# Validation Rules (`mctf validate`)
 
-Every rule MTCF enforces, with rationale and severity. Hard-fails block the build/deploy; warnings inform. Profile column shows when a rule is escalated under stricter profiles.
+Every rule MCTF enforces, with rationale and severity. Hard-fails block the build/deploy; warnings inform. Profile column shows when a rule is escalated under stricter profiles.
 
-`mtcf validate` is the entrypoint. It runs at three points:
+`mctf validate` is the entrypoint. It runs at three points:
 
 1. **CI** — on every push and PR via `.github/workflows/validate.yml`.
-2. **Local pre-commit** — when authors run `mtcf validate` themselves.
-3. **Implicit on deploy** — `mtcf deploy` runs validation first; failures abort.
+2. **Local pre-commit** — when authors run `mctf validate` themselves.
+3. **Implicit on deploy** — `mctf deploy` runs validation first; failures abort.
 
 ## Hard failures (exit code 1)
 
@@ -105,7 +105,7 @@ Every rule MTCF enforces, with rationale and severity. Hard-fails block the buil
 
 ## Disabling rules
 
-A challenge can opt out of specific warnings via a `# mtcf-disable: W001 W005` comment at the top of its `challenge.yml`. **Hard-fails cannot be disabled** — fix the issue or open a PR to change the rule.
+A challenge can opt out of specific warnings via a `# mctf-disable: W001 W005` comment at the top of its `challenge.yml`. **Hard-fails cannot be disabled** — fix the issue or open a PR to change the rule.
 
 ## CI integration
 
@@ -121,8 +121,8 @@ The `validate.yml` workflow reports validation results as a job summary on the P
 
 Many rules are direct improvements over what MCTF 5.0's TypeScript validator catches today (see [CHANGELOG.md](./CHANGELOG.md) for the full list). The most consequential additions:
 
-- **`SEC001` (static-flag image-leak guard)** — the most common bug in CTF prep is shipping a `src/app.py` that hardcodes the flag, then publishing the image to a public registry. MCTF 5.0 has no check for this; MTCF makes it a hard-fail.
+- **`SEC001` (static-flag image-leak guard)** — the most common bug in CTF prep is shipping a `src/app.py` that hardcodes the flag, then publishing the image to a public registry. MCTF 5.0 has no check for this; MCTF makes it a hard-fail.
 - **`D004` (instanced healthcheck mandatory)** — without a healthcheck, the instancer can't tell when a spawn is ready. Players hit the URL too early, see HTTP 502, blame the organizers. Hard-failing at validation time avoids the live-event symptom.
-- **`D006` (port range enforcement)** — MCTF 5.0 designed per-category port ranges (10000–10999 for web, 11000–11999 for pwn, etc.) but disabled the validation. MTCF re-enables it.
-- **`U001`/`U002`/`U003` (uniqueness)** — duplicate ports cause silent deploy collisions; duplicate flags cause cross-solving. MCTF 5.0 doesn't check; MTCF does.
-- **`S005` (difficulty enum)** — MCTF 5.0 accepts any non-empty string for difficulty. MTCF locks it to four values so the CTFd UI is consistent.
+- **`D006` (port range enforcement)** — MCTF 5.0 designed per-category port ranges (10000–10999 for web, 11000–11999 for pwn, etc.) but disabled the validation. MCTF re-enables it.
+- **`U001`/`U002`/`U003` (uniqueness)** — duplicate ports cause silent deploy collisions; duplicate flags cause cross-solving. MCTF 5.0 doesn't check; MCTF does.
+- **`S005` (difficulty enum)** — MCTF 5.0 accepts any non-empty string for difficulty. MCTF locks it to four values so the CTFd UI is consistent.

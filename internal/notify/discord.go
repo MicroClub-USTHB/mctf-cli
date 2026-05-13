@@ -19,7 +19,7 @@ import (
 // Notifier sends one human-readable status message somewhere.
 //
 // Notifiers are best-effort: a transport error from one target should
-// never abort an MTCF command. Callers log + ignore.
+// never abort an MCTF command. Callers log + ignore.
 type Notifier interface {
 	Notify(ctx context.Context, msg Message) error
 }
@@ -66,7 +66,7 @@ func (d *Discord) Notify(ctx context.Context, m Message) error {
 		"timestamp":   time.Now().UTC().Format(time.RFC3339),
 	}
 	body := map[string]any{
-		"username": "MTCF",
+		"username": "MCTF",
 		"embeds":   []any{embed},
 	}
 	raw, err := json.Marshal(body)

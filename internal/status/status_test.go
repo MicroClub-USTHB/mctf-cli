@@ -84,8 +84,8 @@ func TestRun_StaticAndInstancedHaveSyntheticState(t *testing.T) {
 func TestRun_ServiceQueriesInspector(t *testing.T) {
 	insp := fakeInspector{
 		containers: map[string][]composeContainer{
-			"mtcf-evt-misc-welcome": {
-				{Name: "mtcf-evt-misc-welcome-app-1", State: "running", Image: "ghcr.io/x:latest", Status: "Up 5 minutes"},
+			"mctf-evt-misc-welcome": {
+				{Name: "mctf-evt-misc-welcome-app-1", State: "running", Image: "ghcr.io/x:latest", Status: "Up 5 minutes"},
 			},
 		},
 	}
@@ -98,7 +98,7 @@ func TestRun_ServiceQueriesInspector(t *testing.T) {
 	if r.State != "running" {
 		t.Errorf("state = %q", r.State)
 	}
-	if r.Container != "mtcf-evt-misc-welcome-app-1" {
+	if r.Container != "mctf-evt-misc-welcome-app-1" {
 		t.Errorf("container = %q", r.Container)
 	}
 	if r.Uptime != "5 minutes" {

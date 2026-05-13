@@ -13,7 +13,7 @@ import (
 	"github.com/MicroClub-USTHB/mctf-cli/internal/ingress"
 )
 
-// Outputs collects every file `mtcf generate` would write, keyed by
+// Outputs collects every file `mctf generate` would write, keyed by
 // absolute path. Lets callers either write all files or compare against
 // what's already on disk for --check mode.
 type Outputs struct {

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mtcf.dev/schema/v1/challenge.schema.json",
-  "title": "MTCF Challenge Manifest",
+  "$id": "https://mctf.dev/schema/v1/challenge.schema.json",
+  "title": "MCTF Challenge Manifest",
   "description": "Author-edited source-of-truth manifest at challenges/<category>/<name>/challenge/challenge.yml. Schema v1.",
   "type": "object",
   "additionalProperties": false,
@@ -39,7 +39,7 @@
           "description": "Single author handle/name. Multi-author support deferred to v0.2."
         },
         "category": {
-          "description": "Must match parent directory name. Core 10 always allowed; extended/custom categories enabled in mtcf.config.yml.",
+          "description": "Must match parent directory name. Core 10 always allowed; extended/custom categories enabled in mctf.config.yml.",
           "type": "string",
           "pattern": "^[a-z][a-z0-9_-]{0,30}$"
         },
@@ -58,7 +58,7 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 10,
-          "description": "Deployment wave (1..waves_number from mtcf.config.yml)."
+          "description": "Deployment wave (1..waves_number from mctf.config.yml)."
         },
         "force_hidden": {
           "type": "boolean",
@@ -78,7 +78,7 @@
               "flag": {
                 "type": "string",
                 "pattern": "^[a-zA-Z][a-zA-Z0-9]*\\{[^}]+\\}$",
-                "description": "Format <prefix>{...}; prefix configurable in mtcf.config.yml::event.flag_prefix (default mctf)."
+                "description": "Format <prefix>{...}; prefix configurable in mctf.config.yml::event.flag_prefix (default mctf)."
               },
               "case_sensitive": {
                 "type": "boolean",
@@ -108,7 +108,7 @@
             "minLength": 1,
             "maxLength": 40
           },
-          "description": "Free-form CTFd tags. 'wave N' is auto-added by mtcf generate."
+          "description": "Free-form CTFd tags. 'wave N' is auto-added by mctf generate."
         },
         "hints": {
           "type": "array",
@@ -134,7 +134,7 @@
         "scoring": {
           "type": "object",
           "additionalProperties": false,
-          "description": "Per-challenge override of mtcf.config.yml::event.scoring.",
+          "description": "Per-challenge override of mctf.config.yml::event.scoring.",
           "required": ["type"],
           "properties": {
             "type": {

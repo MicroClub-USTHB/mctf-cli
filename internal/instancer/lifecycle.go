@@ -103,7 +103,7 @@ func PlanSpawn(cfg *config.Config, c *challenge.Challenge, teamID string, alloca
 // crypto-random hex (so concurrent spawns by the same team don't
 // collide).
 func MakeInstanceID(c *challenge.Challenge, teamID string) string {
-	return fmt.Sprintf("mtcf-inst-%s-%s-%s",
+	return fmt.Sprintf("mctf-inst-%s-%s-%s",
 		sanitize(c.Slug), sanitize(teamID), shortToken(4))
 }
 

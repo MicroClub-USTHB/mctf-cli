@@ -28,7 +28,7 @@ challenges_dir: "./challenges"
 
 func writeMinimalEvent(t *testing.T, dir string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, "mtcf.config.yml"), []byte(minimalConfig), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "mctf.config.yml"), []byte(minimalConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "challenges"), 0o755); err != nil {
@@ -181,7 +181,7 @@ func TestCheckExpiredInstances_NoStore(t *testing.T) {
 
 func TestCheckExpiredInstances_HasExpired(t *testing.T) {
 	dir := t.TempDir()
-	storePath := filepath.Join(dir, ".mtcf", "instances.json")
+	storePath := filepath.Join(dir, ".mctf", "instances.json")
 	store, err := instancer.NewStore(storePath)
 	if err != nil {
 		t.Fatal(err)
@@ -201,7 +201,7 @@ func TestCheckExpiredInstances_HasExpired(t *testing.T) {
 
 func TestCheckExpiredInstances_AllLive(t *testing.T) {
 	dir := t.TempDir()
-	storePath := filepath.Join(dir, ".mtcf", "instances.json")
+	storePath := filepath.Join(dir, ".mctf", "instances.json")
 	store, _ := instancer.NewStore(storePath)
 	_ = store.Put(instancer.Instance{
 		ID: "live", ChallengeSlug: "x/y", TeamID: "t",

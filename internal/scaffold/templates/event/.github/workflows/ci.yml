@@ -13,11 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: install mtcf
+      - name: install mctf
         run: |
           go install github.com/MicroClub-USTHB/mctf-cli@latest
         env:
           GOBIN: /usr/local/bin
 
-      - run: mtcf validate
-      - run: mtcf generate --check
+      - run: mctf validate
+      - run: mctf generate --check

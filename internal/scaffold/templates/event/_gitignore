@@ -1,5 +1,5 @@
-# MTCF working directory (never committed)
-.mtcf/
+# MCTF working directory (never committed)
+.mctf/
 
 # Local environment
 .env
