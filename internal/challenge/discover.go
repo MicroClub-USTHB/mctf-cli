@@ -65,12 +65,13 @@ func Discover(eventRoot, challengesDir string) ([]*Challenge, map[string]error, 
 				AssetsDir:    filepath.Join(chRoot, "assets"),
 				OtherDir:     filepath.Join(chRoot, "other"),
 			}
-			m, _, err := LoadManifest(manifestPath)
+			m, raw, err := LoadManifest(manifestPath)
 			if err != nil {
 				errs[manifestPath] = err
 			} else {
 				c.Manifest = m
 				c.Archetype = DeriveArchetype(m)
+				c.SchemaOmitted = !HasTopLevelYAMLKey(raw, "schema")
 			}
 			out = append(out, c)
 		}

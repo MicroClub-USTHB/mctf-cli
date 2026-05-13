@@ -124,6 +124,10 @@ type Challenge struct {
 	AssetsDir    string    // absolute path to <root>/assets/
 	OtherDir     string    // absolute path to <root>/other/
 	Archetype    Archetype // derived
+
+	// SchemaOmitted is true when the manifest didn't declare a top-level
+	// `schema:` field (the loader defaults it to 1). Drives W012.
+	SchemaOmitted bool
 }
 
 // ManifestPath returns the path to challenge/challenge.yml.
@@ -178,6 +182,18 @@ func LoadManifest(path string) (Manifest, []byte, error) {
 		m.Schema = 1
 	}
 	return m, raw, nil
+}
+
+// HasTopLevelYAMLKey reports whether the (already-loaded) raw YAML
+// document contains the given top-level key. Used by discover.go to
+// detect whether `schema:` was declared by the author or defaulted.
+func HasTopLevelYAMLKey(raw []byte, key string) bool {
+	var asMap map[string]any
+	if err := yaml.Unmarshal(raw, &asMap); err != nil {
+		return false
+	}
+	_, ok := asMap[key]
+	return ok
 }
 
 // DeriveArchetype computes a challenge's runtime archetype from its manifest.
