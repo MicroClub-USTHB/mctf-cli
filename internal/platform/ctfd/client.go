@@ -139,6 +139,12 @@ func (c *Client) UpdateChallenge(ctx context.Context, id int, in Challenge) (*Ch
 	return &env.Data, nil
 }
 
+// DeleteChallenge removes a challenge by ID. CTFd cascades the delete to
+// the challenge's flags, tags, hints, and files.
+func (c *Client) DeleteChallenge(ctx context.Context, id int) error {
+	return c.do(ctx, "DELETE", fmt.Sprintf("/api/v1/challenges/%d", id), nil, nil)
+}
+
 // ListFlags returns flags currently attached to a challenge.
 func (c *Client) ListFlags(ctx context.Context, challengeID int) ([]Flag, error) {
 	var env envelope[[]Flag]

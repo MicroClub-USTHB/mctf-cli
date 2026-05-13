@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -182,6 +185,138 @@ var platformConfigureCmd = &cobra.Command{
 	},
 }
 
+var (
+	flagUnsyncDryRun bool
+	flagUnsyncYes    bool
+)
+
+var platformUnsyncCmd = &cobra.Command{
+	Use:   "unsync <category>/<slug>",
+	Short: "Remove a challenge from the configured CTF platform",
+	Long: "Looks up the CTFd challenge that corresponds to <category>/<slug>\n" +
+		"and DELETEs it via /api/v1/challenges/<id>. CTFd cascades the\n" +
+		"delete to flags, tags, hints, and files.\n\n" +
+		"Local files in challenges/<category>/<slug>/ are NOT touched —\n" +
+		"this only undoes the platform-side state. Use git for local\n" +
+		"cleanup.\n\n" +
+		"The local manifest's `name:` is preferred for matching; when the\n" +
+		"challenge directory is gone, the command falls back to matching\n" +
+		"on category + slug-from-name.\n\n" +
+		"Examples:\n" +
+		"  mctf platform unsync misc/welcome --dry-run\n" +
+		"  mctf platform unsync misc/welcome\n" +
+		"  mctf platform unsync misc/welcome --yes",
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		category, slug, ok := splitCategorySlug(args[0])
+		if !ok {
+			return fmt.Errorf("argument must be <category>/<slug>, got %q", args[0])
+		}
+		cfg, err := config.Load(flagDir)
+		if err != nil {
+			return err
+		}
+		if cfg.Platform == nil || cfg.Platform.Type != "ctfd" {
+			return fmt.Errorf("platform.type must be 'ctfd' (got %q)", platformType(cfg))
+		}
+		if cfg.Platform.URL == "" {
+			return fmt.Errorf("platform.url is empty in mctf.config.yml")
+		}
+		token := os.Getenv("MCTF_CTFD_TOKEN")
+		if token == "" {
+			return fmt.Errorf("MCTF_CTFD_TOKEN env var is empty")
+		}
+
+		// Prefer the local manifest's display name when available — the
+		// directory may have been removed already, in which case we fall
+		// back to slug-based matching against the platform's list.
+		var wantName string
+		if challs, _, err := challenge.Discover(flagDir, cfg.ChallengesDir); err == nil {
+			for _, c := range challs {
+				if c.CategoryDir == category && c.Slug == slug {
+					wantName = c.Manifest.Challenge.Name
+					break
+				}
+			}
+		}
+
+		client := ctfd.New(cfg.Platform.URL, token)
+		ctx := context.Background()
+		existing, err := client.ListChallenges(ctx)
+		if err != nil {
+			return fmt.Errorf("list challenges: %w", err)
+		}
+
+		target := findUnsyncTarget(existing, category, slug, wantName)
+		if target == nil {
+			return fmt.Errorf("no CTFd challenge matched %s/%s (looked for category=%s, name=%q)",
+				category, slug, category, wantName)
+		}
+
+		fmt.Printf("will delete CTFd challenge id=%d category=%q name=%q\n",
+			target.ID, target.Category, target.Name)
+		if flagUnsyncDryRun {
+			return nil
+		}
+		if !flagUnsyncYes {
+			if !confirmYes(promptIn, os.Stderr, "delete?") {
+				fmt.Println("aborted")
+				return nil
+			}
+		}
+		if err := client.DeleteChallenge(ctx, target.ID); err != nil {
+			return fmt.Errorf("delete challenge id=%d: %w", target.ID, err)
+		}
+		fmt.Printf("deleted id=%d\n", target.ID)
+		return nil
+	},
+}
+
+// findUnsyncTarget picks one CTFd challenge from `existing` that
+// corresponds to <category>/<slug>. It tries:
+//
+//  1. category + exact name match (case-insensitive) using `wantName`
+//     from the local manifest, if provided.
+//  2. category + slug-derived name match (the fallback when the local
+//     challenge has already been removed).
+//
+// Returns nil if no candidate is found.
+func findUnsyncTarget(existing []ctfd.Challenge, category, slug, wantName string) *ctfd.Challenge {
+	for i := range existing {
+		ec := &existing[i]
+		if !strings.EqualFold(ec.Category, category) {
+			continue
+		}
+		if wantName != "" && strings.EqualFold(ec.Name, wantName) {
+			return ec
+		}
+	}
+	// Fallback: slug-from-name match.
+	for i := range existing {
+		ec := &existing[i]
+		if !strings.EqualFold(ec.Category, category) {
+			continue
+		}
+		if challenge.SlugFromName(ec.Name) == slug {
+			return ec
+		}
+	}
+	return nil
+}
+
+// confirmYes blocks on stdin for a y/N answer. Returns true only for
+// explicit "y" / "yes" (case-insensitive). Default is no.
+func confirmYes(in io.Reader, out io.Writer, prompt string) bool {
+	fmt.Fprintf(out, "%s [y/N] ", prompt)
+	r := bufio.NewReader(in)
+	line, err := r.ReadString('\n')
+	if err != nil && line == "" {
+		return false
+	}
+	ans := strings.ToLower(strings.TrimSpace(line))
+	return ans == "y" || ans == "yes"
+}
+
 func init() {
 	platformSyncCmd.Flags().BoolVar(&flagSyncDryRun, "dry-run", false, "show the plan without applying it")
 	platformSyncCmd.Flags().BoolVar(&flagSyncUpdate, "update", false, "reconcile existing challenges (default: skip them)")
@@ -191,6 +326,10 @@ func init() {
 
 	platformConfigureCmd.Flags().BoolVar(&flagConfigureDryRun, "dry-run", false, "show what would be set without making the request")
 	platformCmd.AddCommand(platformConfigureCmd)
+
+	platformUnsyncCmd.Flags().BoolVar(&flagUnsyncDryRun, "dry-run", false, "show what would be deleted without sending the request")
+	platformUnsyncCmd.Flags().BoolVarP(&flagUnsyncYes, "yes", "y", false, "skip the interactive confirmation prompt")
+	platformCmd.AddCommand(platformUnsyncCmd)
 
 	rootCmd.AddCommand(platformCmd)
 }

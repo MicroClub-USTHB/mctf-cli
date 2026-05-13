@@ -168,6 +168,19 @@ func TestDelete_NoBody(t *testing.T) {
 	}
 }
 
+func TestDeleteChallenge_HitsCorrectEndpoint(t *testing.T) {
+	f, c, _ := newFake(t)
+	f.handler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}
+	if err := c.DeleteChallenge(context.Background(), 17); err != nil {
+		t.Fatal(err)
+	}
+	if f.requests[0].Method != "DELETE" || f.requests[0].URL.Path != "/api/v1/challenges/17" {
+		t.Errorf("wrong request: %s %s", f.requests[0].Method, f.requests[0].URL.Path)
+	}
+}
+
 func TestUploadFile_SendsMultipart(t *testing.T) {
 	f, c, _ := newFake(t)
 	f.handler = func(w http.ResponseWriter, r *http.Request) {
