@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -64,7 +65,7 @@ func TestSSHRunner_RemoteComposeCommandUp(t *testing.T) {
 	u := newTestUnit()
 
 	got := r.remoteComposeCommand(u, "up", false)
-	want := "cd '/opt/mctf/mctf-sample-event-misc-welcome/challenge' && PORT_8000=14000 docker compose -p mctf-sample-event-misc-welcome -f docker-compose.yml up -d"
+	want := "cd '/opt/mctf/mctf-sample-event-misc-welcome/challenge' && PORT_8000=14000 docker compose -p mctf-sample-event-misc-welcome -f docker-compose.yml up -d --wait"
 
 	if got != want {
 		t.Fatalf("remoteComposeCommand(up) = %q, want %q", got, want)
@@ -196,6 +197,88 @@ func TestSSHRunner_ValidateKeyPath(t *testing.T) {
 	r.KeyPath = filepath.Join(os.TempDir(), "does-not-exist")
 	if err := r.validate(); err == nil {
 		t.Fatalf("expected validate to fail for missing key")
+	}
+}
+
+func TestSSHRunner_ValidateRejectsLoosePerms(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix perm bits don't apply on windows")
+	}
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "loose_key")
+	if err := os.WriteFile(keyPath, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := &SSHRunner{Host: "example.com", KeyPath: keyPath}
+	err := r.validate()
+	if err == nil {
+		t.Fatal("expected validate to reject world-readable key")
+	}
+	if !strings.Contains(err.Error(), "chmod 600") {
+		t.Errorf("error should hint at chmod 600, got: %v", err)
+	}
+
+	// Tightening to 0600 should make it pass.
+	if err := os.Chmod(keyPath, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.validate(); err != nil {
+		t.Errorf("validate should accept 0600 key, got %v", err)
+	}
+}
+
+func TestSSHRunner_IdentitiesOnly_WhenKeyPathSet(t *testing.T) {
+	r := newTestSSHRunner() // KeyPath set
+	got := strings.Join(r.sshBaseArgs(), " ")
+	if !strings.Contains(got, "-o IdentitiesOnly=yes") {
+		t.Errorf("with KeyPath set, IdentitiesOnly=yes should appear: %q", got)
+	}
+}
+
+func TestSSHRunner_IdentitiesOnly_OmittedWhenNoKey(t *testing.T) {
+	r := &SSHRunner{Host: "example.com"}
+	got := strings.Join(r.sshBaseArgs(), " ")
+	if strings.Contains(got, "IdentitiesOnly") {
+		t.Errorf("without KeyPath, IdentitiesOnly should be absent: %q", got)
+	}
+}
+
+func TestSSHRunner_JumpHost_FlowsToSSHAndSCP(t *testing.T) {
+	r := newTestSSHRunner()
+	r.JumpHost = "deploy@bastion.example.com"
+	ssh := strings.Join(r.sshBaseArgs(), " ")
+	if !strings.Contains(ssh, "-J deploy@bastion.example.com") {
+		t.Errorf("ssh args missing -J: %q", ssh)
+	}
+	scp := strings.Join(r.scpBaseArgs(), " ")
+	if !strings.Contains(scp, "-J deploy@bastion.example.com") {
+		t.Errorf("scp args missing -J: %q", scp)
+	}
+}
+
+func TestSSHRunner_JumpHostFromConfig(t *testing.T) {
+	r := NewSSHRunner(&config.SSHDeploy{
+		Host: "h", JumpHost: "u@bastion",
+	}, false)
+	if r.JumpHost != "u@bastion" {
+		t.Errorf("JumpHost = %q, want u@bastion", r.JumpHost)
+	}
+}
+
+func TestSSHRunner_UpAppendsWait(t *testing.T) {
+	// --wait is the regression guard: without it, `up -d` returns the
+	// moment containers start, so the deploy "succeeds" before services
+	// are healthy.
+	r := newTestSSHRunner()
+	u := newTestUnit()
+	got := r.remoteComposeCommand(u, "up", false)
+	if !strings.HasSuffix(got, " up -d --wait") {
+		t.Errorf("compose up command must end with `up -d --wait`, got: %q", got)
+	}
+	// down should NOT carry --wait.
+	got = r.remoteComposeCommand(u, "down", false)
+	if strings.Contains(got, "--wait") {
+		t.Errorf("compose down must not carry --wait, got: %q", got)
 	}
 }
 

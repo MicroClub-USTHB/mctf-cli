@@ -155,7 +155,11 @@
             "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
             "user": { "type": "string", "default": "root" },
             "key_path": { "type": "string" },
-            "remote_root": { "type": "string", "default": "/opt/mctf" }
+            "remote_root": { "type": "string", "default": "/opt/mctf" },
+            "jump_host": {
+              "type": "string",
+              "description": "ssh ProxyJump target (e.g. user@bastion or user@bastion:2222). Routes ssh + scp through the bastion."
+            }
           }
         },
         "kubernetes": {

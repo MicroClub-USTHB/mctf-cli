@@ -116,6 +116,9 @@ type SSHDeploy struct {
 	User       string `json:"user,omitempty"`
 	KeyPath    string `json:"key_path,omitempty"`
 	RemoteRoot string `json:"remote_root,omitempty"`
+	// JumpHost is an ssh ProxyJump target (user@host[:port]). When set,
+	// every ssh + scp invocation routes through it.
+	JumpHost string `json:"jump_host,omitempty"`
 }
 
 // KubernetesDeploy targets a K8s cluster.

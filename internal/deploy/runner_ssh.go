@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
@@ -31,6 +32,7 @@ type SSHRunner struct {
 	User       string
 	KeyPath    string
 	RemoteRoot string
+	JumpHost   string
 	Stdout     io.Writer
 	Stderr     io.Writer
 	DryRun     bool
@@ -58,6 +60,7 @@ func NewSSHRunner(cfg *config.SSHDeploy, dryRun bool) *SSHRunner {
 	if cfg.RemoteRoot != "" {
 		r.RemoteRoot = cfg.RemoteRoot
 	}
+	r.JumpHost = cfg.JumpHost
 	return r
 }
 
@@ -110,7 +113,11 @@ func (r *SSHRunner) remoteComposeCommand(u Unit, action string, volumes bool) st
 		action,
 	}
 	if action == "up" {
-		args = append(args, "-d")
+		// --wait blocks until every service is healthy (or running, if
+		// no healthcheck is declared). Without it, `up -d` returns the
+		// moment containers start, so a deploy can "succeed" while the
+		// service is still booting and players hit 502s.
+		args = append(args, "-d", "--wait")
 	}
 	if action == "down" && volumes {
 		args = append(args, "-v")
@@ -130,19 +137,31 @@ func (r *SSHRunner) target() string {
 	return r.User + "@" + r.Host
 }
 
-// sshOptions returns the common -o flags. Non-interactive by default so a
-// deploy from CI doesn't hang on a password prompt or first-time host-key
-// confirmation. accept-new pins the key on first use; subsequent key changes
-// still fail loudly.
-func sshOptions() []string {
-	return []string{
+// commonSSHOptions returns the -o / -J flags shared by ssh and scp:
+//
+//   - BatchMode=yes and StrictHostKeyChecking=accept-new keep CI deploys
+//     non-interactive while still pinning the host key on first use.
+//   - When KeyPath is set we also pin IdentitiesOnly=yes so ssh stops at
+//     the configured key instead of cycling through every key in the
+//     user's ssh-agent (which can trip too-many-auth-attempts on some
+//     hosts).
+//   - JumpHost forwards through a bastion via -J.
+func (r *SSHRunner) commonSSHOptions() []string {
+	opts := []string{
 		"-o", "BatchMode=yes",
 		"-o", "StrictHostKeyChecking=accept-new",
 	}
+	if r.KeyPath != "" {
+		opts = append(opts, "-o", "IdentitiesOnly=yes")
+	}
+	if r.JumpHost != "" {
+		opts = append(opts, "-J", r.JumpHost)
+	}
+	return opts
 }
 
 func (r *SSHRunner) sshBaseArgs() []string {
-	args := sshOptions()
+	args := r.commonSSHOptions()
 	if r.Port > 0 {
 		args = append(args, "-p", fmt.Sprintf("%d", r.Port))
 	}
@@ -155,7 +174,7 @@ func (r *SSHRunner) sshBaseArgs() []string {
 
 func (r *SSHRunner) scpBaseArgs() []string {
 	// scp uses -P (capital) for port, unlike ssh's lowercase -p.
-	args := sshOptions()
+	args := r.commonSSHOptions()
 	if r.Port > 0 {
 		args = append(args, "-P", fmt.Sprintf("%d", r.Port))
 	}
@@ -219,8 +238,18 @@ func (r *SSHRunner) validate() error {
 		return fmt.Errorf("ssh host is required")
 	}
 	if r.KeyPath != "" {
-		if _, err := os.Stat(r.KeyPath); err != nil {
+		fi, err := os.Stat(r.KeyPath)
+		if err != nil {
 			return fmt.Errorf("ssh key not found: %s", r.KeyPath)
+		}
+		// ssh refuses to use a key with too-permissive bits and prints a
+		// hard-to-spot error. Fail fast with a clearer message. Skip on
+		// Windows where unix mode bits are simulated and meaningless.
+		if runtime.GOOS != "windows" {
+			if mode := fi.Mode().Perm(); mode&0o077 != 0 {
+				return fmt.Errorf("ssh key %s has overly-permissive permissions %#o (group/other readable); run: chmod 600 %s",
+					r.KeyPath, mode, r.KeyPath)
+			}
 		}
 	}
 	return nil
