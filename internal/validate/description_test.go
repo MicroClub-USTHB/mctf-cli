@@ -203,6 +203,24 @@ func TestW011_RecursiveAssetsFound(t *testing.T) {
 	}
 }
 
+// Inline code like `whoami`, `mctf{flag}`, `nc host 1337` is not a filename
+// and must not trigger W011 — the regex requires a `.<ext>` suffix.
+func TestW011_InlineCodeNotAFilename(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "inline",
+		"Run `whoami` and submit `mctf{flag_here}`. Try `nc host 1337`.")
+	c.Manifest.Challenge.Category = "crypto"
+	c.CategoryDir = "crypto"
+	assetsDir := filepath.Join(c.RootDir, "assets")
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if hasRule(r, "W011", SeverityWarn) {
+		t.Errorf("W011 false-positive on inline code: %s", r.String())
+	}
+}
+
 func TestW011_URLsIgnored(t *testing.T) {
 	root := t.TempDir()
 	c := fixtureChallenge(t, root, "url-test",
