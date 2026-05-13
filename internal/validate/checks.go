@@ -35,9 +35,11 @@ func Run(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, lo
 	return r
 }
 
-// assetMentionRe matches `filename` or [text](filename) in markdown descriptions.
-// Group 1: backtick-delimited content, Group 2: markdown link URL
-var assetMentionRe = regexp.MustCompile("(`[^`]+`)|" + "(\\]\\(([^)]+)\\))")
+// assetMentionRe matches `filename.ext` or [text](filename.ext) in markdown
+// descriptions. The `.ext` requirement is what keeps inline code like
+// `whoami` or `mctf{flag}` from being treated as asset references.
+// Group 1: backtick-delimited filename, Group 2: markdown link URL.
+var assetMentionRe = regexp.MustCompile("`([^`\\s]+\\.[a-zA-Z0-9]+)`|\\]\\(([^)\\s]+\\.[a-zA-Z0-9]+)\\)")
 
 // mutableStateRe matches keywords that suggest a challenge has mutable state (DB, sessions, etc.)
 var mutableStateRe = regexp.MustCompile(`(?i)\b(database|sql|login|register|account|session|admin|password)\b`)
@@ -207,26 +209,17 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 		})
 
 		for _, match := range matches {
-			var fileName string
-
-			// Group 1 is backtick-delimited (`filename`), group 3 is URL from [text](url)
-			if match[1] != "" {
-				// Backtick match: group 1 is `filename`
-				fileName = strings.Trim(match[1], "`")
-			} else if len(match) > 3 && match[3] != "" {
-				// Markdown link match: group 3 is the URL
-				fileName = match[3]
-			} else {
-				continue
+			fileName := match[1]
+			if fileName == "" {
+				fileName = match[2]
 			}
-
-			// Skip URLs and absolute paths — these aren't asset references
+			// Skip URLs and absolute paths — markdown links to external
+			// research pages, not handout references.
 			if strings.Contains(fileName, "://") || strings.HasPrefix(fileName, "/") ||
 				strings.HasPrefix(fileName, "mailto:") {
 				continue
 			}
 			fileName = filepath.Base(fileName)
-
 			if fileName != "" && !assetsOnDisk[fileName] {
 				r.Warnf("W011", manifestPath,
 					"asset %q referenced in description but missing from %s",
