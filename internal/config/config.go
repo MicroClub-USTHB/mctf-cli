@@ -111,9 +111,11 @@ type DockerDeploy struct {
 
 // SSHDeploy is remote single-host deploy via ssh+scp.
 type SSHDeploy struct {
-	Host    string `json:"host"`
-	User    string `json:"user,omitempty"`
-	KeyPath string `json:"key_path,omitempty"`
+	Host       string `json:"host"`
+	Port       int    `json:"port,omitempty"`
+	User       string `json:"user,omitempty"`
+	KeyPath    string `json:"key_path,omitempty"`
+	RemoteRoot string `json:"remote_root,omitempty"`
 }
 
 // KubernetesDeploy targets a K8s cluster.

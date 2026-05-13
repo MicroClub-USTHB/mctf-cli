@@ -152,8 +152,10 @@
           "required": ["host"],
           "properties": {
             "host": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
             "user": { "type": "string", "default": "root" },
-            "key_path": { "type": "string" }
+            "key_path": { "type": "string" },
+            "remote_root": { "type": "string", "default": "/opt/mctf" }
           }
         },
         "kubernetes": {

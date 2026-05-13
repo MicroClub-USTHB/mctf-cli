@@ -37,7 +37,7 @@ var deployCmd = &cobra.Command{
 		"  mctf deploy --category misc\n" +
 		"  mctf deploy --slug welcome",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		plan, _, err := planDeploy()
+		plan, cfg, err := planDeploy()
 		if err != nil {
 			return err
 		}
@@ -48,11 +48,9 @@ var deployCmd = &cobra.Command{
 
 		printPlan("up", plan)
 
-		var runner deploy.Runner
-		if flagDeployDryRun {
-			runner = deploy.NewDryRunner()
-		} else {
-			runner = deploy.NewDockerRunner()
+		runner, err := newDeployRunner(cfg, flagDeployDryRun)
+		if err != nil {
+			return err
 		}
 		ctx := context.Background()
 		if err := deploy.ApplyUp(ctx, runner, plan); err != nil {
@@ -112,7 +110,7 @@ var downCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Reuse the deploy planner with the down-specific filters.
 		flagDeployCat, flagDeploySlug = flagDownCat, flagDownSlug
-		plan, _, err := planDeploy()
+		plan, cfg, err := planDeploy()
 		if err != nil {
 			return err
 		}
@@ -123,12 +121,11 @@ var downCmd = &cobra.Command{
 
 		printPlan("down", plan)
 
-		var runner deploy.Runner
-		if flagDownDryRun {
-			runner = deploy.NewDryRunner()
-		} else {
-			runner = deploy.NewDockerRunner()
+		runner, err := newDeployRunner(cfg, flagDownDryRun)
+		if err != nil {
+			return err
 		}
+
 		ctx := context.Background()
 		if err := deploy.ApplyDown(ctx, runner, plan, flagDownVolumes); err != nil {
 			notifyDiscord(ctx, "teardown failed", "error",
@@ -158,6 +155,24 @@ func planDeploy() ([]deploy.Unit, *config.Config, error) {
 		SlugFilter:     flagDeploySlug,
 	})
 	return plan, cfg, err
+}
+
+func newDeployRunner(cfg *config.Config, dryRun bool) (deploy.Runner, error) {
+	if cfg == nil || cfg.Deploy == nil {
+		return nil, fmt.Errorf("deploy config is missing")
+	}
+	switch cfg.Deploy.Mode {
+	case "ssh":
+		// SSHRunner owns its own DryRun behavior; no wrapper needed.
+		return deploy.NewSSHRunner(cfg.Deploy.SSH, dryRun), nil
+	case "docker":
+		if dryRun {
+			return deploy.NewDryRunner(), nil
+		}
+		return deploy.NewDockerRunner(), nil
+	default:
+		return nil, fmt.Errorf("unsupported deploy mode %q", cfg.Deploy.Mode)
+	}
 }
 
 func printPlan(verb string, plan []deploy.Unit) {
