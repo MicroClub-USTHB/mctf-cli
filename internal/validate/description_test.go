@@ -148,6 +148,105 @@ func TestW007_HighWaveWarns(t *testing.T) {
 	}
 }
 
+// W004 should NOT fire when assets/ contains only .gitkeep — the
+// author has signaled "intentionally empty".
+func TestW004_GitkeepOnly_Suppressed(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "static", "no handouts here")
+	if err := os.MkdirAll(c.AssetsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(c.AssetsDir, ".gitkeep"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if hasRule(r, "W004", SeverityWarn) {
+		t.Errorf("W004 should be silenced by .gitkeep: %s", r.String())
+	}
+}
+
+// Sanity: W004 still fires when assets/ has neither real files nor
+// .gitkeep (the existing behavior we don't want to regress).
+func TestW004_TrulyEmpty_Warns(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "static", "no handouts here")
+	if err := os.MkdirAll(c.AssetsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if !hasRule(r, "W004", SeverityWarn) {
+		t.Errorf("W004 should fire for empty assets/ without .gitkeep: %s", r.String())
+	}
+}
+
+func TestW012_SchemaOmitted_Warns(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	c.SchemaOmitted = true
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if !hasRule(r, "W012", SeverityWarn) {
+		t.Errorf("W012 should warn when schema field omitted: %s", r.String())
+	}
+}
+
+func TestW012_SchemaPresent_NoWarn(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	c.SchemaOmitted = false
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if hasRule(r, "W012", SeverityWarn) {
+		t.Errorf("W012 should not fire when schema is set: %s", r.String())
+	}
+}
+
+func TestI001_WebMissingSubTag_Info(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	c.Manifest.Challenge.Category = "web"
+	c.CategoryDir = "web"
+	c.Manifest.Challenge.Tags = []string{"wave 1", "easy"}
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if !hasRule(r, "I001", SeverityInfo) {
+		t.Errorf("I001 should fire when web has no sqli/xss/etc.: %s", r.String())
+	}
+}
+
+func TestI001_WebWithSubTag_NoInfo(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	c.Manifest.Challenge.Category = "web"
+	c.CategoryDir = "web"
+	c.Manifest.Challenge.Tags = []string{"wave 1", "xss"}
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if hasRule(r, "I001", SeverityInfo) {
+		t.Errorf("I001 should be silenced by a known sub-tag: %s", r.String())
+	}
+}
+
+func TestI001_CaseInsensitive(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	c.Manifest.Challenge.Category = "crypto"
+	c.CategoryDir = "crypto"
+	c.Manifest.Challenge.Tags = []string{"RSA"} // uppercase intentionally
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if hasRule(r, "I001", SeverityInfo) {
+		t.Errorf("I001 must match tags case-insensitively: %s", r.String())
+	}
+}
+
+func TestI001_CategoryWithoutMap_NoInfo(t *testing.T) {
+	root := t.TempDir()
+	c := fixtureChallenge(t, root, "x", "fine")
+	// `misc` has no sub-tag convention — I001 should be silent.
+	c.Manifest.Challenge.Category = "misc"
+	c.CategoryDir = "misc"
+	r := Run(&config.Config{Event: config.Event{Slug: "x", FlagPrefix: "mctf"}}, root, []*challenge.Challenge{c}, nil)
+	if hasRule(r, "I001", SeverityInfo) {
+		t.Errorf("I001 should not fire for categories with no sub-tag map: %s", r.String())
+	}
+}
+
 // Tests for W002, W009, and W011 heuristic validation rules
 func TestW011_AssetFoundNoWarn(t *testing.T) {
 	root := t.TempDir()

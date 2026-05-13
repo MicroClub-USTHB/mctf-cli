@@ -156,11 +156,41 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 		}
 	}
 
-	// W004 — static archetype with empty assets/
+	// W004 — static archetype with empty assets/.
+	// `.gitkeep` is treated as an "intentionally empty" opt-out signal:
+	// the author has explicitly committed the dir as empty (probably a
+	// no-assets challenge by design), so don't nag.
 	if archetype == challenge.ArchetypeStatic {
-		if isEmptyDir(c.AssetsDir) {
+		if isEmptyDir(c.AssetsDir) && !hasGitkeep(c.AssetsDir) {
 			r.Warnf("W004", relTo(eventRoot, c.AssetsDir),
-				"static challenge has no assets/ — what do players download?")
+				"static challenge has no assets/ — what do players download? (commit a `.gitkeep` to silence)")
+		}
+	}
+
+	// W012 — schema field omitted from manifest (defaults to 1).
+	if c.SchemaOmitted {
+		r.Warnf("W012", manifestPath,
+			"manifest has no top-level `schema:` field — defaulting to 1; set it explicitly to future-proof against schema changes")
+	}
+
+	// I001 — category-typical sub-tag missing.
+	if subs, ok := categorySubTags[m.Challenge.Category]; ok {
+		hasSub := false
+		for _, t := range m.Challenge.Tags {
+			for _, s := range subs {
+				if strings.EqualFold(t, s) {
+					hasSub = true
+					break
+				}
+			}
+			if hasSub {
+				break
+			}
+		}
+		if !hasSub {
+			r.Infof("I001", manifestPath,
+				"no category-typical sub-tag for %s (suggested: %s)",
+				m.Challenge.Category, strings.Join(subs, ", "))
 		}
 	}
 
@@ -337,6 +367,27 @@ func hasDockerfileHealthcheck(challengeDir string) bool {
 	}
 	re := regexp.MustCompile(`(?im)^\s*HEALTHCHECK\b`)
 	return re.Match(data)
+}
+
+// hasGitkeep reports whether `.gitkeep` is present in dir. Treated as
+// an explicit author signal that the dir is intentionally empty.
+func hasGitkeep(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, ".gitkeep"))
+	return err == nil
+}
+
+// categorySubTags lists conventional sub-classification tags per
+// category — recommended (not required) hints that drive I001. The
+// lists are reference-quality but intentionally open-ended; adding a
+// tag here only changes which categories trigger the info-level rule.
+var categorySubTags = map[string][]string{
+	"pwn":        {"kernel", "browser", "heap", "format-string", "rop", "bof", "uaf"},
+	"web":        {"sqli", "xss", "ssrf", "xxe", "idor", "jwt", "prototype-pollution", "deserialization", "auth-bypass"},
+	"crypto":     {"rsa", "aes", "ecc", "lattice", "hash", "prng", "padding-oracle"},
+	"ai":         {"prompt-injection", "model-extraction", "jailbreak", "data-poisoning"},
+	"forensics":  {"pcap", "memory", "disk", "windows", "linux", "mobile"},
+	"jailbreak":  {"container-escape", "vm-escape", "sandbox-escape"},
+	"blockchain": {"evm", "solidity", "defi", "nft", "mev"},
 }
 
 func isEmptyDir(dir string) bool {
