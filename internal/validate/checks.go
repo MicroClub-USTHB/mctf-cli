@@ -35,6 +35,17 @@ func Run(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, lo
 	return r
 }
 
+// assetMentionRe matches `filename` or [text](filename) in markdown descriptions.
+// Group 1: backtick-delimited content, Group 2: markdown link URL
+var assetMentionRe = regexp.MustCompile("(`[^`]+`)|" + "(\\]\\(([^)]+)\\))")
+
+// mutableStateRe matches keywords that suggest a challenge has mutable state (DB, sessions, etc.)
+var mutableStateRe = regexp.MustCompile(`(?i)\b(database|sql|login|register|account|session|admin|password)\b`)
+
+// rateLimitRe matches keywords related to rate-limiting or proof-of-work.
+// Use word boundary \b for "pow" to avoid matching "power", "powerful", etc.
+var rateLimitRe = regexp.MustCompile(`(?i)(rate[ -]?limit|\bpow\b|proof[ -]of[ -]work|captcha|\d+\s*s(ecs?|econds)?|time.{0,2}delay)`)
+
 // checkOne runs the per-challenge rules (those that don't need event-wide context).
 func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *challenge.Challenge, eventRoot string) {
 	m := c.Manifest
@@ -177,6 +188,68 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 	} else if n > 1500 {
 		r.Warnf("W010", manifestPath,
 			"description is %d chars — consider trimming for UX (hard cap at 4000)", n)
+	}
+
+	// W011 — asset filename referenced in description but missing from assets/
+	matches := assetMentionRe.FindAllStringSubmatch(m.Challenge.Description, -1)
+	if len(matches) > 0 {
+		assetsOnDisk := make(map[string]bool)
+		// Walk recursively through assets/ to collect all file basenames
+		_ = filepath.WalkDir(c.AssetsDir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
+			}
+			if strings.HasPrefix(d.Name(), ".") {
+				return nil
+			}
+			assetsOnDisk[d.Name()] = true
+			return nil
+		})
+
+		for _, match := range matches {
+			var fileName string
+
+			// Group 1 is backtick-delimited (`filename`), group 3 is URL from [text](url)
+			if match[1] != "" {
+				// Backtick match: group 1 is `filename`
+				fileName = strings.Trim(match[1], "`")
+			} else if len(match) > 3 && match[3] != "" {
+				// Markdown link match: group 3 is the URL
+				fileName = match[3]
+			} else {
+				continue
+			}
+
+			// Skip URLs and absolute paths — these aren't asset references
+			if strings.Contains(fileName, "://") || strings.HasPrefix(fileName, "/") ||
+				strings.HasPrefix(fileName, "mailto:") {
+				continue
+			}
+			fileName = filepath.Base(fileName)
+
+			if fileName != "" && !assetsOnDisk[fileName] {
+				r.Warnf("W011", manifestPath,
+					"asset %q referenced in description but missing from %s",
+					fileName, relTo(eventRoot, c.AssetsDir))
+			}
+		}
+	}
+
+	// W002 — web archetype service but description hints at mutable state
+	// (instanced archetype is preferred to avoid shared state issues)
+	if m.Challenge.Category == "web" && archetype == challenge.ArchetypeService {
+		if mutableStateRe.MatchString(m.Challenge.Description) {
+			r.Warnf("W002", manifestPath,
+				"web challenge is 'service' archetype but description hints at mutable state; consider 'instanced' to avoid player interference")
+		}
+	}
+
+	// W009 — crypto service-archetype with no rate-limit hint
+	if m.Challenge.Category == "crypto" && archetype == challenge.ArchetypeService {
+		if !rateLimitRe.MatchString(m.Challenge.Description) {
+			r.Warnf("W009", manifestPath,
+				"crypto challenge is 'service' archetype but description has no rate-limit hint (rate-limit, POW, proof-of-work, captcha, or time-based delay); players might brute-force your oracle")
+		}
 	}
 
 	// W006 — challenge has no hints in either supported form.
