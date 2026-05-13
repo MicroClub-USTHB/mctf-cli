@@ -5,7 +5,7 @@ LDFLAGS := -X github.com/MicroClub-USTHB/mctf-cli/cmd.version=$(VERSION) \
            -X github.com/MicroClub-USTHB/mctf-cli/cmd.commit=$(COMMIT) \
            -X github.com/MicroClub-USTHB/mctf-cli/cmd.date=$(DATE)
 
-.PHONY: build test lint tidy run clean schemas
+.PHONY: build test test-integration lint tidy run clean schemas
 
 build: schemas
 	go build -ldflags "$(LDFLAGS)" -o mctf .
@@ -20,6 +20,12 @@ schemas:
 
 test:
 	go test ./...
+
+# Integration tests (gated by the `integration` build tag). Boots a real
+# sshd container + exercises the SSH runner end-to-end. Requires docker
+# daemon + ssh/scp/ssh-keygen on PATH; skips gracefully otherwise.
+test-integration:
+	go test -tags integration -run Integration ./...
 
 lint:
 	go vet ./...
