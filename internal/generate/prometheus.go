@@ -3,6 +3,7 @@ package generate
 import (
 	"bytes"
 	"sort"
+	"fmt"
 	
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
@@ -19,5 +20,21 @@ func PrometheusConfig(cfg *config.Config, challs []*challenge.Challenge) ([]byte
 		return challs[i].Slug < challs[j].Slug
 	})
 
-	return nil, nil
+	for _, c := range challs {
+	 if c.Archetype != challenge.ArchetypeInstanced {
+			continue
+	 }
+	 if c.Manifest.Deploy == nil || c.Manifest.Deploy.InternalPort == nil {
+		continue
+	 }
+
+	 port := *c.Manifest.Deploy.InternalPort
+
+	 fmt.Fprintf(&buf, "  - job_name: %q\n", c.Slug)
+	 fmt.Fprintf(&buf, "    static_configs:\n")
+	 fmt.Fprintf(&buf, "      - targets:\n")
+	 fmt.Fprintf(&buf, "          - %q\n", fmt.Sprintf("localhost:%d", port))
+
+   } 
+ return buf.Bytes(), nil
 }
