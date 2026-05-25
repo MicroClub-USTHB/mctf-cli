@@ -70,6 +70,13 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge) (
 		out.Files[filepath.Join(ingressDir, "dynamic", "dynamic.yml")] = ingress.TraefikDynamic(entries)
 	}
 
+	prom, err := PrometheusConfig(cfg, challs)
+	if err != nil {
+		return nil, fmt.Errorf("prometheus: %w", err)
+	}
+
+	out.Files[filepath.Join(eventRoot, "monitoring", "prometheus.yml")] = prom
+
 	return out, nil
 }
 
