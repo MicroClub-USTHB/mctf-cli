@@ -32,7 +32,7 @@ type Unit struct {
 type Options struct {
 	CategoryFilter   string
 	SlugFilter       string
-	IncludeInstanced bool // override v0 default (skip instanced)
+	IncludeInstanced bool   // override v0 default (skip instanced)
 	ImageTag         string // optional: sha used to stamp images
 }
 

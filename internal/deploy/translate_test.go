@@ -10,7 +10,7 @@ import (
 func TestTranslateCompose(t *testing.T) {
 	cwd := t.TempDir()
 	originalCompose := filepath.Join(cwd, "docker-compose.yml")
-	
+
 	yamlContent := `
 services:
   web:

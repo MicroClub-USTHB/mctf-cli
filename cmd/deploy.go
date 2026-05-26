@@ -62,7 +62,11 @@ var deployCmd = &cobra.Command{
 		if err := os.WriteFile(lockFile, []byte("locked"), 0644); err != nil {
 			return fmt.Errorf("failed to create lock file: %w", err)
 		}
-		defer os.Remove(lockFile)
+		defer func() {
+			if err := os.Remove(lockFile); err != nil && !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "warning: failed to remove lock file %s: %v\n", lockFile, err)
+			}
+		}()
 
 		// Determine target SHA and dir
 		targetDir := flagDir
@@ -105,7 +109,11 @@ var deployCmd = &cobra.Command{
 		if err == nil && activeSHA != "" {
 			tempDirActive, err := os.MkdirTemp("", "mctf-active-")
 			if err == nil {
-				defer os.RemoveAll(tempDirActive)
+				defer func() {
+					if err := os.RemoveAll(tempDirActive); err != nil && !os.IsNotExist(err) {
+						fmt.Fprintf(os.Stderr, "warning: failed to remove temp dir %s: %v\n", tempDirActive, err)
+					}
+				}()
 				if err := mctfgit.Archive(flagDir, "mctf-deploy-active", tempDirActive); err == nil {
 					activePlan, activeRunner, err := loadPlanAndRunner(tempDirActive, activeSHA, flagDeployDryRun)
 					if err == nil {
@@ -177,7 +185,9 @@ var deployCmd = &cobra.Command{
 				// Normal deploy
 				oldActive, _ := mctfgit.GetSHA(flagDir, "mctf-deploy-active")
 				if oldActive != "" {
-					mctfgit.UpdateTag(flagDir, "mctf-deploy-previous", oldActive)
+					if err := mctfgit.UpdateTag(flagDir, "mctf-deploy-previous", oldActive); err != nil {
+						return fmt.Errorf("failed to update previous tag: %w", err)
+					}
 				}
 				if err := mctfgit.UpdateTag(flagDir, "mctf-deploy-active", targetSHA); err != nil {
 					return fmt.Errorf("failed to update active tag: %w", err)
