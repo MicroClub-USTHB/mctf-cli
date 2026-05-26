@@ -106,10 +106,11 @@ func (r *SSHRunner) remoteChallengeDir(u Unit) string {
 func (r *SSHRunner) remoteComposeCommand(u Unit, action string, volumes bool) string {
 	dir := r.remoteChallengeDir(u)
 
+	composeBase := filepath.Base(u.ComposeFile)
 	args := []string{
 		"docker", "compose",
 		"-p", u.ProjectName,
-		"-f", "docker-compose.yml",
+		"-f", composeBase,
 		action,
 	}
 	if action == "up" {
