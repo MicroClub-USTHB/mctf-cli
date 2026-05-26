@@ -28,5 +28,5 @@ hints:
     cost: 50
 connection_info: null
 files:
-  - assets/transcript.txt
+  - assets\transcript.txt
 state: visible
