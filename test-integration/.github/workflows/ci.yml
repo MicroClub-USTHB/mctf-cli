@@ -1,0 +1,23 @@
+name: ctf-validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: validate + generate --check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install mctf
+        run: |
+          go install github.com/MicroClub-USTHB/mctf-cli@latest
+        env:
+          GOBIN: /usr/local/bin
+
+      - run: mctf validate
+      - run: mctf generate --check

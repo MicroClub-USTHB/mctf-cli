@@ -1,0 +1,6 @@
+challenge:
+  name: "My Chall"
+  description: "Test"
+  flags:
+    - flag: "mctf{test}"
+  need_deploy: true

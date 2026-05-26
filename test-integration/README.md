@@ -1,0 +1,37 @@
+# test-integration
+
+CTF event repository, managed with [MCTF](https://github.com/MicroClub-USTHB/mctf-cli).
+
+## Quick start
+
+```sh
+mctf validate            # check the spec
+mctf generate            # rebuild derived files
+mctf generate --check    # CI mode (no writes)
+```
+
+## Adding a challenge
+
+Copy `templates/challenge_name/` into `challenges/<category>/<your-slug>/`,
+edit `challenge/challenge.yml`, then run `mctf validate` and `mctf generate`.
+
+A scaffolding shortcut will land in a future release:
+
+```sh
+mctf init challenge web/your-slug
+```
+
+## Layout
+
+```
+mctf.config.yml          # event config
+challenges/<cat>/<slug>/ # one folder per challenge
+  challenge/             # author-edited source-of-truth
+  solution/              # writeup + hints (private)
+  assets/                # downloadable handouts
+  other/                 # private author-only files
+templates/               # local starter templates
+```
+
+See the [MCTF spec](https://github.com/MicroClub-USTHB/mctf-cli/tree/main/docs/spec)
+for the full contract.
