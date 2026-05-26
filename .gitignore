@@ -21,4 +21,3 @@ Thumbs.db
 /dist/
 *.test
 *.out
-test-integration/
