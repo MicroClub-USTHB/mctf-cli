@@ -1,0 +1,11 @@
+challenge:
+  name: "My Chall"
+  description: "Test"
+  flags:
+    - flag: "mctf{test}"
+      case_sensitive: true
+  need_deploy: true
+deploy:
+  subdomain: mychall
+  port: 8080
+  dynamic_instances: false

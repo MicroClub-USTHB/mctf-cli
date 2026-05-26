@@ -1,0 +1,30 @@
+schema: 1
+
+challenge:
+  name: "challenge_name"            # change this
+  author: "your-handle"             # change this
+  category: misc                    # web | pwn | crypto | reverse | forensics | osint | misc | ai | hardware | jailbreak
+  difficulty: easy                  # easy | medium | hard | extreme
+  description: |
+    Short, vivid description of what the player does.
+
+    `nc {{host}} {{port}}` or visit `{{url}}` — Jinja-style placeholders are
+    rendered by the platform integration when the challenge is registered.
+  wave: 1
+  flags:
+    - { flag: "mctf{REPLACE_ME}", case_sensitive: true }
+  need_deploy: false                # true if a Dockerfile + compose live in this folder
+  links: []
+  tags: []
+
+# Uncomment when need_deploy: true.
+# deploy:
+#   subdomain: "your-challenge"
+#   port: 14000                     # null when dynamic_instances: true
+#   internal_port: null             # required when dynamic_instances: true
+#   dynamic_instances: false
+#   tcp: false
+#   noSsl: false
+#   resources:
+#     cpu: "0.5"
+#     memory: "256M"
