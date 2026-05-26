@@ -50,11 +50,18 @@ var deployCmd = &cobra.Command{
 
 		// Local deploy lock to prevent concurrent runs
 		lockFile := filepath.Join(flagDir, ".mctf", "deploy.lock")
-		os.MkdirAll(filepath.Dir(lockFile), 0755)
+		// Ensure lock directory exists
+		if err := os.MkdirAll(filepath.Dir(lockFile), 0755); err != nil {
+			return fmt.Errorf("failed to create lock directory: %w", err)
+		}
+		// Check for existing lock
 		if _, err := os.Stat(lockFile); err == nil {
 			return fmt.Errorf("deploy already in progress (remove %s if stale)", lockFile)
 		}
-		os.WriteFile(lockFile, []byte("locked"), 0644)
+		// Create lock file
+		if err := os.WriteFile(lockFile, []byte("locked"), 0644); err != nil {
+			return fmt.Errorf("failed to create lock file: %w", err)
+		}
 		defer os.Remove(lockFile)
 
 		// Determine target SHA and dir
@@ -65,11 +72,17 @@ var deployCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("could not resolve mctf-deploy-previous: %w", err)
 			}
+			// Create temporary directory for rollback extraction
 			tempDir, err := os.MkdirTemp("", "mctf-rollback-")
 			if err != nil {
 				return err
 			}
-			defer os.RemoveAll(tempDir)
+			// Ensure cleanup of temporary directory
+			defer func() {
+				if err := os.RemoveAll(tempDir); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: failed to clean up temp dir: %v\n", err)
+				}
+			}()
 			if err := mctfgit.Archive(flagDir, "mctf-deploy-previous", tempDir); err != nil {
 				return fmt.Errorf("failed to extract rollback commit: %w", err)
 			}
@@ -110,8 +123,9 @@ var deployCmd = &cobra.Command{
 						if len(orphans) > 0 {
 							fmt.Printf("found %d orphan(s) to clean up...\n", len(orphans))
 							for _, o := range orphans {
-								if !flagDeployDryRun {
-									deploy.TranslateCompose(o, cfg.Registry.URL) // Ensure .mctf.yml exists to down it cleanly
+								if err := deploy.TranslateCompose(o, cfg.Registry.URL); err != nil {
+									fmt.Fprintf(os.Stderr, "warning: failed to translate compose for orphan %s: %v\n", o.Challenge, err)
+								} else {
 									o.ComposeFile = filepath.Join(o.Cwd, "docker-compose.mctf.yml")
 								}
 							}
@@ -151,9 +165,13 @@ var deployCmd = &cobra.Command{
 			if flagDeployRollback {
 				// Swap active and previous
 				oldActive, _ := mctfgit.GetSHA(flagDir, "mctf-deploy-active")
-				mctfgit.UpdateTag(flagDir, "mctf-deploy-active", targetSHA)
+				if err := mctfgit.UpdateTag(flagDir, "mctf-deploy-active", targetSHA); err != nil {
+					return fmt.Errorf("failed to update active tag: %w", err)
+				}
 				if oldActive != "" {
-					mctfgit.UpdateTag(flagDir, "mctf-deploy-previous", oldActive)
+					if err := mctfgit.UpdateTag(flagDir, "mctf-deploy-previous", oldActive); err != nil {
+						return fmt.Errorf("failed to update previous tag: %w", err)
+					}
 				}
 			} else {
 				// Normal deploy
@@ -161,10 +179,14 @@ var deployCmd = &cobra.Command{
 				if oldActive != "" {
 					mctfgit.UpdateTag(flagDir, "mctf-deploy-previous", oldActive)
 				}
-				mctfgit.UpdateTag(flagDir, "mctf-deploy-active", targetSHA)
+				if err := mctfgit.UpdateTag(flagDir, "mctf-deploy-active", targetSHA); err != nil {
+					return fmt.Errorf("failed to update active tag: %w", err)
+				}
 			}
 			if flagDeployPushTags {
-				mctfgit.PushTags(flagDir, "origin", "mctf-deploy-active", "mctf-deploy-previous")
+				if err := mctfgit.PushTags(flagDir, "origin", "mctf-deploy-active", "mctf-deploy-previous"); err != nil {
+					return fmt.Errorf("failed to push tags: %w", err)
+				}
 			}
 		}
 
@@ -274,7 +296,6 @@ var downCmd = &cobra.Command{
 		return nil
 	},
 }
-
 
 func newDeployRunner(cfg *config.Config, dryRun bool) (deploy.Runner, error) {
 	if cfg == nil || cfg.Deploy == nil {
