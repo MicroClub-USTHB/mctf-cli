@@ -4,3 +4,4 @@ challenge:
   flags:
     - flag: "mctf{test}"
   need_deploy: true
+  archetype: service
