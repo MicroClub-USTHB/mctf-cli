@@ -126,6 +126,20 @@ func TestPlan_ProjectName(t *testing.T) {
 	}
 }
 
+func TestPlan_DefaultComposeFile(t *testing.T) {
+	root := t.TempDir()
+	challs := []*challenge.Challenge{
+		newChall(t, root, "misc", "welcome", challenge.ArchetypeService, true, 14000, 8000),
+	}
+	plan, err := Plan(cfgDocker(), root, challs, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(plan[0].ComposeFile) != "docker-compose.yml" {
+		t.Errorf("expected default compose file to be docker-compose.yml, got %q", plan[0].ComposeFile)
+	}
+}
+
 func TestPlan_StampsPortEnv(t *testing.T) {
 	root := t.TempDir()
 	challs := []*challenge.Challenge{
