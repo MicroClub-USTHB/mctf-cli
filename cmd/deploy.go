@@ -44,9 +44,7 @@ var deployCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if cfg.Registry == nil || cfg.Registry.URL == "" {
-			return fmt.Errorf("deploy requires registry.url to be set in mctf.config.yml")
-		}
+		hasRegistry := cfg.Registry != nil && cfg.Registry.URL != ""
 
 		// Local deploy lock to prevent concurrent runs
 		lockFile := filepath.Join(flagDir, ".mctf", "deploy.lock")
@@ -72,6 +70,9 @@ var deployCmd = &cobra.Command{
 		targetDir := flagDir
 		targetSHA := ""
 		if flagDeployRollback {
+			if !hasRegistry {
+				return fmt.Errorf("--rollback requires registry.url to be configured in mctf.config.yml")
+			}
 			targetSHA, err = mctfgit.GetSHA(flagDir, "mctf-deploy-previous")
 			if err != nil {
 				return fmt.Errorf("could not resolve mctf-deploy-previous: %w", err)
@@ -91,7 +92,7 @@ var deployCmd = &cobra.Command{
 				return fmt.Errorf("failed to extract rollback commit: %w", err)
 			}
 			targetDir = tempDir
-		} else {
+		} else if hasRegistry {
 			targetSHA, err = mctfgit.GetSHA(flagDir, "HEAD")
 			if err != nil {
 				return fmt.Errorf("could not resolve HEAD: %w", err)
@@ -99,46 +100,48 @@ var deployCmd = &cobra.Command{
 		}
 
 		// Load target plan
-		plan, runner, err := loadPlanAndRunner(targetDir, targetSHA, flagDeployDryRun)
+		plan, runner, _, err := loadPlanAndRunner(targetDir, targetSHA, flagDeployDryRun)
 		if err != nil {
 			return err
 		}
 
-		// Diff with active state for orphan cleanup
-		activeSHA, err := mctfgit.GetSHA(flagDir, "mctf-deploy-active")
-		if err == nil && activeSHA != "" {
-			tempDirActive, err := os.MkdirTemp("", "mctf-active-")
-			if err == nil {
-				defer func() {
-					if err := os.RemoveAll(tempDirActive); err != nil && !os.IsNotExist(err) {
-						fmt.Fprintf(os.Stderr, "warning: failed to remove temp dir %s: %v\n", tempDirActive, err)
-					}
-				}()
-				if err := mctfgit.Archive(flagDir, "mctf-deploy-active", tempDirActive); err == nil {
-					activePlan, activeRunner, err := loadPlanAndRunner(tempDirActive, activeSHA, flagDeployDryRun)
-					if err == nil {
-						// Compute orphans: in activePlan but not in plan
-						targetMap := make(map[string]bool)
-						for _, u := range plan {
-							targetMap[u.ProjectName] = true
+		// Diff with active state for orphan cleanup (registry mode only)
+		if hasRegistry {
+			activeSHA, err := mctfgit.GetSHA(flagDir, "mctf-deploy-active")
+			if err == nil && activeSHA != "" {
+				tempDirActive, err := os.MkdirTemp("", "mctf-active-")
+				if err == nil {
+					defer func() {
+						if err := os.RemoveAll(tempDirActive); err != nil && !os.IsNotExist(err) {
+							fmt.Fprintf(os.Stderr, "warning: failed to remove temp dir %s: %v\n", tempDirActive, err)
 						}
-						var orphans []deploy.Unit
-						for _, au := range activePlan {
-							if !targetMap[au.ProjectName] {
-								orphans = append(orphans, au)
+					}()
+					if err := mctfgit.Archive(flagDir, "mctf-deploy-active", tempDirActive); err == nil {
+						activePlan, activeRunner, _, err := loadPlanAndRunner(tempDirActive, activeSHA, flagDeployDryRun)
+						if err == nil {
+							// Compute orphans: in activePlan but not in plan
+							targetMap := make(map[string]bool)
+							for _, u := range plan {
+								targetMap[u.ProjectName] = true
 							}
-						}
-						if len(orphans) > 0 {
-							fmt.Printf("found %d orphan(s) to clean up...\n", len(orphans))
-							for _, o := range orphans {
-								if err := deploy.TranslateCompose(o, cfg.Registry.URL); err != nil {
-									fmt.Fprintf(os.Stderr, "warning: failed to translate compose for orphan %s: %v\n", o.Challenge, err)
-								} else {
-									o.ComposeFile = filepath.Join(o.Cwd, "docker-compose.mctf.yml")
+							var orphans []deploy.Unit
+							for _, au := range activePlan {
+								if !targetMap[au.ProjectName] {
+									orphans = append(orphans, au)
 								}
 							}
-							if err := deploy.ApplyDown(context.Background(), activeRunner, orphans, false); err != nil {
-								fmt.Fprintf(os.Stderr, "warning: orphan cleanup failed: %v\n", err)
+							if len(orphans) > 0 {
+								fmt.Printf("found %d orphan(s) to clean up...\n", len(orphans))
+								for _, o := range orphans {
+									if err := deploy.TranslateCompose(o, cfg.Registry.URL); err != nil {
+										fmt.Fprintf(os.Stderr, "warning: failed to translate compose for orphan %s: %v\n", o.Challenge, err)
+									} else {
+										o.ComposeFile = filepath.Join(o.Cwd, "docker-compose.mctf.yml")
+									}
+								}
+								if err := deploy.ApplyDown(context.Background(), activeRunner, orphans, false); err != nil {
+									fmt.Fprintf(os.Stderr, "warning: orphan cleanup failed: %v\n", err)
+								}
 							}
 						}
 					}
@@ -152,14 +155,17 @@ var deployCmd = &cobra.Command{
 		}
 		printPlan("up", plan)
 
-		// Translate and deploy target
-		for i, u := range plan {
-			if !flagDeployDryRun {
-				if err := deploy.TranslateCompose(u, cfg.Registry.URL); err != nil {
-					return fmt.Errorf("translate %s: %w", u.Challenge, err)
+		// Translate compose for registry-pinned deploys; simple mode
+		// uses the original docker-compose.yml unchanged.
+		if hasRegistry {
+			for i, u := range plan {
+				if !flagDeployDryRun {
+					if err := deploy.TranslateCompose(u, cfg.Registry.URL); err != nil {
+						return fmt.Errorf("translate %s: %w", u.Challenge, err)
+					}
 				}
+				plan[i].ComposeFile = filepath.Join(u.Cwd, "docker-compose.mctf.yml")
 			}
-			plan[i].ComposeFile = filepath.Join(u.Cwd, "docker-compose.mctf.yml")
 		}
 
 		ctx := context.Background()
@@ -168,8 +174,8 @@ var deployCmd = &cobra.Command{
 			return err
 		}
 
-		// Update tags
-		if !flagDeployDryRun {
+		// Update deploy tags (registry mode only — tags track image SHAs)
+		if !flagDeployDryRun && hasRegistry {
 			if flagDeployRollback {
 				// Swap active and previous
 				oldActive, _ := mctfgit.GetSHA(flagDir, "mctf-deploy-active")
@@ -208,14 +214,14 @@ var deployCmd = &cobra.Command{
 	},
 }
 
-func loadPlanAndRunner(dir, sha string, dryRun bool) ([]deploy.Unit, deploy.Runner, error) {
+func loadPlanAndRunner(dir, sha string, dryRun bool) ([]deploy.Unit, deploy.Runner, *config.Config, error) {
 	cfg, err := config.Load(dir)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	challs, _, err := challenge.Discover(dir, cfg.ChallengesDir)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	opts := deploy.Options{
 		CategoryFilter: flagDeployCat,
@@ -224,13 +230,13 @@ func loadPlanAndRunner(dir, sha string, dryRun bool) ([]deploy.Unit, deploy.Runn
 	}
 	plan, err := deploy.Plan(cfg, dir, challs, opts)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	runner, err := newDeployRunner(cfg, dryRun)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return plan, runner, nil
+	return plan, runner, cfg, nil
 }
 
 func planSlugs(plan []deploy.Unit) string {
@@ -277,7 +283,7 @@ var downCmd = &cobra.Command{
 		// Reuse the deploy planner with the down-specific filters.
 		flagDeployCat, flagDeploySlug = flagDownCat, flagDownSlug
 		targetSHA, _ := mctfgit.GetSHA(flagDir, "HEAD")
-		plan, runner, err := loadPlanAndRunner(flagDir, targetSHA, flagDownDryRun)
+		plan, runner, cfg, err := loadPlanAndRunner(flagDir, targetSHA, flagDownDryRun)
 		if err != nil {
 			return err
 		}
@@ -289,9 +295,15 @@ var downCmd = &cobra.Command{
 		printPlan("down", plan)
 
 		ctx := context.Background()
-		// Down uses the same generated mctf.yml
-		for i, u := range plan {
-			plan[i].ComposeFile = filepath.Join(u.Cwd, "docker-compose.mctf.yml")
+		// Use translated compose when registry is configured and the
+		// generated file exists; otherwise fall back to the original.
+		if cfg.Registry != nil && cfg.Registry.URL != "" {
+			for i, u := range plan {
+				mctfCompose := filepath.Join(u.Cwd, "docker-compose.mctf.yml")
+				if _, err := os.Stat(mctfCompose); err == nil {
+					plan[i].ComposeFile = mctfCompose
+				}
+			}
 		}
 		if err := deploy.ApplyDown(ctx, runner, plan, flagDownVolumes); err != nil {
 			notifyDiscord(ctx, "teardown failed", "error",
