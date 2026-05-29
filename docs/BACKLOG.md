@@ -37,7 +37,6 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 - **`mctf platform unsync`** — remove a challenge from CTFd by category / slug.
 - **Drop W004** when `assets/.gitkeep` is the only file (currently fires on directories that contain only the placeholder).
 - **Fuzzy slug match** — `mctf info crypto/rs` suggests `crypto/rsa-baby` instead of "no challenge".
-- **Test coverage for `cmd/init` prompts** — `promptIn` is already injectable; just write the test.
 
 ## Polish & docs
 
