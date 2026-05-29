@@ -45,6 +45,28 @@ type Options struct {
 	// output. The Result still captures full stdout/stderr regardless.
 	Stdout io.Writer
 	Stderr io.Writer
+	// Instance, when set, points the solver at a live per-team instance
+	// instead of the deploy block: HOST/PORT/URL are derived from the
+	// instance's host-port mapping, and its per-team flag is accepted in
+	// addition to the manifest flags.
+	Instance *InstanceTarget
+}
+
+// InstanceTarget describes a live per-team instance the solver should
+// run against. The cmd layer builds this from the instancer store so
+// the solve package stays decoupled from instancer.
+type InstanceTarget struct {
+	// ID is the instance handle, exported to the solver as INSTANCE_ID.
+	ID string
+	// TeamID is exported to the solver as TEAM_ID (omitted when empty).
+	TeamID string
+	// Host is where the instance is reachable; defaults to 127.0.0.1.
+	Host string
+	// Ports maps internal container ports to allocated host ports.
+	Ports map[int]int
+	// Flag is the per-team flag value, accepted in addition to the
+	// manifest flags (omitted when empty).
+	Flag string
 }
 
 // ErrNoSolver is returned when no solve.{sh,py,binary} exists.
@@ -101,7 +123,11 @@ func Run(ctx context.Context, cfg *config.Config, c *challenge.Challenge, opts O
 
 	cmd := commandFor(cmdCtx, absSolver)
 	cmd.Dir = absDir
-	cmd.Env = append(os.Environ(), envForChallenge(cfg, c)...)
+	if opts.Instance != nil {
+		cmd.Env = append(os.Environ(), envForInstance(cfg, c, opts.Instance)...)
+	} else {
+		cmd.Env = append(os.Environ(), envForChallenge(cfg, c)...)
+	}
 	// Don't wait forever for I/O to drain after the context cancels;
 	// orphaned grandchild processes (e.g. a `sleep` spawned by sh)
 	// can keep the stdout pipe open even after sh itself is killed.
@@ -138,7 +164,13 @@ func Run(ctx context.Context, cfg *config.Config, c *challenge.Challenge, opts O
 		}
 	}
 
-	res.Flag = findFlag(res.Stdout+"\n"+res.Stderr, c.Manifest.Challenge.Flags)
+	candidates := c.Manifest.Challenge.Flags
+	if opts.Instance != nil && opts.Instance.Flag != "" {
+		// Accept the per-team flag too — a dynamic-flag instance can
+		// recover a value the manifest doesn't carry.
+		candidates = append([]challenge.Flag{{Flag: opts.Instance.Flag}}, candidates...)
+	}
+	res.Flag = findFlag(res.Stdout+"\n"+res.Stderr, candidates)
 	res.Pass = res.Flag != "" && res.ExitCode == 0
 	res.Reason = explain(res)
 	return res, nil
@@ -156,14 +188,18 @@ func commandFor(ctx context.Context, solverPath string) *exec.Cmd {
 	}
 }
 
+// flagPrefix resolves the event flag prefix, defaulting to "mctf".
+func flagPrefix(cfg *config.Config) string {
+	if cfg != nil && cfg.Event.FlagPrefix != "" {
+		return cfg.Event.FlagPrefix
+	}
+	return "mctf"
+}
+
 // envForChallenge derives HOST / PORT / URL / FLAG_PREFIX so solvers
 // can read them with a uniform contract.
 func envForChallenge(cfg *config.Config, c *challenge.Challenge) []string {
-	prefix := "mctf"
-	if cfg != nil && cfg.Event.FlagPrefix != "" {
-		prefix = cfg.Event.FlagPrefix
-	}
-	env := []string{"FLAG_PREFIX=" + prefix}
+	env := []string{"FLAG_PREFIX=" + flagPrefix(cfg)}
 
 	if c.Manifest.Deploy == nil {
 		return env
@@ -201,6 +237,54 @@ func envForChallenge(cfg *config.Config, c *challenge.Challenge) []string {
 		}
 	}
 	return env
+}
+
+// envForInstance derives the solver env for a run against a live
+// per-team instance: HOST/PORT/URL from the instance's host-port
+// mapping, plus INSTANCE_ID / TEAM_ID / FLAG / FLAG_PREFIX.
+func envForInstance(cfg *config.Config, c *challenge.Challenge, inst *InstanceTarget) []string {
+	env := []string{"FLAG_PREFIX=" + flagPrefix(cfg)}
+
+	host := inst.Host
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	env = append(env, "HOST="+host, "INSTANCE_ID="+inst.ID)
+	if inst.TeamID != "" {
+		env = append(env, "TEAM_ID="+inst.TeamID)
+	}
+	if inst.Flag != "" {
+		env = append(env, "FLAG="+inst.Flag)
+	}
+
+	if hostPort := instanceHostPort(c, inst.Ports); hostPort > 0 {
+		env = append(env, fmt.Sprintf("PORT=%d", hostPort))
+		tcp := c.Manifest.Deploy != nil && c.Manifest.Deploy.TCP
+		if !tcp {
+			env = append(env, fmt.Sprintf("URL=http://%s:%d", host, hostPort))
+		}
+	}
+	return env
+}
+
+// instanceHostPort resolves the host port the solver should hit: the
+// mapping for the challenge's declared internal port, or the sole
+// mapping when only one exists.
+func instanceHostPort(c *challenge.Challenge, ports map[int]int) int {
+	if len(ports) == 0 {
+		return 0
+	}
+	if c.Manifest.Deploy != nil && c.Manifest.Deploy.InternalPort != nil {
+		if hp, ok := ports[*c.Manifest.Deploy.InternalPort]; ok {
+			return hp
+		}
+	}
+	if len(ports) == 1 {
+		for _, hp := range ports {
+			return hp
+		}
+	}
+	return 0
 }
 
 func findFlag(haystack string, candidates []challenge.Flag) string {
