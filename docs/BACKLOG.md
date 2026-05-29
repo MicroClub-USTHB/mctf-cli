@@ -17,7 +17,6 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 - **Image-tag pinning in deploy** — `mctf deploy` stamps `IMAGE_TAG` env so compose pulls the SHA from the last successful `mctf build` (the rollback prerequisite).
 - **rCTF + generic-webhook platforms** — second + third platform targets behind the existing platform interface, ideally via plugin once the system lands.
 - **Per-team auth on the instancer** — currently bearer tokens have full power; add team-scoped tokens (`POST /spawn` only allows the request when the token's team_id matches the body).
-- **CTFd file diff by content hash** — currently match by basename; switch to sha256 so updated handouts get re-uploaded.
 - **`mctf solve --against-instance <id>`** — run a solver against a per-team spawned instance (current `solve` only targets static / pre-deployed services).
 - **Native instancer: docker-network isolation** — currently spawns share the event network; isolate each per-team instance to its own bridge.
 - **Better `mctf doctor` checks** — D040 DNS resolves for `<sub>.<domain>`, D041 free disk space, D042 docker daemon storage driver.

@@ -112,7 +112,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - `--quiet` discards docker compose stdout/stderr (recommended in production).
 
 #### Platform integration (CTFd)
-- **`mctf platform sync`** — push challenges to the CTFd instance configured in `mctf.config.yml`. Diffs vs the platform's existing state, creates what's missing, attaches flags / tags / hints / **file uploads (assets/)**. `--update` reconciles existing challenges; `--dry-run` previews; `--category` / `--slug` filter; `--json` for scripting. Requires `MCTF_CTFD_TOKEN` env var.
+- **`mctf platform sync`** — push challenges to the CTFd instance configured in `mctf.config.yml`. Diffs vs the platform's existing state, creates what's missing, attaches flags / tags / hints / **file uploads (assets/)**. Under `--update`, assets are matched by name and content (SHA1 vs CTFd's `sha1sum`), so an edited handout with the same filename is re-uploaded. `--dry-run` previews; `--category` / `--slug` filter; `--json` for scripting. Requires `MCTF_CTFD_TOKEN` env var.
 - **`mctf platform configure`** — sync `ctf_name` from `event.name` to CTFd's `/api/v1/configs`. Theme settings are intentionally not synced (one-time UI setup). `--dry-run` previews.
 
 #### Distribution
