@@ -13,6 +13,7 @@ import (
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/deploy"
 	mctfgit "github.com/MicroClub-USTHB/mctf-cli/internal/git"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/kubernetes"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/notify"
 )
 
@@ -22,13 +23,14 @@ var (
 	flagDeploySlug     string
 	flagDeployRollback bool
 	flagDeployPushTags bool
+	flagDeployMode     string
 )
 
 var deployCmd = &cobra.Command{
 	Use:   "deploy",
-	Short: "Bring up service-archetype challenges via docker compose",
-	Long: "Runs `docker compose up -d` for every deployable, service-archetype\n" +
-		"challenge in the event repo. Each challenge gets its own compose\n" +
+	Short: "Bring up service-archetype challenges via docker compose or kubectl",
+	Long: "Runs `docker compose up -d` (or `kubectl apply`) for every deployable,\n" +
+		"service-archetype challenge in the event repo. Each challenge gets its own compose\n" +
 		"project named mctf-<event>-<category>-<slug>.\n\n" +
 		"Instanced challenges are intentionally skipped — they are spawned\n" +
 		"per-team at game time by the instancer, not at the event-deploy step.\n\n" +
@@ -38,12 +40,24 @@ var deployCmd = &cobra.Command{
 		"Examples:\n" +
 		"  mctf deploy --dry-run\n" +
 		"  mctf deploy --category misc\n" +
-		"  mctf deploy --slug welcome",
+		"  mctf deploy --slug welcome\n" +
+		"  mctf deploy --mode kubernetes --dry-run",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(flagDir)
 		if err != nil {
 			return err
 		}
+
+		// Kubernetes mode: delegate entirely to the K8s planner.
+		if deployMode(cfg, flagDeployMode) == "kubernetes" {
+			challs, _, err := challenge.Discover(flagDir, cfg.ChallengesDir)
+			if err != nil {
+				return err
+			}
+			return applyKube(cmd.Context(), cfg, challs, "up", flagDeployDryRun,
+				flagDeployCat, flagDeploySlug)
+		}
+
 		hasRegistry := cfg.Registry != nil && cfg.Registry.URL != ""
 
 		// Local deploy lock to prevent concurrent runs
@@ -268,18 +282,30 @@ var (
 	flagDownVolumes bool
 	flagDownCat     string
 	flagDownSlug    string
+	flagDownMode    string
 )
 
 var downCmd = &cobra.Command{
 	Use:   "down",
-	Short: "Tear down service-archetype challenges via docker compose",
-	Long: "Reverse of `mctf deploy`. Runs `docker compose down` for every\n" +
-		"deployable, service-archetype challenge in reverse-deploy order.\n\n" +
+	Short: "Tear down service-archetype challenges via docker compose or kubectl",
+	Long: "Reverse of `mctf deploy`. Runs `docker compose down` (or `kubectl delete`)\n" +
+		"for every deployable, service-archetype challenge in reverse-deploy order.\n\n" +
 		"With --volumes, also strips named volumes (passes -v to compose).\n\n" +
 		"Examples:\n" +
 		"  mctf down --dry-run\n" +
-		"  mctf down --volumes",
+		"  mctf down --volumes\n" +
+		"  mctf down --mode kubernetes",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, challs, err := discoverAll()
+		if err != nil {
+			return err
+		}
+
+		if deployMode(cfg, flagDownMode) == "kubernetes" {
+			return applyKube(cmd.Context(), cfg, challs, "down", flagDownDryRun,
+				flagDownCat, flagDownSlug)
+		}
+
 		// Reuse the deploy planner with the down-specific filters.
 		flagDeployCat, flagDeploySlug = flagDownCat, flagDownSlug
 		targetSHA, _ := mctfgit.GetSHA(flagDir, "HEAD")
@@ -319,6 +345,88 @@ var downCmd = &cobra.Command{
 	},
 }
 
+// deployMode resolves the effective deploy mode: flag overrides config.
+func deployMode(cfg *config.Config, flag string) string {
+	if flag != "" {
+		return flag
+	}
+	if cfg != nil && cfg.Deploy != nil {
+		return cfg.Deploy.Mode
+	}
+	return "docker"
+}
+
+// discoverAll loads the config and discovers all challenges from flagDir.
+func discoverAll() (*config.Config, []*challenge.Challenge, error) {
+	cfg, err := config.Load(flagDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	challs, _, err := challenge.Discover(flagDir, cfg.ChallengesDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	return cfg, challs, nil
+}
+
+// applyKube runs the kubernetes planner and applier for the given verb (up/down).
+func applyKube(ctx context.Context, cfg *config.Config, challs []*challenge.Challenge,
+	verb string, dry bool, cat, slug string) error {
+
+	if cfg.Deploy == nil {
+		cfg.Deploy = &config.Deploy{}
+	}
+	cfg.Deploy.Mode = "kubernetes"
+
+	plan, err := kubernetes.Plan(cfg, challs, kubernetes.Options{
+		CategoryFilter: cat,
+		SlugFilter:     slug,
+	})
+	if err != nil {
+		return err
+	}
+	if len(plan) == 0 {
+		fmt.Printf("nothing to %s — no service-archetype challenges matched the filters\n", verb)
+		return nil
+	}
+
+	printKubePlan(verb, plan)
+
+	kubeconfig := ""
+	if cfg.Deploy.Kubernetes != nil {
+		kubeconfig = cfg.Deploy.Kubernetes.Kubeconfig
+	}
+	var runner kubernetes.KubeApplier
+	if dry {
+		runner = kubernetes.NewDryKubeRunner()
+	} else {
+		runner = kubernetes.NewKubeRunner(kubeconfig)
+	}
+
+	if verb == "up" {
+		if err := kubernetes.ApplyUp(ctx, runner, plan); err != nil {
+			notifyDiscord(ctx, "deploy failed", "error", err.Error())
+			return err
+		}
+		fmt.Println("\ndeploy complete")
+		if !dry {
+			notifyDiscord(ctx, "deploy succeeded", "success",
+				fmt.Sprintf("%d challenge(s) up [kubernetes]", len(plan)))
+		}
+	} else {
+		if err := kubernetes.ApplyDown(ctx, runner, plan); err != nil {
+			notifyDiscord(ctx, "teardown failed", "error", err.Error())
+			return err
+		}
+		fmt.Println("\ndown complete")
+		if !dry {
+			notifyDiscord(ctx, "teardown complete", "info",
+				fmt.Sprintf("%d challenge(s) down [kubernetes]", len(plan)))
+		}
+	}
+	return nil
+}
+
 func newDeployRunner(cfg *config.Config, dryRun bool) (deploy.Runner, error) {
 	if cfg == nil || cfg.Deploy == nil {
 		return nil, fmt.Errorf("deploy config is missing")
@@ -346,15 +454,25 @@ func printPlan(verb string, plan []deploy.Unit) {
 	fmt.Println()
 }
 
+func printKubePlan(verb string, plan []kubernetes.KubeUnit) {
+	fmt.Printf("planned: %s %d challenge(s) [kubernetes]\n", verb, len(plan))
+	for _, u := range plan {
+		fmt.Printf("  %-30s -> %s/%s\n", u.Challenge, u.Namespace, u.Name)
+	}
+	fmt.Println()
+}
+
 func init() {
 	deployCmd.Flags().BoolVar(&flagDeployDryRun, "dry-run", false, "print docker compose commands instead of executing")
 	deployCmd.Flags().BoolVar(&flagDeployRollback, "rollback", false, "rollback to mctf-deploy-previous tag")
 	deployCmd.Flags().BoolVar(&flagDeployPushTags, "push-tags", false, "push active and previous tags to origin")
+	deployCmd.Flags().StringVar(&flagDeployMode, "mode", "", "override deploy mode: docker, ssh or kubernetes")
 	deployCmd.Flags().StringVar(&flagDeployCat, "category", "", "deploy only challenges in this category")
 	deployCmd.Flags().StringVar(&flagDeploySlug, "slug", "", "deploy only the challenge with this slug")
 	rootCmd.AddCommand(deployCmd)
 
 	downCmd.Flags().BoolVar(&flagDownDryRun, "dry-run", false, "print docker compose commands instead of executing")
+	downCmd.Flags().StringVar(&flagDownMode, "mode", "", "override deploy mode: docker, ssh or kubernetes")
 	downCmd.Flags().BoolVar(&flagDownVolumes, "volumes", false, "also strip named volumes (-v on docker compose down)")
 	downCmd.Flags().StringVar(&flagDownCat, "category", "", "tear down only challenges in this category")
 	downCmd.Flags().StringVar(&flagDownSlug, "slug", "", "tear down only the challenge with this slug")
