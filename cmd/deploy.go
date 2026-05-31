@@ -12,6 +12,7 @@ import (
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/deploy"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/kubernetes"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/notify"
 )
 
@@ -19,6 +20,7 @@ var (
 	flagDeployDryRun bool
 	flagDeployCat    string
 	flagDeploySlug   string
+	flagDeployMode   string
 )
 
 var deployCmd = &cobra.Command{
@@ -37,7 +39,20 @@ var deployCmd = &cobra.Command{
 		"  mtcf deploy --category misc\n" +
 		"  mtcf deploy --slug welcome",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		plan, _, err := planDeploy()
+		cfg, challs, err := discoverAll()
+		if err != nil {
+			return err
+		}
+
+		if deployMode(cfg, flagDeployMode) == "kubernetes" {
+			return applyKube(context.Background(), cfg, challs, "up", flagDeployDryRun,
+				flagDeployCat, flagDeploySlug)
+		}
+
+		plan, err := deploy.Plan(cfg, flagDir, challs, deploy.Options{
+			CategoryFilter: flagDeployCat,
+			SlugFilter:     flagDeploySlug,
+		})
 		if err != nil {
 			return err
 		}
@@ -98,6 +113,7 @@ var (
 	flagDownVolumes bool
 	flagDownCat     string
 	flagDownSlug    string
+	flagDownMode    string
 )
 
 var downCmd = &cobra.Command{
@@ -110,9 +126,22 @@ var downCmd = &cobra.Command{
 		"  mtcf down --dry-run\n" +
 		"  mtcf down --volumes",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, challs, err := discoverAll()
+		if err != nil {
+			return err
+		}
+
+		if deployMode(cfg, flagDownMode) == "kubernetes" {
+			return applyKube(context.Background(), cfg, challs, "down", flagDownDryRun,
+				flagDownCat, flagDownSlug)
+		}
+
 		// Reuse the deploy planner with the down-specific filters.
 		flagDeployCat, flagDeploySlug = flagDownCat, flagDownSlug
-		plan, _, err := planDeploy()
+		plan, err := deploy.Plan(cfg, flagDir, challs, deploy.Options{
+			CategoryFilter: flagDeployCat,
+			SlugFilter:     flagDeploySlug,
+		})
 		if err != nil {
 			return err
 		}
@@ -144,20 +173,83 @@ var downCmd = &cobra.Command{
 	},
 }
 
-func planDeploy() ([]deploy.Unit, *config.Config, error) {
+func deployMode(cfg *config.Config, flag string) string {
+	if flag != "" {
+		return flag
+	}
+	if cfg.Deploy != nil {
+		return cfg.Deploy.Mode
+	}
+	return "docker"
+}
+
+func discoverAll() (*config.Config, []*challenge.Challenge, error) {
 	cfg, err := config.Load(flagDir)
 	if err != nil {
 		return nil, nil, err
 	}
 	challs, _, err := challenge.Discover(flagDir, cfg.ChallengesDir)
 	if err != nil {
-		return nil, cfg, err
+		return nil, nil, err
 	}
-	plan, err := deploy.Plan(cfg, flagDir, challs, deploy.Options{
-		CategoryFilter: flagDeployCat,
-		SlugFilter:     flagDeploySlug,
+	return cfg, challs, nil
+}
+
+func applyKube(ctx context.Context, cfg *config.Config, challs []*challenge.Challenge,
+	verb string, dry bool, cat, slug string) error {
+
+	if cfg.Deploy == nil {
+		cfg.Deploy = &config.Deploy{}
+	}
+	cfg.Deploy.Mode = "kubernetes"
+
+	plan, err := kubernetes.Plan(cfg, challs, kubernetes.Options{
+		CategoryFilter: cat,
+		SlugFilter:     slug,
 	})
-	return plan, cfg, err
+	if err != nil {
+		return err
+	}
+	if len(plan) == 0 {
+		fmt.Printf("nothing to %s — no service-archetype challenges matched the filters\n", verb)
+		return nil
+	}
+
+	printKubePlan(verb, plan)
+
+	kubeconfig := ""
+	if cfg.Deploy.Kubernetes != nil {
+		kubeconfig = cfg.Deploy.Kubernetes.Kubeconfig
+	}
+	var runner kubernetes.KubeApplier
+	if dry {
+		runner = kubernetes.NewDryKubeRunner()
+	} else {
+		runner = kubernetes.NewKubeRunner(kubeconfig)
+	}
+
+	if verb == "up" {
+		if err := kubernetes.ApplyUp(ctx, runner, plan); err != nil {
+			notifyDiscord(ctx, "deploy failed", "error", err.Error())
+			return err
+		}
+		fmt.Println("\ndeploy complete")
+		if !dry {
+			notifyDiscord(ctx, "deploy succeeded", "success",
+				fmt.Sprintf("%d challenge(s) up [kubernetes]", len(plan)))
+		}
+	} else {
+		if err := kubernetes.ApplyDown(ctx, runner, plan); err != nil {
+			notifyDiscord(ctx, "teardown failed", "error", err.Error())
+			return err
+		}
+		fmt.Println("\ndown complete")
+		if !dry {
+			notifyDiscord(ctx, "teardown complete", "info",
+				fmt.Sprintf("%d challenge(s) down [kubernetes]", len(plan)))
+		}
+	}
+	return nil
 }
 
 func printPlan(verb string, plan []deploy.Unit) {
@@ -169,13 +261,23 @@ func printPlan(verb string, plan []deploy.Unit) {
 	fmt.Println()
 }
 
+func printKubePlan(verb string, plan []kubernetes.KubeUnit) {
+	fmt.Printf("planned: %s %d challenge(s) [kubernetes]\n", verb, len(plan))
+	for _, u := range plan {
+		fmt.Printf("  %-30s -> %s/%s\n", u.Challenge, u.Namespace, u.Name)
+	}
+	fmt.Println()
+}
+
 func init() {
 	deployCmd.Flags().BoolVar(&flagDeployDryRun, "dry-run", false, "print docker compose commands instead of executing")
+	deployCmd.Flags().StringVar(&flagDeployMode, "mode", "", "override deploy mode: docker or kubernetes")
 	deployCmd.Flags().StringVar(&flagDeployCat, "category", "", "deploy only challenges in this category")
 	deployCmd.Flags().StringVar(&flagDeploySlug, "slug", "", "deploy only the challenge with this slug")
 	rootCmd.AddCommand(deployCmd)
 
 	downCmd.Flags().BoolVar(&flagDownDryRun, "dry-run", false, "print docker compose commands instead of executing")
+	downCmd.Flags().StringVar(&flagDownMode, "mode", "", "override deploy mode: docker or kubernetes")
 	downCmd.Flags().BoolVar(&flagDownVolumes, "volumes", false, "also strip named volumes (-v on docker compose down)")
 	downCmd.Flags().StringVar(&flagDownCat, "category", "", "tear down only challenges in this category")
 	downCmd.Flags().StringVar(&flagDownSlug, "slug", "", "tear down only the challenge with this slug")
