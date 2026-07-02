@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/instancer"
 )
 
@@ -230,4 +231,48 @@ func byID(cs []Check) map[string]Check {
 		out[c.ID] = c
 	}
 	return out
+}
+
+func TestCheckDockerStorageDriver_VFS(t *testing.T) {
+	orig := checkDockerStorageDriverFn
+	defer func() { checkDockerStorageDriverFn = orig }()
+	checkDockerStorageDriverFn = func() Check {
+		return Check{
+			ID: "D042", Name: "docker storage driver",
+			Status: StatusWarn, Detail: "using slow/legacy storage driver: vfs",
+		}
+	}
+	got := checkDockerStorageDriver()
+	if got.Status != StatusWarn {
+		t.Errorf("vfs should warn: %+v", got)
+	}
+}
+
+func TestCheckDNSResolves_Failed(t *testing.T) {
+	orig := lookupIPFn
+	defer func() { lookupIPFn = orig }()
+	lookupIPFn = func(host string) ([]net.IP, error) {
+		return nil, &net.DNSError{Err: "no such host", Name: host}
+	}
+
+	cfg := &config.Config{Event: config.Event{Domain: "ctf.local"}}
+	challs := []*challenge.Challenge{
+		{
+			Manifest: challenge.Manifest{
+				Challenge: challenge.ChallengeBlock{NeedDeploy: true},
+				Deploy:    &challenge.DeployBlock{Subdomain: "web"},
+			},
+		},
+	}
+	got := checkDNSResolves(cfg, challs)
+	if got.Status != StatusWarn {
+		t.Errorf("failed dns should warn: %+v", got)
+	}
+}
+
+func TestCheckDiskSpace(t *testing.T) {
+	got := checkDiskSpace(t.TempDir())
+	if got.Status == StatusFail {
+		t.Errorf("checkDiskSpace should not fail: %+v", got)
+	}
 }

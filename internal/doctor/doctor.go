@@ -72,13 +72,16 @@ func Run(dir string, opts Options) []Check {
 	if !opts.SkipEnv {
 		checks = append(checks, checkDockerBinary())
 		checks = append(checks, checkDockerDaemon())
+		checks = append(checks, checkDockerStorageDriver())
 		checks = append(checks, checkDockerCompose())
 		checks = append(checks, checkGit())
 		checks = append(checks, checkRegistryCreds())
 		checks = append(checks, checkCTFdToken())
 		if len(challs) > 0 {
 			checks = append(checks, checkPortsFree(challs))
+			checks = append(checks, checkDNSResolves(cfg, challs))
 		}
+		checks = append(checks, checkDiskSpace(dir))
 	}
 
 	checks = append(checks, checkExpiredInstances(dir))
@@ -212,6 +215,32 @@ func checkDockerDaemon() Check {
 	}
 }
 
+// checkDockerStorageDriverFn shells out to `docker info`.
+// Overridable in tests.
+var checkDockerStorageDriverFn = checkDockerStorageDriverViaDocker
+
+func checkDockerStorageDriverViaDocker() Check {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "docker", "info", "--format", "{{.Driver}}").Output()
+	driver := strings.TrimSpace(string(out))
+	if err != nil || driver == "" {
+		return Check{ID: "D042", Name: "docker storage driver", Status: StatusSkip, Detail: "docker daemon not reachable"}
+	}
+	if driver == "vfs" || driver == "devicemapper" {
+		return Check{
+			ID: "D042", Name: "docker storage driver",
+			Status: StatusWarn, Detail: "using slow/legacy storage driver: " + driver,
+			Suggest: "reconfigure docker to use overlay2, zfs, or btrfs",
+		}
+	}
+	return Check{ID: "D042", Name: "docker storage driver", Status: StatusOK, Detail: driver}
+}
+
+func checkDockerStorageDriver() Check {
+	return checkDockerStorageDriverFn()
+}
+
 func checkDockerCompose() Check {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return Check{ID: "D012", Name: "docker compose v2", Status: StatusSkip, Detail: "docker not installed"}
@@ -267,6 +296,49 @@ func checkCTFdToken() Check {
 		ID: "D021", Name: "CTFd token",
 		Status: StatusWarn, Detail: "MCTF_CTFD_TOKEN not set",
 		Suggest: "required for `mctf deploy` (CTFd registration)",
+	}
+}
+
+// lookupIPFn resolves hostnames. Overridable in tests.
+var lookupIPFn = net.LookupIP
+
+func checkDNSResolves(cfg *config.Config, challs []*challenge.Challenge) Check {
+	if cfg == nil || cfg.Event.Domain == "" {
+		return Check{
+			ID: "D040", Name: "dns resolution",
+			Status: StatusSkip, Detail: "event.domain not configured",
+		}
+	}
+	var failed []string
+	checked := 0
+	for _, c := range challs {
+		if !c.Manifest.Challenge.NeedDeploy || c.Manifest.Deploy == nil || c.Manifest.Deploy.Subdomain == "" {
+			continue
+		}
+		fqdn := fmt.Sprintf("%s.%s", c.Manifest.Deploy.Subdomain, cfg.Event.Domain)
+		checked++
+		ips, err := lookupIPFn(fqdn)
+		if err != nil || len(ips) == 0 {
+			failed = append(failed, fqdn)
+		}
+	}
+	if checked == 0 {
+		return Check{
+			ID: "D040", Name: "dns resolution",
+			Status: StatusSkip, Detail: "no challenges with subdomains",
+		}
+	}
+	if len(failed) > 0 {
+		sort.Strings(failed)
+		return Check{
+			ID: "D040", Name: "dns resolution",
+			Status: StatusWarn, Detail: fmt.Sprintf("failed to resolve: %s", strings.Join(failed, ", ")),
+			Suggest: "check your DNS zone configuration",
+		}
+	}
+	return Check{
+		ID: "D040", Name: "dns resolution",
+		Status: StatusOK, Detail: fmt.Sprintf("all %d subdomains resolve", checked),
 	}
 }
 
