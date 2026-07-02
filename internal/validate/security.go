@@ -115,8 +115,8 @@ func SecurityChecks(r *Report, cfg *config.Config, c *challenge.Challenge, event
 	composePath := filepath.Join(c.ChallengeDir, "docker-compose.yml")
 
 	if compose, ok := loadCompose(composePath); ok {
-		checkPrivileged(r, cfg, compose, manifestPath)
-		checkCapabilities(r, cfg, compose, manifestPath)
+		checkPrivileged(r, cfg, c, compose, manifestPath)
+		checkCapabilities(r, cfg, c, compose, manifestPath)
 		checkComposePorts(r, c, compose, manifestPath)
 	}
 
@@ -181,9 +181,14 @@ func isInstancerPortPattern(host string, container int) bool {
 }
 
 // SEC002 — privileged: true. Always warn; fail under the pro profile.
-func checkPrivileged(r *Report, cfg *config.Config, compose *composeShape, manifestPath string) {
+func checkPrivileged(r *Report, cfg *config.Config, c *challenge.Challenge, compose *composeShape, manifestPath string) {
+	allowPrivileged := false
+	if c.Manifest.Deploy != nil && c.Manifest.Deploy.SecurityOpts != nil {
+		allowPrivileged = c.Manifest.Deploy.SecurityOpts.AllowPrivileged
+	}
+
 	for name, svc := range compose.Services {
-		if !svc.Privileged {
+		if !svc.Privileged || allowPrivileged {
 			continue
 		}
 		profile := config.ProfileSimple
@@ -244,13 +249,32 @@ func userAfterLastFrom(dockerfile []byte) bool {
 
 // SEC004 — `cap_add` contains a capability that defeats container
 // isolation. Warn under simple/instanced; fail under pro.
-func checkCapabilities(r *Report, cfg *config.Config, compose *composeShape, manifestPath string) {
+func checkCapabilities(r *Report, cfg *config.Config, c *challenge.Challenge, compose *composeShape, manifestPath string) {
+	var allowCaps []string
+	if c.Manifest.Deploy != nil && c.Manifest.Deploy.SecurityOpts != nil {
+		for _, ac := range c.Manifest.Deploy.SecurityOpts.AllowCaps {
+			allowCaps = append(allowCaps, strings.ToUpper(strings.TrimPrefix(strings.TrimSpace(ac), "CAP_")))
+		}
+	}
+
 	for name, svc := range compose.Services {
 		for _, cap := range svc.CapAdd {
 			normalized := strings.ToUpper(strings.TrimPrefix(strings.TrimSpace(cap), "CAP_"))
 			if _, dangerous := dangerousCaps[normalized]; !dangerous {
 				continue
 			}
+
+			allowed := false
+			for _, ac := range allowCaps {
+				if ac == normalized {
+					allowed = true
+					break
+				}
+			}
+			if allowed {
+				continue
+			}
+
 			msg := fmt.Sprintf("service %s requests cap_add: %s — review whether the challenge needs it", name, cap)
 			if profileIs(cfg, config.ProfilePro) {
 				r.Errorf("SEC004", manifestPath, "%s — disallowed under the pro profile", msg)

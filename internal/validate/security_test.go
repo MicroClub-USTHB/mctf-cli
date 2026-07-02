@@ -67,6 +67,24 @@ func TestSEC002_PrivilegedFailsUnderPro(t *testing.T) {
 	}
 }
 
+func TestSEC002_AllowedPrivilegedClean(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "pwn", "x", "FROM scratch\nUSER ctf\n",
+		`services:
+  app:
+    privileged: true
+`)
+	c.Manifest.Deploy.SecurityOpts = &challenge.SecurityOpts{
+		AllowPrivileged: true,
+	}
+	r := &Report{}
+	cfg := &config.Config{Profile: config.ProfilePro}
+	SecurityChecks(r, cfg, c, root)
+	if hasRule(r, "SEC002", SeverityError) || hasRule(r, "SEC002", SeverityWarn) {
+		t.Errorf("SEC002 should not fire when allow_privileged is true: %s", r.String())
+	}
+}
+
 func TestSEC003_PwnRequiresUserDirective(t *testing.T) {
 	root := t.TempDir()
 	noUser := makeChallenge(t, root, "pwn", "rootful", "FROM scratch\n", `services:
@@ -161,6 +179,25 @@ func TestSEC004_DangerousCapabilities(t *testing.T) {
 	}
 	if count != 1 {
 		t.Errorf("expected 1 SEC004, got %d", count)
+	}
+}
+
+func TestSEC004_AllowedCapabilityClean(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "misc", "x", "FROM scratch\n",
+		`services:
+  app:
+    cap_add:
+      - SYS_ADMIN
+      - NET_RAW
+`)
+	c.Manifest.Deploy.SecurityOpts = &challenge.SecurityOpts{
+		AllowCaps: []string{"SYS_ADMIN"},
+	}
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if hasRule(r, "SEC004", SeverityWarn) || hasRule(r, "SEC004", SeverityError) {
+		t.Errorf("SEC004 should not fire when cap is in allow_caps: %s", r.String())
 	}
 }
 

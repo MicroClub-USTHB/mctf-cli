@@ -53,7 +53,7 @@ Every rule MCTF enforces, with rationale and severity. Hard-fails block the buil
 | ID | Rule | Severity by profile |
 |---|---|---|
 | `SEC001` | Static flag value found inside any file under `challenge/src/` (image-leak guard) — exempt: `flag.txt`, files explicitly env-loaded | always hard |
-| `SEC002` | `privileged: true` in `docker-compose.yml` | warn / warn / **hard** |
+| `SEC002` | `privileged: true` in `docker-compose.yml` without `deploy.security_opts.allow_privileged` allowlisting it | warn / warn / **hard** |
 | `SEC003` | `pwn` or `jailbreak` Dockerfile lacks a non-root `USER` directive after the last `FROM` | warn / warn / **hard** |
 | `SEC004` | `cap_add` lists privileged caps (`SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE`, `SYS_MODULE`) without `deploy.security_opts.allow_caps` allowlisting them | warn / warn / **hard** |
 | `SEC005` | Unique flag value not present at all (e.g. challenge ships unflagged) | always hard |
