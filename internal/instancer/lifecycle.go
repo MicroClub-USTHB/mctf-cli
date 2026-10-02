@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -110,10 +111,10 @@ func PlanSpawn(cfg *config.Config, c *challenge.Challenge, teamID string, alloca
 	timeout := defaultTimeout(cfg, c)
 	spec := &SpawnSpec{
 		ID:            id,
-		ChallengeSlug: c.CategoryDir + "/" + c.Slug,
+		ChallengeSlug: filepath.Join(c.CategoryDir, c.Slug),
 		TeamID:        teamID,
 		Cwd:           c.ChallengeDir,
-		ComposeFile:   c.ChallengeDir + "/docker-compose.yml",
+		ComposeFile:   filepath.Join(c.ChallengeDir, "docker-compose.yml"),
 		Ports:         map[int]int{internal: hostPort},
 		ExpiresAt:     now().Add(timeout).UTC(),
 		Env: map[string]string{
