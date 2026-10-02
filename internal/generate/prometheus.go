@@ -34,6 +34,7 @@ func PrometheusConfig(cfg *config.Config, challs []*challenge.Challenge) ([]byte
 		fmt.Fprintf(&buf, "  - job_name: %q\n", c.Slug)
 		fmt.Fprintf(&buf, "    static_configs:\n")
 		fmt.Fprintf(&buf, "      - targets:\n")
+		// TODO: localhost won't be reachable for per-team dynamic instances
 		fmt.Fprintf(&buf, "          - %q\n", fmt.Sprintf("localhost:%d", port))
 
 	}
