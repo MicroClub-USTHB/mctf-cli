@@ -10,13 +10,13 @@ package build
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	mctfgit "github.com/MicroClub-USTHB/mctf-cli/internal/git"
 )
 
 // ImageSpec is what the builder needs to produce one image.
@@ -165,12 +165,6 @@ func PushArgs(tag string) []string {
 // GitSHA returns the short HEAD sha of the repo at dir, or "" if dir
 // isn't a git repo or git isn't installed.
 func GitSHA(dir string) string {
-	if _, err := exec.LookPath("git"); err != nil {
-		return ""
-	}
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--short", "HEAD").Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
+	sha, _ := mctfgit.GetSHA(dir, "HEAD")
+	return sha
 }

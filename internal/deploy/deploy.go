@@ -25,13 +25,15 @@ type Unit struct {
 	Cwd         string            // working dir for `docker compose` (the challenge/ folder)
 	ComposeFile string            // absolute path to docker-compose.yml
 	Env         map[string]string // env passed to docker compose (PORT_<n>, etc.)
+	ImageTag    string            // sha tag used for image interpolation
 }
 
 // Options narrow or alter the plan.
 type Options struct {
 	CategoryFilter   string
 	SlugFilter       string
-	IncludeInstanced bool // override v0 default (skip instanced)
+	IncludeInstanced bool   // override v0 default (skip instanced)
+	ImageTag         string // optional: sha used to stamp images
 }
 
 // Plan returns one Unit per deployable, service-archetype challenge
@@ -70,7 +72,8 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, o
 			ProjectName: ProjectName(cfg, c),
 			Cwd:         cwd,
 			ComposeFile: filepath.Join(cwd, "docker-compose.yml"),
-			Env:         envForUnit(c),
+			Env:         envForUnit(c, opts.ImageTag),
+			ImageTag:    opts.ImageTag,
 		}
 		out = append(out, u)
 	}
@@ -91,12 +94,18 @@ func ProjectName(cfg *config.Config, c *challenge.Challenge) string {
 // challenges with internal_port set, it stamps PORT_<internal> with
 // the manifest's port so the compose's ${PORT_N:-N} convention picks
 // the right host port.
-func envForUnit(c *challenge.Challenge) map[string]string {
+func envForUnit(c *challenge.Challenge, imageTag string) map[string]string {
+	env := make(map[string]string)
+	if imageTag != "" {
+		env["IMAGE_TAG"] = imageTag
+	}
 	if c.Manifest.Deploy == nil {
-		return nil
+		if len(env) == 0 {
+			return nil
+		}
+		return env
 	}
 	d := c.Manifest.Deploy
-	env := make(map[string]string)
 	if d.InternalPort != nil && d.Port != nil {
 		env[fmt.Sprintf("PORT_%d", *d.InternalPort)] = fmt.Sprintf("%d", *d.Port)
 	}

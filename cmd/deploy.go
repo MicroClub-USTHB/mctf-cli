@@ -12,13 +12,16 @@ import (
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/deploy"
+	mctfgit "github.com/MicroClub-USTHB/mctf-cli/internal/git"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/notify"
 )
 
 var (
-	flagDeployDryRun bool
-	flagDeployCat    string
-	flagDeploySlug   string
+	flagDeployDryRun   bool
+	flagDeployCat      string
+	flagDeploySlug     string
+	flagDeployRollback bool
+	flagDeployPushTags bool
 )
 
 var deployCmd = &cobra.Command{
@@ -37,34 +40,203 @@ var deployCmd = &cobra.Command{
 		"  mctf deploy --category misc\n" +
 		"  mctf deploy --slug welcome",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		plan, cfg, err := planDeploy()
+		cfg, err := config.Load(flagDir)
 		if err != nil {
 			return err
 		}
+		hasRegistry := cfg.Registry != nil && cfg.Registry.URL != ""
+
+		// Local deploy lock to prevent concurrent runs
+		lockFile := filepath.Join(flagDir, ".mctf", "deploy.lock")
+		// Ensure lock directory exists
+		if err := os.MkdirAll(filepath.Dir(lockFile), 0755); err != nil {
+			return fmt.Errorf("failed to create lock directory: %w", err)
+		}
+		// Check for existing lock
+		if _, err := os.Stat(lockFile); err == nil {
+			return fmt.Errorf("deploy already in progress (remove %s if stale)", lockFile)
+		}
+		// Create lock file
+		if err := os.WriteFile(lockFile, []byte("locked"), 0644); err != nil {
+			return fmt.Errorf("failed to create lock file: %w", err)
+		}
+		defer func() {
+			if err := os.Remove(lockFile); err != nil && !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "warning: failed to remove lock file %s: %v\n", lockFile, err)
+			}
+		}()
+
+		// Determine target SHA and dir
+		targetDir := flagDir
+		targetSHA := ""
+		if flagDeployRollback {
+			if !hasRegistry {
+				return fmt.Errorf("--rollback requires registry.url to be configured in mctf.config.yml")
+			}
+			targetSHA, err = mctfgit.GetSHA(flagDir, "mctf-deploy-previous")
+			if err != nil {
+				return fmt.Errorf("could not resolve mctf-deploy-previous: %w", err)
+			}
+			// Create temporary directory for rollback extraction
+			tempDir, err := os.MkdirTemp("", "mctf-rollback-")
+			if err != nil {
+				return err
+			}
+			// Ensure cleanup of temporary directory
+			defer func() {
+				if err := os.RemoveAll(tempDir); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: failed to clean up temp dir: %v\n", err)
+				}
+			}()
+			if err := mctfgit.Archive(flagDir, "mctf-deploy-previous", tempDir); err != nil {
+				return fmt.Errorf("failed to extract rollback commit: %w", err)
+			}
+			targetDir = tempDir
+		} else if hasRegistry {
+			targetSHA, err = mctfgit.GetSHA(flagDir, "HEAD")
+			if err != nil {
+				return fmt.Errorf("could not resolve HEAD: %w", err)
+			}
+		}
+
+		// Load target plan
+		plan, runner, _, err := loadPlanAndRunner(targetDir, targetSHA, flagDeployDryRun)
+		if err != nil {
+			return err
+		}
+
+		// Diff with active state for orphan cleanup (registry mode only)
+		if hasRegistry {
+			activeSHA, err := mctfgit.GetSHA(flagDir, "mctf-deploy-active")
+			if err == nil && activeSHA != "" {
+				tempDirActive, err := os.MkdirTemp("", "mctf-active-")
+				if err == nil {
+					defer func() {
+						if err := os.RemoveAll(tempDirActive); err != nil && !os.IsNotExist(err) {
+							fmt.Fprintf(os.Stderr, "warning: failed to remove temp dir %s: %v\n", tempDirActive, err)
+						}
+					}()
+					if err := mctfgit.Archive(flagDir, "mctf-deploy-active", tempDirActive); err == nil {
+						activePlan, activeRunner, _, err := loadPlanAndRunner(tempDirActive, activeSHA, flagDeployDryRun)
+						if err == nil {
+							// Compute orphans: in activePlan but not in plan
+							targetMap := make(map[string]bool)
+							for _, u := range plan {
+								targetMap[u.ProjectName] = true
+							}
+							var orphans []deploy.Unit
+							for _, au := range activePlan {
+								if !targetMap[au.ProjectName] {
+									orphans = append(orphans, au)
+								}
+							}
+							if len(orphans) > 0 {
+								fmt.Printf("found %d orphan(s) to clean up...\n", len(orphans))
+								for _, o := range orphans {
+									if err := deploy.TranslateCompose(o, cfg.Registry.URL); err != nil {
+										fmt.Fprintf(os.Stderr, "warning: failed to translate compose for orphan %s: %v\n", o.Challenge, err)
+									} else {
+										o.ComposeFile = filepath.Join(o.Cwd, "docker-compose.mctf.yml")
+									}
+								}
+								if err := deploy.ApplyDown(context.Background(), activeRunner, orphans, false); err != nil {
+									fmt.Fprintf(os.Stderr, "warning: orphan cleanup failed: %v\n", err)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		if len(plan) == 0 {
 			fmt.Println("nothing to deploy — no service-archetype challenges matched the filters")
 			return nil
 		}
-
 		printPlan("up", plan)
 
-		runner, err := newDeployRunner(cfg, flagDeployDryRun)
-		if err != nil {
-			return err
+		// Translate compose for registry-pinned deploys; simple mode
+		// uses the original docker-compose.yml unchanged.
+		if hasRegistry {
+			for i, u := range plan {
+				if !flagDeployDryRun {
+					if err := deploy.TranslateCompose(u, cfg.Registry.URL); err != nil {
+						return fmt.Errorf("translate %s: %w", u.Challenge, err)
+					}
+				}
+				plan[i].ComposeFile = filepath.Join(u.Cwd, "docker-compose.mctf.yml")
+			}
 		}
+
 		ctx := context.Background()
 		if err := deploy.ApplyUp(ctx, runner, plan); err != nil {
-			notifyDiscord(ctx, "deploy failed", "error",
-				fmt.Sprintf("%s: %v", planSlugs(plan), err))
+			notifyDiscord(ctx, "deploy failed", "error", fmt.Sprintf("%s: %v", planSlugs(plan), err))
 			return err
 		}
+
+		// Update deploy tags (registry mode only — tags track image SHAs)
+		if !flagDeployDryRun && hasRegistry {
+			if flagDeployRollback {
+				// Swap active and previous
+				oldActive, _ := mctfgit.GetSHA(flagDir, "mctf-deploy-active")
+				if err := mctfgit.UpdateTag(flagDir, "mctf-deploy-active", targetSHA); err != nil {
+					return fmt.Errorf("failed to update active tag: %w", err)
+				}
+				if oldActive != "" {
+					if err := mctfgit.UpdateTag(flagDir, "mctf-deploy-previous", oldActive); err != nil {
+						return fmt.Errorf("failed to update previous tag: %w", err)
+					}
+				}
+			} else {
+				// Normal deploy
+				oldActive, _ := mctfgit.GetSHA(flagDir, "mctf-deploy-active")
+				if oldActive != "" {
+					if err := mctfgit.UpdateTag(flagDir, "mctf-deploy-previous", oldActive); err != nil {
+						return fmt.Errorf("failed to update previous tag: %w", err)
+					}
+				}
+				if err := mctfgit.UpdateTag(flagDir, "mctf-deploy-active", targetSHA); err != nil {
+					return fmt.Errorf("failed to update active tag: %w", err)
+				}
+			}
+			if flagDeployPushTags {
+				if err := mctfgit.PushTags(flagDir, "origin", "mctf-deploy-active", "mctf-deploy-previous"); err != nil {
+					return fmt.Errorf("failed to push tags: %w", err)
+				}
+			}
+		}
+
 		fmt.Println("\ndeploy complete")
 		if !flagDeployDryRun {
-			notifyDiscord(ctx, "deploy succeeded", "success",
-				fmt.Sprintf("%d challenge(s) up:\n%s", len(plan), planSlugs(plan)))
+			notifyDiscord(ctx, "deploy succeeded", "success", fmt.Sprintf("%d challenge(s) up:\n%s", len(plan), planSlugs(plan)))
 		}
 		return nil
 	},
+}
+
+func loadPlanAndRunner(dir, sha string, dryRun bool) ([]deploy.Unit, deploy.Runner, *config.Config, error) {
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	challs, _, err := challenge.Discover(dir, cfg.ChallengesDir)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	opts := deploy.Options{
+		CategoryFilter: flagDeployCat,
+		SlugFilter:     flagDeploySlug,
+		ImageTag:       sha,
+	}
+	plan, err := deploy.Plan(cfg, dir, challs, opts)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	runner, err := newDeployRunner(cfg, dryRun)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return plan, runner, cfg, nil
 }
 
 func planSlugs(plan []deploy.Unit) string {
@@ -110,7 +282,8 @@ var downCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Reuse the deploy planner with the down-specific filters.
 		flagDeployCat, flagDeploySlug = flagDownCat, flagDownSlug
-		plan, cfg, err := planDeploy()
+		targetSHA, _ := mctfgit.GetSHA(flagDir, "HEAD")
+		plan, runner, cfg, err := loadPlanAndRunner(flagDir, targetSHA, flagDownDryRun)
 		if err != nil {
 			return err
 		}
@@ -121,12 +294,17 @@ var downCmd = &cobra.Command{
 
 		printPlan("down", plan)
 
-		runner, err := newDeployRunner(cfg, flagDownDryRun)
-		if err != nil {
-			return err
-		}
-
 		ctx := context.Background()
+		// Use translated compose when registry is configured and the
+		// generated file exists; otherwise fall back to the original.
+		if cfg.Registry != nil && cfg.Registry.URL != "" {
+			for i, u := range plan {
+				mctfCompose := filepath.Join(u.Cwd, "docker-compose.mctf.yml")
+				if _, err := os.Stat(mctfCompose); err == nil {
+					plan[i].ComposeFile = mctfCompose
+				}
+			}
+		}
 		if err := deploy.ApplyDown(ctx, runner, plan, flagDownVolumes); err != nil {
 			notifyDiscord(ctx, "teardown failed", "error",
 				fmt.Sprintf("%s: %v", planSlugs(plan), err))
@@ -139,22 +317,6 @@ var downCmd = &cobra.Command{
 		}
 		return nil
 	},
-}
-
-func planDeploy() ([]deploy.Unit, *config.Config, error) {
-	cfg, err := config.Load(flagDir)
-	if err != nil {
-		return nil, nil, err
-	}
-	challs, _, err := challenge.Discover(flagDir, cfg.ChallengesDir)
-	if err != nil {
-		return nil, cfg, err
-	}
-	plan, err := deploy.Plan(cfg, flagDir, challs, deploy.Options{
-		CategoryFilter: flagDeployCat,
-		SlugFilter:     flagDeploySlug,
-	})
-	return plan, cfg, err
 }
 
 func newDeployRunner(cfg *config.Config, dryRun bool) (deploy.Runner, error) {
@@ -186,6 +348,8 @@ func printPlan(verb string, plan []deploy.Unit) {
 
 func init() {
 	deployCmd.Flags().BoolVar(&flagDeployDryRun, "dry-run", false, "print docker compose commands instead of executing")
+	deployCmd.Flags().BoolVar(&flagDeployRollback, "rollback", false, "rollback to mctf-deploy-previous tag")
+	deployCmd.Flags().BoolVar(&flagDeployPushTags, "push-tags", false, "push active and previous tags to origin")
 	deployCmd.Flags().StringVar(&flagDeployCat, "category", "", "deploy only challenges in this category")
 	deployCmd.Flags().StringVar(&flagDeploySlug, "slug", "", "deploy only the challenge with this slug")
 	rootCmd.AddCommand(deployCmd)
