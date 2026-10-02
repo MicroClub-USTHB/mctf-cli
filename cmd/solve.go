@@ -12,6 +12,7 @@ import (
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/instancer"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/solve"
 )
 
@@ -19,6 +20,7 @@ var (
 	flagSolveAll      bool
 	flagSolveTimeout  time.Duration
 	flagSolveCategory string
+	flagSolveInstance string
 )
 
 var solveCmd = &cobra.Command{
@@ -30,12 +32,16 @@ var solveCmd = &cobra.Command{
 		"the manifest flags appears in the output.\n\n" +
 		"With --all, runs every discovered solver in turn and exits non-\n" +
 		"zero if any one fails. Useful as a final CI gate after deploy.\n\n" +
-		"Instanced challenges receive INSTANCER_URL but not HOST/PORT —\n" +
-		"smoke-testing them requires spawning a per-team instance first.\n\n" +
+		"With --against-instance <id>, runs the solver against a live per-\n" +
+		"team instance (spawned via `mctf instance spawn`): HOST/PORT/URL\n" +
+		"point at the instance's host-port mapping and its per-team flag is\n" +
+		"accepted. The challenge is resolved from the instance record, so no\n" +
+		"<category>/<slug> argument is needed.\n\n" +
 		"Examples:\n" +
 		"  mctf solve misc/welcome\n" +
 		"  mctf solve --all\n" +
-		"  mctf solve --all --category web --timeout 30s",
+		"  mctf solve --all --category web --timeout 30s\n" +
+		"  mctf solve --against-instance mctf-inst-rubik-team1-ab12cd34",
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(flagDir)
@@ -47,8 +53,29 @@ var solveCmd = &cobra.Command{
 			return err
 		}
 
+		if flagSolveInstance != "" {
+			if flagSolveAll {
+				return fmt.Errorf("--against-instance cannot be combined with --all")
+			}
+			if len(args) > 0 {
+				return fmt.Errorf("--against-instance takes no <category>/<slug> argument; the challenge is resolved from the instance")
+			}
+		}
+
 		var targets []*challenge.Challenge
+		var instTarget *solve.InstanceTarget
 		switch {
+		case flagSolveInstance != "":
+			store, err := openStore()
+			if err != nil {
+				return err
+			}
+			c, it, err := resolveInstanceTarget(store, challs, flagSolveInstance)
+			if err != nil {
+				return err
+			}
+			targets = append(targets, c)
+			instTarget = it
 		case flagSolveAll:
 			for _, c := range challs {
 				if flagSolveCategory != "" && c.CategoryDir != flagSolveCategory {
@@ -81,7 +108,7 @@ var solveCmd = &cobra.Command{
 		}
 
 		ctx := context.Background()
-		opts := solve.Options{Timeout: flagSolveTimeout}
+		opts := solve.Options{Timeout: flagSolveTimeout, Instance: instTarget}
 		if !flagJSON {
 			opts.Stdout = os.Stdout
 			opts.Stderr = os.Stderr
@@ -124,6 +151,38 @@ var solveCmd = &cobra.Command{
 	},
 }
 
+// instanceGetter is the slice of the instancer store that
+// resolveInstanceTarget needs — narrowed to an interface so the
+// resolution is unit-testable without a real store or docker daemon.
+type instanceGetter interface {
+	Get(id string) (instancer.Instance, bool)
+}
+
+// resolveInstanceTarget looks up an instance by id and pairs it with
+// the discovered challenge it spawned from, returning the solver
+// target (host-port mapping + per-team flag).
+func resolveInstanceTarget(store instanceGetter, challs []*challenge.Challenge, id string) (*challenge.Challenge, *solve.InstanceTarget, error) {
+	inst, ok := store.Get(id)
+	if !ok {
+		return nil, nil, fmt.Errorf("no instance with id %q", id)
+	}
+	category, slug, ok := splitCategorySlug(inst.ChallengeSlug)
+	if !ok {
+		return nil, nil, fmt.Errorf("instance %q has malformed challenge slug %q", inst.ID, inst.ChallengeSlug)
+	}
+	for _, c := range challs {
+		if c.CategoryDir == category && c.Slug == slug {
+			return c, &solve.InstanceTarget{
+				ID:     inst.ID,
+				TeamID: inst.TeamID,
+				Ports:  inst.Ports,
+				Flag:   inst.Flag,
+			}, nil
+		}
+	}
+	return nil, nil, fmt.Errorf("instance %q references unknown challenge %s", inst.ID, inst.ChallengeSlug)
+}
+
 func printResult(res *solve.Result) {
 	mark := "✗"
 	if res.Pass {
@@ -139,5 +198,6 @@ func init() {
 	solveCmd.Flags().BoolVar(&flagSolveAll, "all", false, "run every discovered solver in turn")
 	solveCmd.Flags().DurationVar(&flagSolveTimeout, "timeout", 60*time.Second, "kill a solver after this duration")
 	solveCmd.Flags().StringVar(&flagSolveCategory, "category", "", "with --all, restrict to challenges in this category")
+	solveCmd.Flags().StringVar(&flagSolveInstance, "against-instance", "", "run the solver against a live per-team instance by id")
 	rootCmd.AddCommand(solveCmd)
 }

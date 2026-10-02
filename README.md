@@ -87,7 +87,7 @@ Requires Go 1.23+, GNU make. Python (`pyyaml`, `jsonschema`) only needed if you 
 - **`mctf deploy`** — `docker compose up -d` for every service-archetype challenge; per-challenge project name `mctf-<event>-<cat>-<slug>`; auto-stamps `PORT_<internal>` env so the compose's `${PORT_N:-N}` convention picks the right host port; instanced challenges are skipped (the instancer owns those at game time).
 - **`mctf down`** — symmetric teardown in reverse-deploy order; `--volumes` to also drop named volumes.
 - **`mctf logs <category>/<slug>`** — stream logs from a deployed challenge's compose project; `-f` to follow, `--tail N` for the tail.
-- **`mctf solve <category>/<slug>`** — runs `solution/solve.sh` (or `solve.py` / `solve` binary) with `HOST` / `PORT` / `URL` / `FLAG_PREFIX` env, asserts the manifest flag appears in output. `--all` smoke-tests every solver; `--timeout` caps each run; `--json` for scripting.
+- **`mctf solve <category>/<slug>`** — runs `solution/solve.sh` (or `solve.py` / `solve` binary) with `HOST` / `PORT` / `URL` / `FLAG_PREFIX` env, asserts the manifest flag appears in output. `--all` smoke-tests every solver; `--timeout` caps each run; `--json` for scripting. `--against-instance <id>` targets a live per-team instance instead of the deploy block: `HOST` / `PORT` / `URL` point at the instance's host-port mapping, `INSTANCE_ID` / `TEAM_ID` are stamped, and the per-team flag is accepted alongside the manifest flags. The challenge is resolved from the instance record.
 
 #### Notifications
 - **Discord webhook** — set `MCTF_DISCORD_WEBHOOK` and `mctf deploy` / `mctf down` post embedded status messages (success/failure with the challenge list). Best-effort — webhook errors warn but never block the deploy.
