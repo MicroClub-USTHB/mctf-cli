@@ -94,6 +94,7 @@ Two cases:
 
 - `go test ./...` runs the unit tests. Add new tests next to the package they cover.
 - Tests should not require network, Docker, or a running CTFd. If you need fixtures, put them under `internal/<pkg>/testdata/`.
+- For interactive prompts (e.g., `cmd/init.go`), inject test input via the `promptIn` variable — see `cmd/init_test.go` for the pattern.
 - The sample event under `examples/sample-event/` is the integration fixture; CI uses it directly.
 
 ## Branching & PRs
