@@ -2,7 +2,10 @@ package ctfd
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -68,6 +71,7 @@ type FileDelta struct {
 	Existing   *File
 	WantedName string // basename, used for display + sort
 	WantedPath string // absolute local path (only set for "add")
+	WantedSHA1 string // sha1 of the local file, compared to File.SHA1
 }
 
 // Plan is the full set of actions for a sync run.
@@ -154,14 +158,34 @@ func PayloadFiles(c *challenge.Challenge) []FileDelta {
 		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		out = append(out, FileDelta{
-			Op:         "add",
-			WantedName: e.Name(),
-			WantedPath: filepath.Join(c.AssetsDir, e.Name()),
-		})
+		path := filepath.Join(c.AssetsDir, e.Name())
+		fd := FileDelta{Op: "add", WantedName: e.Name(), WantedPath: path}
+		// A hash failure leaves WantedSHA1 empty, which degrades the
+		// diff to basename-only for that file rather than failing the
+		// whole plan.
+		if sum, err := hashFile(path); err == nil {
+			fd.WantedSHA1 = sum
+		}
+		out = append(out, fd)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].WantedName < out[j].WantedName })
 	return out
+}
+
+// hashFile returns the SHA1 of the file at path. SHA1 is used because
+// it is the digest CTFd records and exposes as sha1sum; this is a
+// content-identity check, not a security boundary.
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha1.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // PayloadHints returns the CTFd Hint list a manifest wants.
@@ -369,9 +393,12 @@ func childDeltas(ctx context.Context, c *Client, existingID int, ch *challenge.C
 	return flagDeltas, tagDeltas, hintDeltas, fileDeltas, nil
 }
 
-// diffFiles matches local assets to CTFd-side files by basename. Local
-// content changes are not detected (CTFd hashes server-side); to force
-// a re-upload, delete the file in CTFd first.
+// diffFiles matches local assets to CTFd-side files by basename, then
+// by content hash. A file present on both sides whose local SHA1
+// differs from the CTFd-side sha1sum is re-uploaded (delete the stale
+// remote copy, add the local one). When either hash is unavailable the
+// file is left untouched, so older CTFd builds that omit sha1sum keep
+// the previous basename-only behavior instead of churning every sync.
 func diffFiles(have []File, want []FileDelta) []FileDelta {
 	wantIdx := map[string]FileDelta{}
 	for _, f := range want {
@@ -382,9 +409,15 @@ func diffFiles(have []File, want []FileDelta) []FileDelta {
 		haveIdx[f.Basename()] = f
 	}
 	var out []FileDelta
-	for name, f := range wantIdx {
-		if _, ok := haveIdx[name]; !ok {
-			out = append(out, f)
+	for name, w := range wantIdx {
+		h, ok := haveIdx[name]
+		if !ok {
+			out = append(out, w) // missing on platform
+			continue
+		}
+		if fileContentChanged(h, w) {
+			hv := h
+			out = append(out, FileDelta{Op: "delete", Existing: &hv, WantedName: name}, w)
 		}
 	}
 	for name, f := range haveIdx {
@@ -399,6 +432,13 @@ func diffFiles(have []File, want []FileDelta) []FileDelta {
 		return ki < kj
 	})
 	return out
+}
+
+// fileContentChanged reports whether a same-named local/remote pair has
+// diverging content. Only returns true when both hashes are known, so
+// an unknown digest is never treated as a change.
+func fileContentChanged(remote File, local FileDelta) bool {
+	return remote.SHA1 != "" && local.WantedSHA1 != "" && remote.SHA1 != local.WantedSHA1
 }
 
 func fileSortKey(d FileDelta) string {

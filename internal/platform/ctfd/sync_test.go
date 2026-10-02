@@ -2,6 +2,8 @@ package ctfd
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -295,6 +297,68 @@ func TestDiffFiles_ByBasename(t *testing.T) {
 	}
 	if add != 1 || del != 1 {
 		t.Errorf("add=%d delete=%d, want 1/1", add, del)
+	}
+}
+
+func TestDiffFiles_ReuploadsOnContentChange(t *testing.T) {
+	have := []File{
+		{ID: 7, Location: "uploads/abc/handout.zip", SHA1: "oldhash", ChallengeID: 5},
+	}
+	want := []FileDelta{
+		{Op: "add", WantedName: "handout.zip", WantedPath: "/local/handout.zip", WantedSHA1: "newhash"},
+	}
+	got := diffFiles(have, want)
+	if len(got) != 2 {
+		t.Fatalf("want delete+add for the changed file, got %d: %+v", len(got), got)
+	}
+	// add sorts before delete for the same name, so the new copy is
+	// uploaded before the stale one is removed.
+	if got[0].Op != "add" || got[0].WantedSHA1 != "newhash" {
+		t.Errorf("first delta should add the local file: %+v", got[0])
+	}
+	if got[1].Op != "delete" || got[1].Existing.ID != 7 {
+		t.Errorf("second delta should delete stale id=7: %+v", got[1])
+	}
+}
+
+func TestDiffFiles_SkipsWhenContentSame(t *testing.T) {
+	have := []File{{ID: 7, Location: "uploads/abc/handout.zip", SHA1: "samehash", ChallengeID: 5}}
+	want := []FileDelta{{Op: "add", WantedName: "handout.zip", WantedSHA1: "samehash"}}
+	if got := diffFiles(have, want); len(got) != 0 {
+		t.Errorf("identical content should produce no deltas, got %+v", got)
+	}
+}
+
+func TestDiffFiles_SkipsWhenHashUnavailable(t *testing.T) {
+	// Older CTFd omits sha1sum: fall back to basename-only (no churn).
+	have := []File{{ID: 7, Location: "uploads/abc/handout.zip", ChallengeID: 5}}
+	want := []FileDelta{{Op: "add", WantedName: "handout.zip", WantedSHA1: "newhash"}}
+	if got := diffFiles(have, want); len(got) != 0 {
+		t.Errorf("unknown remote hash should not trigger re-upload, got %+v", got)
+	}
+}
+
+func TestPayloadFiles_ComputesSHA1(t *testing.T) {
+	dir := t.TempDir()
+	assets := filepath.Join(dir, "assets")
+	if err := os.MkdirAll(assets, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := []byte("handout-bytes")
+	if err := os.WriteFile(filepath.Join(assets, "handout.zip"), content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha1.Sum(content)
+	want := hex.EncodeToString(sum[:])
+
+	c := sampleStatic()
+	c.AssetsDir = assets
+	got := PayloadFiles(c)
+	if len(got) != 1 {
+		t.Fatalf("want 1 asset, got %d", len(got))
+	}
+	if got[0].WantedSHA1 != want {
+		t.Errorf("WantedSHA1 = %q, want %q", got[0].WantedSHA1, want)
 	}
 }
 
