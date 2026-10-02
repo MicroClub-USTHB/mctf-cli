@@ -120,20 +120,20 @@ func shouldEmitPrometheus(cfg *config.Config, challs []*challenge.Challenge) boo
 //
 // Also removes stale instance.toml from challenges that are no longer
 // instanced — staleness is the silent-bug source we're guarding against.
-func (o *Outputs) Apply() (written []string, removed []string, err error) {
+func (o *Outputs) Apply() (written []string, err error) {
 	for path, data := range o.Files {
 		if existing, e := os.ReadFile(path); e == nil && bytes.Equal(existing, data) {
 			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return written, removed, err
+			return written, err
 		}
 		if err := os.WriteFile(path, data, 0o644); err != nil {
-			return written, removed, err
+			return written, err
 		}
 		written = append(written, path)
 	}
-	return written, removed, nil
+	return written, nil
 }
 
 // CleanStale removes derived files that exist on disk but are not in the

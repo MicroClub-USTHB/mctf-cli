@@ -85,7 +85,7 @@ challenge that's no longer instanced).`,
 			return fmt.Errorf("%d derived file(s) out of sync — run `mctf generate`", len(drifts))
 		}
 
-		written, _, err := out.Apply()
+		written, err := out.Apply()
 		if err != nil {
 			return err
 		}
