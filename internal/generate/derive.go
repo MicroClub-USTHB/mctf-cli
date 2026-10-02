@@ -109,7 +109,7 @@ func listAssets(c *challenge.Challenge) []string {
 		if name == "README.md" || name == "Readme.md" {
 			continue
 		}
-		files = append(files, filepath.Join("assets", name))
+		files = append(files, filepath.ToSlash(filepath.Join("assets", name)))
 	}
 	if len(files) == 0 {
 		return nil
