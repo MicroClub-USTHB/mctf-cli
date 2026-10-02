@@ -103,6 +103,18 @@ Every rule MCTF enforces, with rationale and severity. Hard-fails block the buil
 | `I001` | Category-typical tag missing (e.g. `web` challenge with no sub-tag like `sqli`/`xss`/`ssrf`) |
 | `I002` | Manifest uses deprecated field (none in v1; reserved for future migrations) |
 
+## Doctor checks (`mctf doctor`)
+
+These checks are evaluated by the `mctf doctor` command to verify the host environment's health, rather than the challenge manifests.
+
+| ID | Rule | Severity |
+|---|---|---|
+| `D030` | Host ports free (verifies required category/deploy ports are not already bound) | hard |
+| `D031` | Expired instances (detects leaked/zombie per-team dynamic containers) | hard |
+| `D040` | DNS resolution (verifies that the event `subdomain.domain` resolves correctly) | hard |
+| `D041` | Free disk space (warns if < 15GB, fails if < 5GB) | warn / hard |
+| `D042` | Docker storage driver (warns if using slow drivers like `vfs`) | warn |
+
 ## Disabling rules
 
 A challenge can opt out of specific warnings via a `# mctf-disable: W001 W005` comment at the top of its `challenge.yml`. **Hard-fails cannot be disabled** — fix the issue or open a PR to change the rule.
