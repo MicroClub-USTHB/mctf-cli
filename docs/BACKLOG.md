@@ -5,7 +5,6 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 ## Big rocks (multi-day each)
 
 - **K8s deploy mode** — `mctf deploy --mode kubernetes`. Generate K8s Deployment / Service / Ingress manifests from per-challenge compose, `kubectl apply -f`. Honor `cfg.Deploy.Kubernetes.{Kubeconfig, Namespace, IngressClass}`.
-- **SSH deploy mode** — `mctf deploy --mode ssh`. scp the compose tree to the configured host, run `docker compose up -d` over ssh. Single-VPS workflow.
 - **Plugin system** — subprocess + JSON-RPC over stdio (Terraform-style). Lifecycle hooks: `before_build`, `after_build`, `before_deploy`, `after_deploy`, `on_instance_spawn`, `on_health_failure`. Language-agnostic, crash-isolated.
 - **Per-team dynamic flags** — instancer mints per-team flags at spawn time (currently every team gets the manifest's static flag). Schema additions: `flags[].dynamic: true`, optional `flags[].generator`.
 - **Prometheus / Grafana wiring** — `mctf monitoring up` brings up prom + grafana + cAdvisor with prebuilt dashboards. Generate scrape config from challenge labels.
@@ -13,28 +12,15 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 ## Medium features (1–2 days each)
 
-- **Rollback support** — `.mctf/state.json` snapshot before each deploy; `mctf deploy --rollback` reverts. Prerequisite: compose must use `image: <reg>/<name>:<sha>` instead of `build:` so a previous SHA can be redeployed.
-- **Image-tag pinning in deploy** — `mctf deploy` stamps `IMAGE_TAG` env so compose pulls the SHA from the last successful `mctf build` (the rollback prerequisite).
 - **rCTF + generic-webhook platforms** — second + third platform targets behind the existing platform interface, ideally via plugin once the system lands.
 - **Per-team auth on the instancer** — currently bearer tokens have full power; add team-scoped tokens (`POST /spawn` only allows the request when the token's team_id matches the body).
 - **Native instancer: docker-network isolation** — currently spawns share the event network; isolate each per-team instance to its own bridge.
-- [x] **Better `mctf doctor` checks** — D040 DNS resolves for `<sub>.<domain>`, D041 free disk space, D042 docker daemon storage driver.
 - **`mctf platform configure` extensions** — sync `start` / `end` timestamps (needs schema addition `event.start_at` / `event.end_at`), `ctf_description`.
 - **`mctf release`** — tag git, build via goreleaser, draft a release notes file from conventional-commits since last tag.
 
 ## Small wins (~half-day each)
 
-- **W002** — `web` archetype `service` but description hints at mutable state → suggest `instanced` (regex-heuristic).
-- **W009** — `crypto` service-archetype with no rate-limit hint.
-- **W011** — asset filename referenced in description but missing from `assets/` (broken handout link).
-- **W012** — schema field omitted from manifest (warn; default-filled to 1).
-- **I001** — category-typical sub-tag missing (e.g. `web` with no `sqli` / `xss` / `ssrf`).
-- **`mctf generate --json`** — list of written / skipped / drift files for CI.
-- **`mctf instance ps`** — live container state from docker (uptime, healthcheck status) for one instance ID.
-- **`mctf instance flag <id>`** — print the per-team flag (read-only convenience).
-- **`mctf platform unsync`** — remove a challenge from CTFd by category / slug.
-- **Drop W004** when `assets/.gitkeep` is the only file (currently fires on directories that contain only the placeholder).
-- **Fuzzy slug match** — `mctf info crypto/rs` suggests `crypto/rsa-baby` instead of "no challenge".
+*(All wave 1 small wins have been shipped!)*
 
 ## Polish & docs
 
@@ -72,12 +58,9 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 Highest leverage, smallest blast radius — pick from these to start:
 
-1. **golangci-lint in CI** — easy quality lift across the whole tree.
-2. **goreleaser + Homebrew tap** — unlock distribution.
-3. **K8s deploy mode** — biggest deployment-flexibility win.
-4. **Image-tag pinning in deploy + rollback** — operational safety.
-5. **W002 / W011 / I001 batch** — cheap validate improvements.
-6. **`docs/spec/` refresh** — backfill what shipped this session.
+1. **goreleaser + Homebrew tap** — unlock distribution.
+2. **K8s deploy mode** — biggest deployment-flexibility win.
+3. **`docs/spec/` refresh** — backfill what shipped this session.
 
 ## Conventions for new tasks
 
