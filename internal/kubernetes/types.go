@@ -1,11 +1,8 @@
-/*
-Package kubernetes generates Kubernetes manifests for deployable
-challenges and applies them via kubectl.
-
-Only the API shapes actually used for Deployment / Service / Ingress
-are defined here .
-*/
-
+// Package kubernetes generates Kubernetes manifests for deployable
+// challenges and applies them via kubectl.
+//
+// Only the API shapes actually used for Deployment / Service / Ingress
+// are defined here.
 package kubernetes
 
 // TypeMeta holds the Kubernetes apiVersion and kind fields
@@ -27,8 +24,8 @@ type ResourceList map[string]string
 
 // ResourceRequirements holds container resource limits and requests
 type ResourceRequirements struct {
-	Limits   ResourceList `json:"limits,omitempty"`   //max ressources the container is allowed to consume
-	Requests ResourceList `json:"requests,omitempty"` //min ressources the container need to run
+	Limits   ResourceList `json:"limits,omitempty"`   // max resources the container is allowed to consume
+	Requests ResourceList `json:"requests,omitempty"` // min resources the container needs to run
 }
 
 // ContainerPort exposes one port from a container
@@ -42,30 +39,27 @@ type ExecAction struct {
 	Command []string `json:"command"`
 }
 
-/*
-HTTPGetAction performs an HTTP GET for a probe generally used for web
-
-challenges to check if the website is up
-*/
+// HTTPGetAction performs an HTTP GET for a probe generally used for web
+// challenges to check if the website is up.
 type HTTPGetAction struct {
 	Path string `json:"path"`
 	Port int    `json:"port"`
 }
 
-/*
-	 Probe defines a liveness or readiness probe
-		-ExecAction: for file system checks or running a script inside the container
-		-HTTPGetAction: for web challenges to check if the website is up
-		-PeriodSeconds: how often to check
-		-TimeoutSeconds: how long to wait for a response
-		-FailureThreshold: how many times to check before giving up
-*/
+// Probe defines a liveness or readiness probe:
+//   - Exec: file system checks or running a script inside the container
+//   - HTTPGet: web challenges to check if the website is up
+//   - InitialDelaySeconds: how long to wait before first probe
+//   - PeriodSeconds: how often to check
+//   - TimeoutSeconds: how long to wait for a response
+//   - FailureThreshold: how many times to check before giving up
 type Probe struct {
-	Exec             *ExecAction    `json:"exec,omitempty"`
-	HTTPGet          *HTTPGetAction `json:"httpGet,omitempty"`
-	PeriodSeconds    int            `json:"periodSeconds,omitempty"`
-	TimeoutSeconds   int            `json:"timeoutSeconds,omitempty"`
-	FailureThreshold int            `json:"failureThreshold,omitempty"`
+	Exec                *ExecAction    `json:"exec,omitempty"`
+	HTTPGet             *HTTPGetAction `json:"httpGet,omitempty"`
+	InitialDelaySeconds int            `json:"initialDelaySeconds,omitempty"`
+	PeriodSeconds       int            `json:"periodSeconds,omitempty"`
+	TimeoutSeconds      int            `json:"timeoutSeconds,omitempty"`
+	FailureThreshold    int            `json:"failureThreshold,omitempty"`
 }
 
 // Container describes one container in a Pod

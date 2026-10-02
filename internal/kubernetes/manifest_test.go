@@ -13,8 +13,8 @@ import (
 
 func cfgK8s(ns, ingress string) *config.Config {
 	return &config.Config{
-		Version: 1,
-		Event:   config.Event{Slug: "evt", Domain: "ctf.example.com"},
+		Version:  1,
+		Event:    config.Event{Slug: "evt", Domain: "ctf.example.com"},
 		Registry: &config.Registry{URL: "registry.example.com"},
 		Deploy: &config.Deploy{
 			Mode: "kubernetes",
@@ -86,7 +86,7 @@ func TestPlan_NameAndNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan[0].Name != "mtcf-evt-misc-welcome" {
+	if plan[0].Name != "mctf-evt-misc-welcome" {
 		t.Errorf("name = %q", plan[0].Name)
 	}
 	if plan[0].Namespace != "ctf" {
@@ -162,7 +162,7 @@ func TestPlan_MissingInternalPort(t *testing.T) {
 
 func TestManifestsYAML_HTTPHasThreeDocs(t *testing.T) {
 	u := KubeUnit{
-		Challenge: "misc/welcome", Name: "mtcf-evt-misc-welcome",
+		Challenge: "misc/welcome", Name: "mctf-evt-misc-welcome",
 		Namespace: "ctf", Image: "registry.example.com/evt-misc-welcome:latest",
 		InternalPort: 8000, Subdomain: "welcome", Domain: "ctf.example.com",
 		IngressClass: "nginx",
@@ -177,7 +177,7 @@ func TestManifestsYAML_HTTPHasThreeDocs(t *testing.T) {
 		t.Errorf("expected >=3 --- markers, got %d\nYAML:\n%s", docs, raw)
 	}
 	s := string(raw)
-	for _, want := range []string{"Deployment", "Service", "Ingress", "mtcf-evt-misc-welcome", "welcome.ctf.example.com"} {
+	for _, want := range []string{"Deployment", "Service", "Ingress", "mctf-evt-misc-welcome", "welcome.ctf.example.com"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("manifests missing %q", want)
 		}
@@ -186,9 +186,9 @@ func TestManifestsYAML_HTTPHasThreeDocs(t *testing.T) {
 
 func TestManifestsYAML_TCPNoIngress(t *testing.T) {
 	u := KubeUnit{
-		Challenge: "misc/nc", Name: "mtcf-evt-misc-nc",
+		Challenge: "misc/nc", Name: "mctf-evt-misc-nc",
 		Namespace: "ctf", Image: "registry.example.com/evt-misc-nc:latest",
-		InternalPort: 4444, Subdomain: "nc", Domain: "ctf.example.com",
+		InternalPort: 4444, NodePort: 31337, Subdomain: "nc", Domain: "ctf.example.com",
 		TCP: true,
 	}
 	raw, err := ManifestsYAML(u)
@@ -202,11 +202,14 @@ func TestManifestsYAML_TCPNoIngress(t *testing.T) {
 	if !strings.Contains(s, "NodePort") {
 		t.Errorf("TCP challenge Service should be NodePort, got:\n%s", s)
 	}
+	if !strings.Contains(s, "nodePort: 31337") {
+		t.Errorf("TCP challenge Service should have fixed nodePort: 31337, got:\n%s", s)
+	}
 }
 
 func TestManifestsYAML_NoSSLSkipsTLS(t *testing.T) {
 	u := KubeUnit{
-		Challenge: "misc/plain", Name: "mtcf-evt-misc-plain",
+		Challenge: "misc/plain", Name: "mctf-evt-misc-plain",
 		Namespace: "ctf", Image: "registry.example.com/evt-misc-plain:latest",
 		InternalPort: 8080, Subdomain: "plain", Domain: "ctf.example.com",
 		NoSSL: true,
@@ -222,7 +225,7 @@ func TestManifestsYAML_NoSSLSkipsTLS(t *testing.T) {
 
 func TestManifestsYAML_ResourceLimits(t *testing.T) {
 	u := KubeUnit{
-		Challenge: "misc/heavy", Name: "mtcf-evt-misc-heavy",
+		Challenge: "misc/heavy", Name: "mctf-evt-misc-heavy",
 		Namespace: "ctf", Image: "img:latest",
 		InternalPort: 8000, Subdomain: "heavy", Domain: "ctf.example.com",
 		Resources: &challenge.Resources{CPU: "500m", Memory: "128Mi"},
@@ -232,8 +235,37 @@ func TestManifestsYAML_ResourceLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(raw)
-	if !strings.Contains(s, "500m") || !strings.Contains(s, "128Mi") {
-		t.Errorf("resource limits missing from:\n%s", s)
+	if !strings.Contains(s, "cpu: 500m") && !strings.Contains(s, "cpu: \"500m\"") {
+		t.Errorf("cpu requests missing from:\n%s", s)
+	}
+	if !strings.Contains(s, "cpu: 1000m") && !strings.Contains(s, "cpu: \"1000m\"") {
+		t.Errorf("cpu limits (2x burstable) missing from:\n%s", s)
+	}
+	if !strings.Contains(s, "128Mi") {
+		t.Errorf("memory limits missing from:\n%s", s)
+	}
+}
+
+func TestManifestsYAML_ProbeInitialDelay(t *testing.T) {
+	u := KubeUnit{
+		Challenge: "web/probe", Name: "mctf-evt-web-probe",
+		Namespace: "ctf", Image: "img:latest",
+		InternalPort: 8080, Subdomain: "probe", Domain: "ctf.example.com",
+		Healthcheck: &challenge.Healthcheck{
+			Type:     "http",
+			Path:     "/healthz",
+			Interval: "15s",
+			Timeout:  "3s",
+			Retries:  3,
+		},
+	}
+	raw, err := ManifestsYAML(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	if !strings.Contains(s, "initialDelaySeconds: 15") {
+		t.Errorf("probe missing initialDelaySeconds: 15, got:\n%s", s)
 	}
 }
 

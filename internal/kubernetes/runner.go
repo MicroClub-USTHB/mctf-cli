@@ -30,11 +30,11 @@ func (r *KubeRunner) Up(ctx context.Context, u KubeUnit) error {
 	return r.kubectl(ctx, manifests, "apply", "-f", "-")
 }
 
-// Down deletes all resources for the unit by label selector.
+// Down deletes all resources for the unit by exact name.
 func (r *KubeRunner) Down(ctx context.Context, u KubeUnit) error {
 	return r.kubectl(ctx, nil,
 		"delete", "deployment,service,ingress",
-		"-l", "app="+u.Name,
+		u.Name,
 		"-n", u.Namespace,
 		"--ignore-not-found",
 	)
@@ -74,7 +74,7 @@ func (d *DryKubeRunner) Up(_ context.Context, u KubeUnit) error {
 // Down prints the kubectl delete command that would be executed.
 func (d *DryKubeRunner) Down(_ context.Context, u KubeUnit) error {
 	fmt.Fprintf(d.Stdout,
-		"kubectl delete deployment,service,ingress -l app=%s -n %s --ignore-not-found\n",
+		"kubectl delete deployment,service,ingress %s -n %s --ignore-not-found\n",
 		u.Name, u.Namespace)
 	return nil
 }

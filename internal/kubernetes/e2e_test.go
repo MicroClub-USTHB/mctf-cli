@@ -30,7 +30,7 @@ func setupEvent(t *testing.T, cfgYAML string, challs map[string]string) (*config
 	t.Helper()
 	root := t.TempDir()
 
-	writeFile(t, filepath.Join(root, "mtcf.config.yml"), cfgYAML)
+	writeFile(t, filepath.Join(root, "mctf.config.yml"), cfgYAML)
 
 	for relPath, content := range challs {
 		writeFile(t, filepath.Join(root, "challenges", relPath, "challenge", "challenge.yml"), content)
@@ -173,8 +173,8 @@ func TestE2E_FullPipeline_HTTPChallenge(t *testing.T) {
 	if u.IngressClass != "nginx" {
 		t.Errorf("ingressClass = %q, want nginx", u.IngressClass)
 	}
-	if u.Name != "mtcf-e2e-test-web-web-app" {
-		t.Errorf("name = %q, want mtcf-e2e-test-web-web-app", u.Name)
+	if u.Name != "mctf-e2e-test-web-web-app" {
+		t.Errorf("name = %q, want mctf-e2e-test-web-web-app", u.Name)
 	}
 	if u.Image != "ghcr.io/testing/e2e-test-web-web-app:latest" {
 		t.Errorf("image = %q", u.Image)
@@ -212,7 +212,7 @@ func TestE2E_FullPipeline_HTTPChallenge(t *testing.T) {
 		"memory: 128M",
 		"httpGet:",
 		"path: /",
-		"secretName: mtcf-e2e-test-web-web-app-tls",
+		"secretName: mctf-e2e-test-web-web-app-tls",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("manifest missing %q\nfull YAML:\n%s", want, s)
@@ -262,10 +262,10 @@ func TestE2E_FullPipeline_TCPChallenge(t *testing.T) {
 
 func TestE2E_FullPipeline_FiltersStaticAndInstanced(t *testing.T) {
 	cfg, challs := setupEvent(t, k8sConfigYAML, map[string]string{
-		"web/web-app":   httpChallengeYAML,
-		"pwn/pwn-me":    tcpChallengeYAML,
-		"crypto/easy":   staticChallengeYAML,
-		"web/inst-web":  instancedChallengeYAML,
+		"web/web-app":  httpChallengeYAML,
+		"pwn/pwn-me":   tcpChallengeYAML,
+		"crypto/easy":  staticChallengeYAML,
+		"web/inst-web": instancedChallengeYAML,
 	})
 
 	plan, err := Plan(cfg, challs, Options{})
@@ -401,7 +401,7 @@ deploy:
 `
 	cfg, err := config.Load(func() string {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "mtcf.config.yml"), cfgYAML)
+		writeFile(t, filepath.Join(root, "mctf.config.yml"), cfgYAML)
 		writeFile(t, filepath.Join(root, "challenges", "web", "web-app", "challenge", "challenge.yml"), httpChallengeYAML)
 		return root
 	}())
@@ -450,7 +450,7 @@ deploy:
 
 func TestE2E_ImageFromCompose(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "mtcf.config.yml"), k8sConfigYAML)
+	writeFile(t, filepath.Join(root, "mctf.config.yml"), k8sConfigYAML)
 	writeFile(t, filepath.Join(root, "challenges", "web", "web-app", "challenge", "challenge.yml"), httpChallengeYAML)
 	writeFile(t, filepath.Join(root, "challenges", "web", "web-app", "challenge", "docker-compose.yml"),
 		`services:
@@ -650,8 +650,8 @@ func TestE2E_DryRunner_DownOutput(t *testing.T) {
 	if !strings.Contains(out, "kubectl delete") {
 		t.Errorf("dry-run down missing kubectl delete\n%s", out)
 	}
-	if !strings.Contains(out, "app=mtcf-e2e-test-web-web-app") {
-		t.Errorf("dry-run down missing label selector\n%s", out)
+	if !strings.Contains(out, "mctf-e2e-test-web-web-app") {
+		t.Errorf("dry-run down missing resource name\n%s", out)
 	}
 	if !strings.Contains(out, "-n ctf-ns") {
 		t.Errorf("dry-run down missing namespace\n%s", out)
@@ -828,7 +828,7 @@ deploy:
   mode: docker
 `
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "mtcf.config.yml"), cfgYAML)
+	writeFile(t, filepath.Join(root, "mctf.config.yml"), cfgYAML)
 
 	cfg, err := config.Load(root)
 	if err != nil {

@@ -26,10 +26,11 @@ type KubeUnit struct {
 	Challenge    string // <category>/<slug>
 	Category     string
 	Slug         string
-	Name         string // mtcf-<event>-<cat>-<slug> — K8s resource name prefix
+	Name         string // mctf-<event>-<cat>-<slug> — K8s resource name prefix
 	Namespace    string
 	Image        string
 	InternalPort int
+	NodePort     int // fixed NodePort if TCP and port > 0
 	Subdomain    string
 	Domain       string
 	IngressClass string
@@ -90,15 +91,21 @@ func Plan(cfg *config.Config, challs []*challenge.Challenge, opts Options) ([]Ku
 			return nil, fmt.Errorf("%s/%s: %w", c.CategoryDir, c.Slug, err)
 		}
 
-		name := fmt.Sprintf("mtcf-%s-%s-%s", cfg.Event.Slug, c.CategoryDir, c.Slug)
+		var nodePort int
+		if d.TCP && d.Port != nil && *d.Port > 0 {
+			nodePort = *d.Port
+		}
+
+		name := fmt.Sprintf("mctf-%s-%s-%s", cfg.Event.Slug, c.CategoryDir, c.Slug)
 		out = append(out, KubeUnit{
-			Challenge:    c.CategoryDir + "/" + c.Slug,
+			Challenge:    filepath.Join(c.CategoryDir, c.Slug),
 			Category:     c.CategoryDir,
 			Slug:         c.Slug,
 			Name:         name,
 			Namespace:    ns,
 			Image:        image,
 			InternalPort: *d.InternalPort,
+			NodePort:     nodePort,
 			Subdomain:    d.Subdomain,
 			Domain:       cfg.Event.Domain,
 			IngressClass: ingressClass,
@@ -121,7 +128,7 @@ type composeDoc struct {
 
 // resolveImage returns the container image for the challenge. It first
 // inspects the docker-compose.yml image: field; if absent it falls back
-// to <registry>/<event>-<cat>-<slug>:latest (matching mtcf build naming).
+// to <registry>/<event>-<cat>-<slug>:latest (matching mctf build naming).
 func resolveImage(c *challenge.Challenge, cfg *config.Config, registry string) (string, error) {
 	composePath := filepath.Join(c.ChallengeDir, "docker-compose.yml")
 	if data, err := os.ReadFile(composePath); err == nil {

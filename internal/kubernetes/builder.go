@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"fmt"
+	"strings"
 
 	"sigs.k8s.io/yaml"
 
@@ -51,15 +52,18 @@ func buildDeployment(u KubeUnit) Deployment {
 	}
 
 	if r := u.Resources; r != nil {
-		rl := ResourceList{}
+		req := ResourceList{}
+		lim := ResourceList{}
 		if r.CPU != "" {
-			rl["cpu"] = r.CPU
+			req["cpu"] = r.CPU
+			lim["cpu"] = doubleCPU(r.CPU)
 		}
 		if r.Memory != "" {
-			rl["memory"] = r.Memory
+			req["memory"] = r.Memory
+			lim["memory"] = r.Memory
 		}
-		if len(rl) > 0 {
-			container.Resources = ResourceRequirements{Limits: rl, Requests: rl}
+		if len(req) > 0 || len(lim) > 0 {
+			container.Resources = ResourceRequirements{Limits: lim, Requests: req}
 		}
 	}
 
@@ -83,11 +87,38 @@ func buildDeployment(u KubeUnit) Deployment {
 	}
 }
 
+func doubleCPU(cpu string) string {
+	if strings.HasSuffix(cpu, "m") {
+		var n int
+		if _, err := fmt.Sscanf(cpu, "%dm", &n); err == nil && n > 0 {
+			return fmt.Sprintf("%dm", n*2)
+		}
+	}
+	var f float64
+	if _, err := fmt.Sscanf(cpu, "%f", &f); err == nil && f > 0 {
+		val := f * 2
+		if val == float64(int(val)) {
+			return fmt.Sprintf("%d", int(val))
+		}
+		return fmt.Sprintf("%.2f", val)
+	}
+	return cpu
+}
+
 func buildService(u KubeUnit) Service {
 	labels := map[string]string{"app": u.Name}
 	svcType := "ClusterIP"
 	if u.TCP {
 		svcType = "NodePort"
+	}
+	sp := ServicePort{
+		Name:       "main",
+		Protocol:   "TCP",
+		Port:       u.InternalPort,
+		TargetPort: u.InternalPort,
+	}
+	if u.TCP && u.NodePort > 0 {
+		sp.NodePort = u.NodePort
 	}
 	return Service{
 		TypeMeta: TypeMeta{APIVersion: "v1", Kind: "Service"},
@@ -95,12 +126,7 @@ func buildService(u KubeUnit) Service {
 		Spec: ServiceSpec{
 			Type:     svcType,
 			Selector: labels,
-			Ports: []ServicePort{{
-				Name:       "main",
-				Protocol:   "TCP",
-				Port:       u.InternalPort,
-				TargetPort: u.InternalPort,
-			}},
+			Ports:    []ServicePort{sp},
 		},
 	}
 }
@@ -152,10 +178,12 @@ func buildProbe(h *challenge.Healthcheck, port int) *Probe {
 	if h == nil {
 		return nil
 	}
+	interval := parseSeconds(h.Interval, 10)
 	p := &Probe{
-		PeriodSeconds:    parseSeconds(h.Interval, 10),
-		TimeoutSeconds:   parseSeconds(h.Timeout, 5),
-		FailureThreshold: h.Retries,
+		InitialDelaySeconds: interval,
+		PeriodSeconds:       interval,
+		TimeoutSeconds:      parseSeconds(h.Timeout, 5),
+		FailureThreshold:    h.Retries,
 	}
 	switch h.Type {
 	case "http":
