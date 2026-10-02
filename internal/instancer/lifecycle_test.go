@@ -158,13 +158,13 @@ func TestPlanSpawn_MintsDynamicFlag(t *testing.T) {
 	c := instancedChall("x", "web", 8000)
 	c.Manifest.Challenge.Flags[0].Dynamic = true
 	c.Manifest.Challenge.Flags[0].Flag = "" // should not be used
-	
+
 	spec1, _ := PlanSpawn(cfgWithInstancer(), c, "team1", nil, SpawnOptions{})
 	spec2, _ := PlanSpawn(cfgWithInstancer(), c, "team1", nil, SpawnOptions{})
-	
+
 	f1 := spec1.Env["FLAG"]
 	f2 := spec2.Env["FLAG"]
-	
+
 	if !strings.HasPrefix(f1, "mctf{team1_") || !strings.HasSuffix(f1, "}") {
 		t.Errorf("FLAG = %q, does not match expected dynamic format", f1)
 	}
