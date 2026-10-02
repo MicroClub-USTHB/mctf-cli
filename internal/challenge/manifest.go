@@ -49,7 +49,8 @@ type ChallengeBlock struct {
 
 // Flag is one accepted flag for a challenge.
 type Flag struct {
-	Flag          string `json:"flag"`
+	Flag          string `json:"flag,omitempty"`
+	Dynamic       bool   `json:"dynamic,omitempty"`
 	CaseSensitive bool   `json:"case_sensitive"`
 }
 

@@ -31,12 +31,27 @@ type SpawnOptions struct {
 	// instancer allocates from this slice (default 30000-32999).
 	HostPortStart int
 	HostPortEnd   int
-	// FlagOverride pins a specific flag value. When empty, the static
-	// flag from the manifest is used. (Dynamic flag minting ships
-	// later; the field is here so callers can already pass one.)
+	// FlagOverride pins a specific flag value. When empty, the instancer
+	// resolves the flag from the manifest: static challenges use the
+	// declared flag string; dynamic challenges mint a per-team random
+	// value via crypto/rand at spawn time.
 	FlagOverride string
 	// Now lets tests stub time.
 	Now func() time.Time
+}
+
+// mintFlag generates a cryptographically random per-team flag.
+// SHA1 is used because CTFd records and exposes sha1sum; this is a
+// content-identity check, not a security boundary.
+//
+// Format: <prefix>{<teamID>_<32 hex chars>}
+// e.g.   mctf{team1_3f8a2b1c...}
+func mintFlag(prefix, teamID string) (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("mintFlag: entropy source failure: %w", err)
+	}
+	return fmt.Sprintf("%s{%s_%s}", prefix, teamID, hex.EncodeToString(b)), nil
 }
 
 // PlanSpawn computes a SpawnSpec for the given (team, challenge) pair.
@@ -76,7 +91,20 @@ func PlanSpawn(cfg *config.Config, c *challenge.Challenge, teamID string, alloca
 
 	flag := opts.FlagOverride
 	if flag == "" && len(c.Manifest.Challenge.Flags) > 0 {
-		flag = c.Manifest.Challenge.Flags[0].Flag
+		f := c.Manifest.Challenge.Flags[0]
+		if f.Dynamic {
+			prefix := "mctf"
+			if cfg != nil && cfg.Event.FlagPrefix != "" {
+				prefix = cfg.Event.FlagPrefix
+			}
+			var err error
+			flag, err = mintFlag(prefix, teamID)
+			if err != nil {
+				return nil, fmt.Errorf("PlanSpawn: %w", err)
+			}
+		} else {
+			flag = f.Flag
+		}
 	}
 
 	timeout := defaultTimeout(cfg, c)

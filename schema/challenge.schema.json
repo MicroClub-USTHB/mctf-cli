@@ -73,17 +73,30 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["flag", "case_sensitive"],
             "properties": {
+              "dynamic": {
+                "type": "boolean",
+                "default": false,
+                "description": "If true, the instancer mints a per-team flag at spawn time."
+              },
               "flag": {
                 "type": "string",
                 "pattern": "^[a-zA-Z][a-zA-Z0-9]*\\{[^}]+\\}$",
-                "description": "Format <prefix>{...}; prefix configurable in mctf.config.yml::event.flag_prefix (default mctf)."
+                "description": "Required when dynamic=false. Format <prefix>{...}; prefix configurable in mctf.config.yml::event.flag_prefix (default mctf)."
               },
               "case_sensitive": {
                 "type": "boolean",
                 "default": true
               }
+            },
+            "if": {
+              "properties": { "dynamic": { "const": true } }
+            },
+            "then": {
+              "required": ["case_sensitive"]
+            },
+            "else": {
+              "required": ["flag", "case_sensitive"]
             }
           }
         },
