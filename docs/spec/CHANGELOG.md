@@ -22,6 +22,12 @@ All features below are merged into `develop` and pass CI. Not yet released to `m
 
 - **`feat(generate)`: `--json` output** — `mctf generate` and `mctf generate --check` support `--json` to emit a machine-parseable drift/apply report. Used by CI tooling.
 
+- **`fix(kubernetes)`: deterministic NodePort mapping** — TCP challenges now expose `nodePort = node_port_base + (deploy.port − category range min)` (new `deploy.kubernetes.node_port_base`, default `30000`) instead of reusing `deploy.port`, which fell outside the stock `30000–32767` NodePort range. New rules `K001`/`K002`/`K003` (NodePort mapping, DNS-1123 name ≤ 63 chars, NodePort collisions).
+- **`fix(deploy)`: kubernetes mode shares the deploy lock** — `mctf deploy --mode kubernetes` takes `.mctf/deploy.lock` (now created atomically with `O_EXCL`), rejects `--rollback`, validates `--mode` (`docker|ssh|kubernetes`, no silent ignore of docker/ssh overrides) and no longer mutates the loaded config.
+- **`feat(kubernetes)`: pod security hardening** — Deployments now enforce `automountServiceAccountToken: false`, `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]` (with opt-in capabilities via `deploy.security_opts.allow_caps`), and `seccompProfile: RuntimeDefault`.
+- **`feat(kubernetes)`: TCP probes & startupProbe** — Added support for `type: tcp` socket probes, separate probe objects, and automatic `startupProbe` generation to eliminate CrashLoopBackOffs during slow startup.
+- **`feat(kubernetes)`: auto-namespace & rollout status wait** — `KubeRunner` now automatically creates missing namespaces idempotently and waits for deployment rollouts (`kubectl rollout status`) before reporting deployment success.
+
 ### Fixes & Refactors
 
 - `fix(generate)`: `PrometheusConfig` no longer mutates the caller's challenge slice (defensive copy before sort).

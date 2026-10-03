@@ -48,8 +48,21 @@ var deployCmd = &cobra.Command{
 			return err
 		}
 
+		mode, err := deployMode(cfg, flagDeployMode)
+		if err != nil {
+			return err
+		}
+
 		// Kubernetes mode: delegate entirely to the K8s planner.
-		if deployMode(cfg, flagDeployMode) == "kubernetes" {
+		if mode == "kubernetes" {
+			if flagDeployRollback {
+				return fmt.Errorf("--rollback is not supported in kubernetes mode yet (use `kubectl rollout undo`)")
+			}
+			release, err := acquireDeployLock(flagDir)
+			if err != nil {
+				return err
+			}
+			defer release()
 			challs, _, err := challenge.Discover(flagDir, cfg.ChallengesDir)
 			if err != nil {
 				return err
@@ -61,24 +74,11 @@ var deployCmd = &cobra.Command{
 		hasRegistry := cfg.Registry != nil && cfg.Registry.URL != ""
 
 		// Local deploy lock to prevent concurrent runs
-		lockFile := filepath.Join(flagDir, ".mctf", "deploy.lock")
-		// Ensure lock directory exists
-		if err := os.MkdirAll(filepath.Dir(lockFile), 0755); err != nil {
-			return fmt.Errorf("failed to create lock directory: %w", err)
+		release, err := acquireDeployLock(flagDir)
+		if err != nil {
+			return err
 		}
-		// Check for existing lock
-		if _, err := os.Stat(lockFile); err == nil {
-			return fmt.Errorf("deploy already in progress (remove %s if stale)", lockFile)
-		}
-		// Create lock file
-		if err := os.WriteFile(lockFile, []byte("locked"), 0644); err != nil {
-			return fmt.Errorf("failed to create lock file: %w", err)
-		}
-		defer func() {
-			if err := os.Remove(lockFile); err != nil && !os.IsNotExist(err) {
-				fmt.Fprintf(os.Stderr, "warning: failed to remove lock file %s: %v\n", lockFile, err)
-			}
-		}()
+		defer release()
 
 		// Determine target SHA and dir
 		targetDir := flagDir
@@ -301,7 +301,11 @@ var downCmd = &cobra.Command{
 			return err
 		}
 
-		if deployMode(cfg, flagDownMode) == "kubernetes" {
+		mode, err := deployMode(cfg, flagDownMode)
+		if err != nil {
+			return err
+		}
+		if mode == "kubernetes" {
 			return applyKube(cmd.Context(), cfg, challs, "down", flagDownDryRun,
 				flagDownCat, flagDownSlug)
 		}
@@ -345,15 +349,52 @@ var downCmd = &cobra.Command{
 	},
 }
 
-// deployMode resolves the effective deploy mode: flag overrides config.
-func deployMode(cfg *config.Config, flag string) string {
-	if flag != "" {
-		return flag
+// validDeployModes is the closed set accepted by deploy.mode and --mode.
+var validDeployModes = map[string]bool{"docker": true, "ssh": true, "kubernetes": true}
+
+// deployMode resolves the effective deploy mode. The --mode flag may only
+// switch to kubernetes or restate the configured mode: the docker/ssh
+// runners are driven by deploy.mode in mctf.config.yml, so any other
+// override would be silently ignored and is rejected instead.
+func deployMode(cfg *config.Config, flag string) (string, error) {
+	configured := "docker"
+	if cfg != nil && cfg.Deploy != nil && cfg.Deploy.Mode != "" {
+		configured = cfg.Deploy.Mode
 	}
-	if cfg != nil && cfg.Deploy != nil {
-		return cfg.Deploy.Mode
+	if flag == "" {
+		return configured, nil
 	}
-	return "docker"
+	if !validDeployModes[flag] {
+		return "", fmt.Errorf("invalid --mode %q (want docker, ssh or kubernetes)", flag)
+	}
+	if flag != "kubernetes" && flag != configured {
+		return "", fmt.Errorf("--mode %s conflicts with deploy.mode %q in mctf.config.yml; edit the config instead", flag, configured)
+	}
+	return flag, nil
+}
+
+// acquireDeployLock creates .mctf/deploy.lock under dir and returns a
+// release func. It fails if another deploy holds the lock.
+func acquireDeployLock(dir string) (func(), error) {
+	lockFile := filepath.Join(dir, ".mctf", "deploy.lock")
+	if err := os.MkdirAll(filepath.Dir(lockFile), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create lock directory: %w", err)
+	}
+	// O_EXCL makes check-and-create atomic.
+	f, err := os.OpenFile(lockFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		if os.IsExist(err) {
+			return nil, fmt.Errorf("deploy already in progress (remove %s if stale)", lockFile)
+		}
+		return nil, fmt.Errorf("failed to create lock file: %w", err)
+	}
+	_, _ = f.WriteString("locked")
+	_ = f.Close()
+	return func() {
+		if err := os.Remove(lockFile); err != nil && !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "warning: failed to remove lock file %s: %v\n", lockFile, err)
+		}
+	}, nil
 }
 
 // discoverAll loads the config and discovers all challenges from flagDir.
@@ -373,10 +414,15 @@ func discoverAll() (*config.Config, []*challenge.Challenge, error) {
 func applyKube(ctx context.Context, cfg *config.Config, challs []*challenge.Challenge,
 	verb string, dry bool, cat, slug string) error {
 
-	if cfg.Deploy == nil {
-		cfg.Deploy = &config.Deploy{}
+	// Work on a copy: the caller's config must not be mutated.
+	kcfg := *cfg
+	kdeploy := config.Deploy{}
+	if cfg.Deploy != nil {
+		kdeploy = *cfg.Deploy
 	}
-	cfg.Deploy.Mode = "kubernetes"
+	kdeploy.Mode = "kubernetes"
+	kcfg.Deploy = &kdeploy
+	cfg = &kcfg
 
 	plan, err := kubernetes.Plan(cfg, challs, kubernetes.Options{
 		CategoryFilter: cat,

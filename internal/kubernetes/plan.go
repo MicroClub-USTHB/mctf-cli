@@ -12,6 +12,7 @@ import (
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/validate"
 )
 
 // Options narrows the planning to specific categories or slugs.
@@ -30,7 +31,7 @@ type KubeUnit struct {
 	Namespace    string
 	Image        string
 	InternalPort int
-	NodePort     int // fixed NodePort if TCP and port > 0
+	NodePort     int // NodePort derived from deploy.port (TCP only), see validate.NodePortFor
 	Subdomain    string
 	Domain       string
 	IngressClass string
@@ -38,6 +39,7 @@ type KubeUnit struct {
 	TCP          bool
 	Resources    *challenge.Resources
 	Healthcheck  *challenge.Healthcheck
+	SecurityOpts *challenge.SecurityOpts
 }
 
 // Plan builds KubeUnits for every deployable, service-archetype challenge
@@ -65,6 +67,7 @@ func Plan(cfg *config.Config, challs []*challenge.Challenge, opts Options) ([]Ku
 	}
 
 	var out []KubeUnit
+	seenNodePort := map[int]string{}
 	for _, c := range challs {
 		if !c.Manifest.Challenge.NeedDeploy {
 			continue
@@ -91,12 +94,26 @@ func Plan(cfg *config.Config, challs []*challenge.Challenge, opts Options) ([]Ku
 			return nil, fmt.Errorf("%s/%s: %w", c.CategoryDir, c.Slug, err)
 		}
 
-		var nodePort int
-		if d.TCP && d.Port != nil && *d.Port > 0 {
-			nodePort = *d.Port
+		name := validate.K8sResourceName(cfg.Event.Slug, c.CategoryDir, c.Slug)
+		if err := validate.CheckK8sName(name); err != nil {
+			return nil, fmt.Errorf("%s/%s: %w", c.CategoryDir, c.Slug, err)
 		}
 
-		name := fmt.Sprintf("mctf-%s-%s-%s", cfg.Event.Slug, c.CategoryDir, c.Slug)
+		var nodePort int
+		if d.TCP {
+			if d.Port == nil || *d.Port <= 0 {
+				return nil, fmt.Errorf("%s/%s: tcp challenge requires deploy.port", c.CategoryDir, c.Slug)
+			}
+			nodePort, err = validate.NodePortFor(cfg, c.CategoryDir, *d.Port)
+			if err != nil {
+				return nil, fmt.Errorf("%s/%s: %w", c.CategoryDir, c.Slug, err)
+			}
+			key := filepath.Join(c.CategoryDir, c.Slug)
+			if other, dup := seenNodePort[nodePort]; dup {
+				return nil, fmt.Errorf("%s: NodePort %d already assigned to %s (pick a different deploy.port offset within the category)", key, nodePort, other)
+			}
+			seenNodePort[nodePort] = key
+		}
 		out = append(out, KubeUnit{
 			Challenge:    filepath.Join(c.CategoryDir, c.Slug),
 			Category:     c.CategoryDir,
@@ -113,6 +130,7 @@ func Plan(cfg *config.Config, challs []*challenge.Challenge, opts Options) ([]Ku
 			TCP:          d.TCP,
 			Resources:    d.Resources,
 			Healthcheck:  d.Healthcheck,
+			SecurityOpts: d.SecurityOpts,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Challenge < out[j].Challenge })
@@ -164,5 +182,9 @@ func parseSeconds(s string, def int) int {
 	if err != nil {
 		return def
 	}
-	return int(d.Seconds())
+	sec := int(d.Seconds())
+	if sec <= 0 {
+		return 1
+	}
+	return sec
 }

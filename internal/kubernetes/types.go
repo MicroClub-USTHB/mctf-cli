@@ -46,35 +46,71 @@ type HTTPGetAction struct {
 	Port int    `json:"port"`
 }
 
-// Probe defines a liveness or readiness probe:
+// TCPSocketAction performs a TCP socket check for services that don't serve HTTP.
+type TCPSocketAction struct {
+	Port int `json:"port"`
+}
+
+// Probe defines a liveness, readiness, or startup probe:
 //   - Exec: file system checks or running a script inside the container
 //   - HTTPGet: web challenges to check if the website is up
+//   - TCPSocket: TCP challenges to check if the socket is accepting connections
 //   - InitialDelaySeconds: how long to wait before first probe
 //   - PeriodSeconds: how often to check
 //   - TimeoutSeconds: how long to wait for a response
 //   - FailureThreshold: how many times to check before giving up
 type Probe struct {
-	Exec                *ExecAction    `json:"exec,omitempty"`
-	HTTPGet             *HTTPGetAction `json:"httpGet,omitempty"`
-	InitialDelaySeconds int            `json:"initialDelaySeconds,omitempty"`
-	PeriodSeconds       int            `json:"periodSeconds,omitempty"`
-	TimeoutSeconds      int            `json:"timeoutSeconds,omitempty"`
-	FailureThreshold    int            `json:"failureThreshold,omitempty"`
+	Exec                *ExecAction      `json:"exec,omitempty"`
+	HTTPGet             *HTTPGetAction   `json:"httpGet,omitempty"`
+	TCPSocket           *TCPSocketAction `json:"tcpSocket,omitempty"`
+	InitialDelaySeconds int              `json:"initialDelaySeconds,omitempty"`
+	PeriodSeconds       int              `json:"periodSeconds,omitempty"`
+	TimeoutSeconds      int              `json:"timeoutSeconds,omitempty"`
+	FailureThreshold    int              `json:"failureThreshold,omitempty"`
+}
+
+// Capabilities lists Linux capabilities to add or drop
+type Capabilities struct {
+	Add  []string `json:"add,omitempty"`
+	Drop []string `json:"drop,omitempty"`
+}
+
+// SeccompProfile defines the seccomp profile applied to a container
+type SeccompProfile struct {
+	Type string `json:"type"`
+}
+
+// SecurityContext holds container-level security options
+type SecurityContext struct {
+	AllowPrivilegeEscalation *bool           `json:"allowPrivilegeEscalation,omitempty"`
+	Privileged               *bool           `json:"privileged,omitempty"`
+	Capabilities             *Capabilities   `json:"capabilities,omitempty"`
+	SeccompProfile           *SeccompProfile `json:"seccompProfile,omitempty"`
+}
+
+// PodSecurityContext holds pod-level security options
+type PodSecurityContext struct {
+	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty"`
 }
 
 // Container describes one container in a Pod
 type Container struct {
-	Name           string               `json:"name"`
-	Image          string               `json:"image"`
-	Ports          []ContainerPort      `json:"ports,omitempty"`
-	Resources      ResourceRequirements `json:"resources,omitempty"`
-	LivenessProbe  *Probe               `json:"livenessProbe,omitempty"`
-	ReadinessProbe *Probe               `json:"readinessProbe,omitempty"`
+	Name            string               `json:"name"`
+	Image           string               `json:"image"`
+	ImagePullPolicy string               `json:"imagePullPolicy,omitempty"`
+	Ports           []ContainerPort      `json:"ports,omitempty"`
+	Resources       ResourceRequirements `json:"resources,omitempty"`
+	StartupProbe    *Probe               `json:"startupProbe,omitempty"`
+	LivenessProbe   *Probe               `json:"livenessProbe,omitempty"`
+	ReadinessProbe  *Probe               `json:"readinessProbe,omitempty"`
+	SecurityContext *SecurityContext     `json:"securityContext,omitempty"`
 }
 
 // PodSpec describes the pod's desired behavior
 type PodSpec struct {
-	Containers []Container `json:"containers"`
+	AutomountServiceAccountToken *bool               `json:"automountServiceAccountToken,omitempty"`
+	Containers                   []Container         `json:"containers"`
+	SecurityContext              *PodSecurityContext `json:"securityContext,omitempty"`
 }
 
 // PodTemplateSpec is the pod template used in a Deployment

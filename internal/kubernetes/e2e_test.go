@@ -106,7 +106,7 @@ challenge:
   need_deploy: true
 deploy:
   subdomain: "pwn-me"
-  port: 15000
+  port: 11500
   internal_port: 5000
   dynamic_instances: false
   tcp: true

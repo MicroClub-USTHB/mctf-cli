@@ -7,27 +7,84 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 )
 
 // KubeRunner applies and deletes K8s manifests by shelling out to kubectl.
 type KubeRunner struct {
-	Kubeconfig string
-	Stdout     io.Writer
-	Stderr     io.Writer
+	Kubeconfig        string
+	Stdout            io.Writer
+	Stderr            io.Writer
+	ensuredNamespaces map[string]bool
+	mu                sync.Mutex
 }
 
 // NewKubeRunner returns a runner that streams kubectl output to os.Stdout/Stderr.
 func NewKubeRunner(kubeconfig string) *KubeRunner {
-	return &KubeRunner{Kubeconfig: kubeconfig, Stdout: os.Stdout, Stderr: os.Stderr}
+	return &KubeRunner{
+		Kubeconfig:        kubeconfig,
+		Stdout:            os.Stdout,
+		Stderr:            os.Stderr,
+		ensuredNamespaces: make(map[string]bool),
+	}
 }
 
 // Up generates manifests and applies them via `kubectl apply -f -`.
 func (r *KubeRunner) Up(ctx context.Context, u KubeUnit) error {
+	if _, err := exec.LookPath("kubectl"); err != nil {
+		return fmt.Errorf("kubectl not found in PATH — please install kubectl to use kubernetes deploy mode")
+	}
+
+	if err := r.ensureNamespace(ctx, u.Namespace); err != nil {
+		return fmt.Errorf("ensure namespace %s: %w", u.Namespace, err)
+	}
+
 	manifests, err := ManifestsYAML(u)
 	if err != nil {
 		return err
 	}
-	return r.kubectl(ctx, manifests, "apply", "-f", "-")
+	if err := r.kubectl(ctx, manifests, "apply", "-f", "-"); err != nil {
+		return err
+	}
+
+	return r.kubectl(ctx, nil, "rollout", "status", "deployment/"+u.Name, "-n", u.Namespace, "--timeout=120s")
+}
+
+func (r *KubeRunner) ensureNamespace(ctx context.Context, ns string) error {
+	if ns == "" || ns == "default" {
+		return nil
+	}
+	r.mu.Lock()
+	if r.ensuredNamespaces == nil {
+		r.ensuredNamespaces = make(map[string]bool)
+	}
+	if r.ensuredNamespaces[ns] {
+		r.mu.Unlock()
+		return nil
+	}
+	r.mu.Unlock()
+
+	// Check if namespace already exists
+	checkCmd := exec.CommandContext(ctx, "kubectl", "get", "namespace", ns)
+	if r.Kubeconfig != "" {
+		checkCmd.Args = append([]string{"--kubeconfig", r.Kubeconfig}, checkCmd.Args...)
+	}
+	if err := checkCmd.Run(); err == nil {
+		r.mu.Lock()
+		r.ensuredNamespaces[ns] = true
+		r.mu.Unlock()
+		return nil
+	}
+
+	// Create namespace
+	if err := r.kubectl(ctx, nil, "create", "namespace", ns); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	r.ensuredNamespaces[ns] = true
+	r.mu.Unlock()
+	return nil
 }
 
 // Down deletes all resources for the unit by exact name.

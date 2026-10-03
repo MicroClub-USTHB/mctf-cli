@@ -72,6 +72,20 @@ Every rule MCTF enforces, with rationale and severity. Hard-fails block the buil
 | `D008` | Any file under `assets/` exceeds 100 MB | warn / warn / **hard** |
 | `D009` | Total `assets/` directory size exceeds 500 MB | warn / warn / **hard** |
 
+### Kubernetes (only when `deploy.mode: kubernetes`)
+
+A TCP challenge's public `deploy.port` is mapped to a NodePort deterministically:
+`nodePort = deploy.kubernetes.node_port_base + (deploy.port − category range min)`.
+`node_port_base` defaults to `30000` (stock NodePort range `30000–32767`); `0` uses
+`deploy.port` verbatim and requires a cluster started with a widened
+`--service-node-port-range`.
+
+| ID | Rule | Severity |
+|---|---|---|
+| `K001` | TCP challenge has no `deploy.port`, or its port cannot be mapped to a NodePort (outside the category range, or derived NodePort outside `30000–32767`) | always hard |
+| `K002` | Derived resource name `mctf-<event>-<category>-<slug>` is not a valid DNS-1123 label (lowercase `a-z0-9-`) or exceeds 63 characters | always hard |
+| `K003` | Two TCP challenges map to the same NodePort (e.g. `pwn` 11001 and `jailbreak` 16001) | always hard |
+
 ### Solution
 
 | ID | Rule | Severity by profile |

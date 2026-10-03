@@ -300,3 +300,98 @@ type recordApplier struct {
 
 func (r *recordApplier) Up(_ context.Context, u KubeUnit) error   { return r.up(u) }
 func (r *recordApplier) Down(_ context.Context, u KubeUnit) error { return r.down(u) }
+
+func TestManifestsYAML_TCPProbe(t *testing.T) {
+	u := KubeUnit{
+		Challenge: "pwn/net", Name: "mctf-evt-pwn-net",
+		Namespace: "ctf", Image: "img:latest",
+		InternalPort: 1337, Subdomain: "net", Domain: "ctf.example.com",
+		TCP: true, NodePort: 30042,
+		Healthcheck: &challenge.Healthcheck{
+			Type:     "tcp",
+			Interval: "10s",
+			Timeout:  "2s",
+			Retries:  3,
+		},
+	}
+	raw, err := ManifestsYAML(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	if !strings.Contains(s, "tcpSocket:") {
+		t.Errorf("manifest missing tcpSocket block:\n%s", s)
+	}
+	if !strings.Contains(s, "port: 1337") {
+		t.Errorf("manifest missing tcpSocket port 1337:\n%s", s)
+	}
+	if !strings.Contains(s, "startupProbe:") {
+		t.Errorf("manifest missing startupProbe:\n%s", s)
+	}
+}
+
+func TestManifestsYAML_SecurityContext_HardenedDefaults(t *testing.T) {
+	u := KubeUnit{
+		Challenge: "web/app", Name: "mctf-evt-web-app", Slug: "app",
+		Namespace: "ctf", Image: "img:latest",
+		InternalPort: 8080, Subdomain: "app", Domain: "ctf.example.com",
+	}
+	raw, err := ManifestsYAML(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	if !strings.Contains(s, "automountServiceAccountToken: false") {
+		t.Errorf("manifest missing automountServiceAccountToken: false:\n%s", s)
+	}
+	if !strings.Contains(s, "allowPrivilegeEscalation: false") {
+		t.Errorf("manifest missing allowPrivilegeEscalation: false:\n%s", s)
+	}
+	if !strings.Contains(s, "type: RuntimeDefault") {
+		t.Errorf("manifest missing seccompProfile RuntimeDefault:\n%s", s)
+	}
+	if !strings.Contains(s, "app.kubernetes.io/managed-by: mctf") {
+		t.Errorf("manifest missing app.kubernetes.io/managed-by:\n%s", s)
+	}
+}
+
+func TestManifestsYAML_SecurityContext_AllowCaps(t *testing.T) {
+	u := KubeUnit{
+		Challenge: "pwn/netadmin", Name: "mctf-evt-pwn-netadmin",
+		Namespace: "ctf", Image: "img:latest",
+		InternalPort: 5000, Subdomain: "netadmin", Domain: "ctf.example.com",
+		SecurityOpts: &challenge.SecurityOpts{
+			AllowCaps: []string{"NET_ADMIN"},
+		},
+	}
+	raw, err := ManifestsYAML(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	if !strings.Contains(s, "- NET_ADMIN") {
+		t.Errorf("manifest missing NET_ADMIN capability:\n%s", s)
+	}
+}
+
+func TestManifestsYAML_SecurityContext_AllowPrivileged(t *testing.T) {
+	u := KubeUnit{
+		Challenge: "jailbreak/root", Name: "mctf-evt-jailbreak-root",
+		Namespace: "ctf", Image: "img:latest",
+		InternalPort: 8080, Subdomain: "root", Domain: "ctf.example.com",
+		SecurityOpts: &challenge.SecurityOpts{
+			AllowPrivileged: true,
+		},
+	}
+	raw, err := ManifestsYAML(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	if !strings.Contains(s, "privileged: true") {
+		t.Errorf("manifest missing privileged: true:\n%s", s)
+	}
+	if !strings.Contains(s, "allowPrivilegeEscalation: true") {
+		t.Errorf("manifest missing allowPrivilegeEscalation: true when privileged:\n%s", s)
+	}
+}

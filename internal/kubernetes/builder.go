@@ -43,12 +43,39 @@ func ManifestsYAML(u KubeUnit) ([]byte, error) {
 }
 
 func buildDeployment(u KubeUnit) Deployment {
-	labels := map[string]string{"app": u.Name}
+	selectorLabels := map[string]string{"app": u.Name}
+	labels := map[string]string{
+		"app":                          u.Name,
+		"app.kubernetes.io/name":       u.Slug,
+		"app.kubernetes.io/part-of":    "mctf",
+		"app.kubernetes.io/managed-by": "mctf",
+	}
 
 	container := Container{
-		Name:  u.Name,
-		Image: u.Image,
-		Ports: []ContainerPort{{ContainerPort: u.InternalPort, Protocol: "TCP"}},
+		Name:            u.Name,
+		Image:           u.Image,
+		ImagePullPolicy: "IfNotPresent",
+		Ports:           []ContainerPort{{ContainerPort: u.InternalPort, Protocol: "TCP"}},
+	}
+
+	// Hardened container security context:
+	// Prevent privilege escalation and enforce RuntimeDefault seccomp.
+	allowEscalation := false
+	var priv *bool
+	if u.SecurityOpts != nil && u.SecurityOpts.AllowPrivileged {
+		allowEscalation = true
+		p := true
+		priv = &p
+	}
+	var caps *Capabilities
+	if u.SecurityOpts != nil && len(u.SecurityOpts.AllowCaps) > 0 {
+		caps = &Capabilities{Add: u.SecurityOpts.AllowCaps}
+	}
+	container.SecurityContext = &SecurityContext{
+		AllowPrivilegeEscalation: &allowEscalation,
+		Privileged:               priv,
+		Capabilities:             caps,
+		SeccompProfile:           &SeccompProfile{Type: "RuntimeDefault"},
 	}
 
 	if r := u.Resources; r != nil {
@@ -68,20 +95,24 @@ func buildDeployment(u KubeUnit) Deployment {
 	}
 
 	if u.Healthcheck != nil {
-		p := buildProbe(u.Healthcheck, u.InternalPort)
-		container.LivenessProbe = p
-		container.ReadinessProbe = p
+		container.StartupProbe = buildStartupProbe(u.Healthcheck, u.InternalPort)
+		container.LivenessProbe = buildProbe(u.Healthcheck, u.InternalPort)
+		container.ReadinessProbe = buildProbe(u.Healthcheck, u.InternalPort)
 	}
 
+	noToken := false
 	return Deployment{
 		TypeMeta: TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
 		Metadata: ObjectMeta{Name: u.Name, Namespace: u.Namespace, Labels: labels},
 		Spec: DeploymentSpec{
 			Replicas: 1,
-			Selector: LabelSelector{MatchLabels: labels},
+			Selector: LabelSelector{MatchLabels: selectorLabels},
 			Template: PodTemplateSpec{
 				Metadata: ObjectMeta{Labels: labels},
-				Spec:     PodSpec{Containers: []Container{container}},
+				Spec: PodSpec{
+					AutomountServiceAccountToken: &noToken,
+					Containers:                   []Container{container},
+				},
 			},
 		},
 	}
@@ -179,17 +210,56 @@ func buildProbe(h *challenge.Healthcheck, port int) *Probe {
 		return nil
 	}
 	interval := parseSeconds(h.Interval, 10)
+	retries := h.Retries
+	if retries <= 0 {
+		retries = 3
+	}
 	p := &Probe{
 		InitialDelaySeconds: interval,
 		PeriodSeconds:       interval,
 		TimeoutSeconds:      parseSeconds(h.Timeout, 5),
-		FailureThreshold:    h.Retries,
+		FailureThreshold:    retries,
 	}
 	switch h.Type {
 	case "http":
-		p.HTTPGet = &HTTPGetAction{Path: h.Path, Port: port}
+		path := h.Path
+		if path == "" {
+			path = "/"
+		}
+		p.HTTPGet = &HTTPGetAction{Path: path, Port: port}
 	case "cmd":
 		p.Exec = &ExecAction{Command: h.Cmd}
+	case "tcp":
+		p.TCPSocket = &TCPSocketAction{Port: port}
+	default:
+		p.TCPSocket = &TCPSocketAction{Port: port}
+	}
+	return p
+}
+
+func buildStartupProbe(h *challenge.Healthcheck, port int) *Probe {
+	if h == nil {
+		return nil
+	}
+	p := &Probe{
+		InitialDelaySeconds: 1,
+		PeriodSeconds:       5,
+		TimeoutSeconds:      parseSeconds(h.Timeout, 5),
+		FailureThreshold:    30, // 30 * 5s = 150s startup window
+	}
+	switch h.Type {
+	case "http":
+		path := h.Path
+		if path == "" {
+			path = "/"
+		}
+		p.HTTPGet = &HTTPGetAction{Path: path, Port: port}
+	case "cmd":
+		p.Exec = &ExecAction{Command: h.Cmd}
+	case "tcp":
+		p.TCPSocket = &TCPSocketAction{Port: port}
+	default:
+		p.TCPSocket = &TCPSocketAction{Port: port}
 	}
 	return p
 }

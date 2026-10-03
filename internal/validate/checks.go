@@ -32,6 +32,7 @@ func Run(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, lo
 		checkOne(r, cfg, cats, c, eventRoot)
 	}
 	checkUniqueness(r, challs)
+	checkKubernetes(r, cfg, eventRoot, challs)
 	return r
 }
 
