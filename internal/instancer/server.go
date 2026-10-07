@@ -17,12 +17,14 @@ import (
 // Server is the HTTP daemon. It owns the store, runner, and challenge
 // catalog; routes are bearer-token authenticated.
 type Server struct {
-	cfg     *config.Config
-	store   *Store
-	runner  Runner
-	tokens  map[string]struct{}
-	chalIdx map[string]*challenge.Challenge // "<cat>/<slug>" -> challenge
-	mu      sync.Mutex                      // serializes Spawn for the same (team, slug)
+	cfg           *config.Config
+	store         *Store
+	runner        Runner
+	tokens        map[string]struct{}
+	chalIdx       map[string]*challenge.Challenge // "<cat>/<slug>" -> challenge
+	spawns        keyLock
+	portMu        sync.Mutex
+	reservedPorts map[int]bool
 }
 
 // Options configures the Server.
@@ -47,7 +49,15 @@ func NewServer(cfg *config.Config, store *Store, runner Runner, challs []*challe
 			tok[t] = struct{}{}
 		}
 	}
-	return &Server{cfg: cfg, store: store, runner: runner, tokens: tok, chalIdx: idx}
+	return &Server{
+		cfg:           cfg,
+		store:         store,
+		runner:        runner,
+		tokens:        tok,
+		chalIdx:       idx,
+		spawns:        keyLock{m: make(map[string]*refLock)},
+		reservedPorts: make(map[int]bool),
+	}
 }
 
 // Handler returns the http.Handler with all routes registered.
@@ -129,22 +139,23 @@ func (s *Server) spawn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Serialize spawn to keep idempotency-by-(team,slug) honest under
-	// concurrent requests.
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// Serialize spawn per (team,slug) to keep idempotency honest under
+	// concurrent requests without blocking other teams/challenges.
+	key := req.TeamID + "/" + req.ChallengeSlug
+	unlock := s.spawns.Lock(key)
+	defer unlock()
 
 	if existing, ok := s.store.ByTeamAndChallenge(req.TeamID, req.ChallengeSlug); ok {
 		writeJSON(w, http.StatusOK, existing)
 		return
 	}
 
-	spec, err := PlanSpawn(s.cfg, c, req.TeamID, s.store.AllocatedHostPorts(),
-		SpawnOptions{FlagOverride: req.FlagOverride})
+	spec, err := s.planSpawnLockedPorts(c, req.TeamID, req.FlagOverride)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	defer s.releasePorts(spec.Ports)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
@@ -245,4 +256,63 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]any{"error": msg})
+}
+
+func (s *Server) planSpawnLockedPorts(c *challenge.Challenge, teamID, flagOverride string) (*SpawnSpec, error) {
+	s.portMu.Lock()
+	defer s.portMu.Unlock()
+
+	ports := s.store.AllocatedHostPorts()
+	for p := range s.reservedPorts {
+		ports[p] = true
+	}
+	spec, err := PlanSpawn(s.cfg, c, teamID, ports, SpawnOptions{FlagOverride: flagOverride})
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range spec.Ports {
+		s.reservedPorts[p] = true
+	}
+	return spec, nil
+}
+
+func (s *Server) releasePorts(ports map[int]int) {
+	s.portMu.Lock()
+	defer s.portMu.Unlock()
+	for _, p := range ports {
+		delete(s.reservedPorts, p)
+	}
+}
+
+type keyLock struct {
+	mu sync.Mutex
+	m  map[string]*refLock
+}
+
+type refLock struct {
+	mu   sync.Mutex
+	refs int
+}
+
+func (l *keyLock) Lock(key string) func() {
+	l.mu.Lock()
+	entry, ok := l.m[key]
+	if !ok {
+		entry = &refLock{}
+		l.m[key] = entry
+	}
+	entry.refs++
+	l.mu.Unlock()
+
+	entry.mu.Lock()
+
+	return func() {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		entry.refs--
+		if entry.refs == 0 {
+			delete(l.m, key)
+		}
+		entry.mu.Unlock()
+	}
 }

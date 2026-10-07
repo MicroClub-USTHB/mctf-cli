@@ -10,7 +10,9 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
@@ -226,6 +228,103 @@ func TestServer_ListInstances(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&got)
 	if len(got) != 3 {
 		t.Errorf("want 3 instances, got %d", len(got))
+	}
+}
+
+func TestServer_ConcurrentSpawns(t *testing.T) {
+	srv, httpSrv, runner := newTestServer(t)
+
+	// Barrier to ensure both spawns run Up concurrently
+	inUp := make(chan struct{}, 2)
+	releaseUp := make(chan struct{})
+
+	runner.UpHook = func(_ context.Context, _ SpawnSpec) {
+		inUp <- struct{}{}
+		<-releaseUp
+	}
+
+	c2 := instancedChall("chall2", "pwn", 9000)
+	srv.chalIdx["pwn/chall2"] = c2
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var resp1, resp2 *http.Response
+	go func() {
+		defer wg.Done()
+		resp1 = authedPOST(t, httpSrv.URL, "/spawn", "secret", `{"team_id": "t1", "challenge_slug": "web/cub3"}`)
+	}()
+	go func() {
+		defer wg.Done()
+		resp2 = authedPOST(t, httpSrv.URL, "/spawn", "secret", `{"team_id": "t2", "challenge_slug": "pwn/chall2"}`)
+	}()
+
+	// Wait for BOTH spawns to enter Up simultaneously.
+	// If Up was serialized behind a global mutex, the second spawn could never enter Up while the first is blocked here.
+	select {
+	case <-inUp:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for first spawn to enter Up")
+	}
+
+	select {
+	case <-inUp:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for second spawn to enter Up (serialized execution detected)")
+	}
+
+	// Release both
+	close(releaseUp)
+	wg.Wait()
+
+	if resp1.StatusCode != 201 {
+		t.Errorf("spawn 1 status = %d", resp1.StatusCode)
+	}
+	if resp2.StatusCode != 201 {
+		t.Errorf("spawn 2 status = %d", resp2.StatusCode)
+	}
+
+	var inst1, inst2 Instance
+	_ = json.NewDecoder(resp1.Body).Decode(&inst1)
+	_ = json.NewDecoder(resp2.Body).Decode(&inst2)
+
+	if inst1.Ports[8000] == inst2.Ports[9000] {
+		t.Errorf("allocated duplicate host port: %d vs %d", inst1.Ports[8000], inst2.Ports[9000])
+	}
+}
+
+func TestServer_ConcurrentDuplicateSpawn(t *testing.T) {
+	_, httpSrv, runner := newTestServer(t)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	statuses := make([]int, 2)
+
+	for i := 0; i < 2; i++ {
+		idx := i
+		go func() {
+			defer wg.Done()
+			resp := authedPOST(t, httpSrv.URL, "/spawn", "secret", `{"team_id": "t1", "challenge_slug": "web/cub3"}`)
+			statuses[idx] = resp.StatusCode
+		}()
+	}
+	wg.Wait()
+
+	created := 0
+	ok := 0
+	for _, st := range statuses {
+		switch st {
+		case 201:
+			created++
+		case 200:
+			ok++
+		}
+	}
+	if created != 1 || ok != 1 {
+		t.Errorf("expected one 201 and one 200, got statuses: %v", statuses)
+	}
+	if len(runner.UpCalls) != 1 {
+		t.Errorf("expected Up to be called exactly once, got %d", len(runner.UpCalls))
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // Runner brings up, tears down, and inspects compose projects for one
@@ -87,11 +88,13 @@ func (d *DockerRunner) containerIDs(ctx context.Context, s SpawnSpec) ([]string,
 // hands back canned container IDs. ErrOn lets tests inject failures
 // for specific instance IDs.
 type FakeRunner struct {
+	mu        sync.Mutex
 	UpCalls   []string
 	DownCalls []string
 	ErrOnUp   map[string]error
 	ErrOnDown map[string]error
 	IDsForUp  []string // returned by Up unless overridden by ErrOnUp
+	UpHook    func(ctx context.Context, s SpawnSpec)
 }
 
 // NewFakeRunner returns a runner that succeeds for every call,
@@ -100,7 +103,12 @@ func NewFakeRunner() *FakeRunner {
 	return &FakeRunner{IDsForUp: []string{"fake-container-1"}}
 }
 
-func (f *FakeRunner) Up(_ context.Context, s SpawnSpec) ([]string, error) {
+func (f *FakeRunner) Up(ctx context.Context, s SpawnSpec) ([]string, error) {
+	if f.UpHook != nil {
+		f.UpHook(ctx, s)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if err, ok := f.ErrOnUp[s.ID]; ok {
 		return nil, err
 	}
@@ -109,6 +117,8 @@ func (f *FakeRunner) Up(_ context.Context, s SpawnSpec) ([]string, error) {
 }
 
 func (f *FakeRunner) Down(_ context.Context, s SpawnSpec, _ bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if err, ok := f.ErrOnDown[s.ID]; ok {
 		return err
 	}
