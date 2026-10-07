@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -40,21 +41,37 @@ func TranslateCompose(u Unit, registryURL string) error {
 					continue
 				}
 
+				// Check if this service defines a 'build' section
+				hasBuild := false
+				for k := 0; k < len(serviceMap.Content); k += 2 {
+					if serviceMap.Content[k].Value == "build" {
+						hasBuild = true
+						break
+					}
+				}
+				if !hasBuild {
+					// Leave third-party services (e.g. databases) untouched
+					continue
+				}
+
 				var newServiceContent []*yaml.Node
 				for k := 0; k < len(serviceMap.Content); k += 2 {
 					sKey := serviceMap.Content[k]
 					sVal := serviceMap.Content[k+1]
-					if sKey.Value == "build" {
-						// Skip build block
+					if sKey.Value == "build" || sKey.Value == "image" {
+						// Strip build and any existing image to avoid duplicate keys
 						continue
 					}
 					newServiceContent = append(newServiceContent, sKey, sVal)
 				}
 
-				// Inject image: <registryURL>/<project_name>:${IMAGE_TAG}
+				// Inject image: <registryURL>/<event>-<cat>-<slug>:${IMAGE_TAG}
+				// ProjectName is mctf-<event>-<cat>-<slug>; strip the mctf- prefix
+				// to match the canonical image pushed by build.Plan.
+				imageName := strings.TrimPrefix(u.ProjectName, "mctf-")
 				imageNode := &yaml.Node{
 					Kind:  yaml.ScalarNode,
-					Value: fmt.Sprintf("%s/%s:${IMAGE_TAG}", registryURL, u.ProjectName),
+					Value: fmt.Sprintf("%s/%s:${IMAGE_TAG}", registryURL, imageName),
 				}
 				imageKey := &yaml.Node{
 					Kind:  yaml.ScalarNode,
