@@ -65,6 +65,16 @@ func splitPortString(s string) (host string, container int) {
 	return
 }
 
+// parseHostPort extracts the port number from a host port specification,
+// stripping any bind address (e.g. "127.0.0.1:14000" -> 14000, "14000" -> 14000).
+func parseHostPort(host string) (int, error) {
+	host = strings.TrimSpace(host)
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		host = strings.TrimSpace(host[i+1:])
+	}
+	return strconv.Atoi(host)
+}
+
 // dangerousCaps are Linux capabilities whose presence in `cap_add`
 // effectively undoes most container isolation. They warrant an
 // explicit author acknowledgement (we warn so authors can justify
@@ -147,8 +157,8 @@ func checkComposePorts(r *Report, c *challenge.Challenge, compose *composeShape,
 				}
 				// D001 — host side must match deploy.port literally.
 				if d.Port != nil {
-					hostInt, _ := strconv.Atoi(port.Host)
-					if hostInt != *d.Port {
+					hostInt, err := parseHostPort(port.Host)
+					if err != nil || hostInt != *d.Port {
 						r.Errorf("D001", manifestPath,
 							"compose maps host %q -> %d but deploy.port is %d",
 							port.Host, port.Container, *d.Port)

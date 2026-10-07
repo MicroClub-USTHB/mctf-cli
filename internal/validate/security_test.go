@@ -288,6 +288,25 @@ func TestD001_ServiceMatchingPortsClean(t *testing.T) {
 	}
 }
 
+func TestD001_ServiceHostBindIPClean(t *testing.T) {
+	root := t.TempDir()
+	port := 14000
+	internal := 8000
+	c := makeChallenge(t, root, "misc", "x", "FROM scratch\nUSER ctf\n",
+		`services:
+  app:
+    ports:
+      - "127.0.0.1:14000:8000"
+`)
+	c.Manifest.Deploy = &challenge.DeployBlock{Port: &port, InternalPort: &internal}
+	c.Archetype = challenge.ArchetypeService
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if hasRule(r, "D001", SeverityError) || hasRule(r, "D002", SeverityError) {
+		t.Errorf("matching ports with bind IP should not fire D001/D002: %s", r.String())
+	}
+}
+
 func TestD003_InstancedRequiresEnvVarPattern(t *testing.T) {
 	root := t.TempDir()
 	internal := 8000
