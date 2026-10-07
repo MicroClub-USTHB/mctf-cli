@@ -357,6 +357,9 @@ func checkUniqueness(r *Report, challs []*challenge.Challenge) {
 			}
 		}
 		for _, f := range m.Challenge.Flags {
+			if f.Dynamic || f.Flag == "" {
+				continue
+			}
 			fkey := f.Flag
 			if !f.CaseSensitive {
 				fkey = strings.ToLower(fkey)
