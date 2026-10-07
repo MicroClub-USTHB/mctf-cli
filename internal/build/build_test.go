@@ -238,3 +238,15 @@ func TestApply_PushesWhenAsked(t *testing.T) {
 		t.Errorf("builds=%v pushes=%v", r.builds, r.pushes)
 	}
 }
+
+func TestApply_BuildsAllBeforePush(t *testing.T) {
+	r := &recordingRunner{failOn: "web/b"}
+	plan := []ImageSpec{
+		{Challenge: "web/a", Tags: []string{"x"}},
+		{Challenge: "web/b", Tags: []string{"y"}},
+	}
+	_ = Apply(context.Background(), r, plan, Options{Push: true})
+	if len(r.pushes) != 0 {
+		t.Errorf("expected 0 pushes when a subsequent build fails, got %v", r.pushes)
+	}
+}

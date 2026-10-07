@@ -126,10 +126,18 @@ func Apply(ctx context.Context, r Runner, plan []ImageSpec, opts Options) error 
 		if err := r.Build(ctx, spec, opts); err != nil {
 			return fmt.Errorf("%s: build failed: %w", spec.Challenge, err)
 		}
-		if opts.Push {
-			if err := r.Push(ctx, spec, opts); err != nil {
-				return fmt.Errorf("%s: push failed: %w", spec.Challenge, err)
-			}
+	}
+	if opts.Push {
+		return ApplyPush(ctx, r, plan, opts)
+	}
+	return nil
+}
+
+// ApplyPush pushes the built images for every spec in plan.
+func ApplyPush(ctx context.Context, r Runner, plan []ImageSpec, opts Options) error {
+	for _, spec := range plan {
+		if err := r.Push(ctx, spec, opts); err != nil {
+			return fmt.Errorf("%s: push failed: %w", spec.Challenge, err)
 		}
 	}
 	return nil
