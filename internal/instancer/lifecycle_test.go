@@ -242,3 +242,17 @@ func TestEnvSlice_Sorted(t *testing.T) {
 		t.Errorf("EnvSlice = %v, want %v", got, want)
 	}
 }
+
+func TestPlanSpawn_ChallengeSlugFormat(t *testing.T) {
+	c := instancedChall("chall", "web", 8000)
+	spec, err := PlanSpawn(cfgWithInstancer(), c, "team1", nil, SpawnOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.ChallengeSlug != "web/chall" {
+		t.Errorf("expected ChallengeSlug 'web/chall', got %q", spec.ChallengeSlug)
+	}
+	if strings.Contains(spec.ChallengeSlug, "\\") {
+		t.Errorf("ChallengeSlug contains backslash: %q", spec.ChallengeSlug)
+	}
+}

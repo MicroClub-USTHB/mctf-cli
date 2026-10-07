@@ -111,7 +111,7 @@ func PlanSpawn(cfg *config.Config, c *challenge.Challenge, teamID string, alloca
 	timeout := defaultTimeout(cfg, c)
 	spec := &SpawnSpec{
 		ID:            id,
-		ChallengeSlug: filepath.Join(c.CategoryDir, c.Slug),
+		ChallengeSlug: c.CategoryDir + "/" + c.Slug,
 		TeamID:        teamID,
 		Cwd:           c.ChallengeDir,
 		ComposeFile:   filepath.Join(c.ChallengeDir, "docker-compose.yml"),
