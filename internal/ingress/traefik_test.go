@@ -209,3 +209,78 @@ func TestComposeServiceName_HonorsContainerName(t *testing.T) {
 		t.Errorf("want pinned name, got %q", got)
 	}
 }
+
+func TestPlanEntries_SelectsServiceExposingPort(t *testing.T) {
+	root := t.TempDir()
+	composeMulti := `services:
+  db:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+`
+	c := mkChallenge(t, root, "web", "multi", challenge.ArchetypeService, 8000, "multi", false, false, composeMulti)
+	got, err := PlanEntries(sampleCfg(), []*challenge.Challenge{c})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("want 1 entry, got %d", len(got))
+	}
+	want := "http://mctf-evt-web-multi-web-1:8000"
+	if got[0].Backend != want {
+		t.Errorf("backend = %q, want %q", got[0].Backend, want)
+	}
+}
+
+func TestPlanEntries_HonorsExplicitContainerName(t *testing.T) {
+	root := t.TempDir()
+	composePinned := `services:
+  web:
+    build: .
+    container_name: custom-web-app
+    ports:
+      - "8000:8000"
+`
+	c := mkChallenge(t, root, "web", "pinned", challenge.ArchetypeService, 8000, "pinned", false, false, composePinned)
+	got, err := PlanEntries(sampleCfg(), []*challenge.Challenge{c})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("want 1 entry, got %d", len(got))
+	}
+	want := "http://custom-web-app:8000"
+	if got[0].Backend != want {
+		t.Errorf("backend = %q, want %q", got[0].Backend, want)
+	}
+}
+
+func TestPlanEntries_MultiServiceWithContainerName(t *testing.T) {
+	root := t.TempDir()
+	composeMultiPinned := `services:
+  db:
+    image: postgres:15
+    container_name: custom-db
+  web:
+    build: .
+    container_name: custom-web
+    ports:
+      - "8000:8000"
+`
+	c := mkChallenge(t, root, "web", "multipin", challenge.ArchetypeService, 8000, "multipin", false, false, composeMultiPinned)
+	got, err := PlanEntries(sampleCfg(), []*challenge.Challenge{c})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("want 1 entry, got %d", len(got))
+	}
+	want := "http://custom-web:8000"
+	if got[0].Backend != want {
+		t.Errorf("backend = %q, want %q", got[0].Backend, want)
+	}
+}

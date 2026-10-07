@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"sigs.k8s.io/yaml"
@@ -29,6 +30,9 @@ type composeShape struct {
 
 type composeService struct {
 	ContainerName string `json:"container_name"`
+	Build         any    `json:"build"`
+	Ports         []any  `json:"ports"`
+	Image         string `json:"image"`
 }
 
 // Entry describes one resolved ingress entry. Pure data — used by both
@@ -64,11 +68,6 @@ func PlanEntries(cfg *config.Config, challs []*challenge.Challenge) ([]Entry, er
 		}
 
 		project := projectName(cfg, c)
-		serviceName, err := composeServiceName(filepath.Join(c.ChallengeDir, "docker-compose.yml"))
-		if err != nil {
-			return nil, fmt.Errorf("%s/%s: %w", c.CategoryDir, c.Slug, err)
-		}
-		container := fmt.Sprintf("%s-%s-1", project, serviceName)
 		// Traefik connects to the container's listening port (inside
 		// the docker network), which is internal_port. The host port
 		// is irrelevant for in-network routing.
@@ -76,6 +75,11 @@ func PlanEntries(cfg *config.Config, challs []*challenge.Challenge) ([]Entry, er
 			return nil, fmt.Errorf("%s/%s: deploy.internal_port is required for ingress (the container's listening port)", c.CategoryDir, c.Slug)
 		}
 		port := *d.InternalPort
+
+		container, err := targetContainer(project, filepath.Join(c.ChallengeDir, "docker-compose.yml"), port)
+		if err != nil {
+			return nil, fmt.Errorf("%s/%s: %w", c.CategoryDir, c.Slug, err)
+		}
 
 		entry := Entry{
 			Challenge: c.CategoryDir + "/" + c.Slug,
@@ -189,33 +193,120 @@ func projectName(cfg *config.Config, c *challenge.Challenge) string {
 	return fmt.Sprintf("mctf-%s-%s-%s", cfg.Event.Slug, c.CategoryDir, c.Slug)
 }
 
-// composeServiceName returns the first service name from the compose
-// file (alphabetical). For multi-service compose files, document the
-// "first service is the entrypoint" convention.
+// targetContainer resolves the target container name for Traefik routing.
+// If the selected service sets an explicit container_name, that name is used directly
+// without project prefix or -1 suffix. Otherwise, the standard Compose container
+// name "<project>-<service>-1" is used.
+func targetContainer(project, path string, internalPort int) (string, error) {
+	svcName, containerName, err := selectService(path, internalPort)
+	if err != nil {
+		return "", err
+	}
+	if containerName != "" {
+		return containerName, nil
+	}
+	return fmt.Sprintf("%s-%s-1", project, svcName), nil
+}
+
+// composeServiceName returns the selected service name from the compose
+// file (or explicit container_name if set).
 func composeServiceName(path string) (string, error) {
+	svcName, containerName, err := selectService(path, 0)
+	if err != nil {
+		return "", err
+	}
+	if containerName != "" {
+		return containerName, nil
+	}
+	return svcName, nil
+}
+
+// selectService picks the primary service from a compose file. When multiple
+// services exist, it prefers services that declare ports matching internalPort,
+// then services declaring ports, then services with a build block, and finally
+// falls back to alphabetical order.
+func selectService(path string, internalPort int) (string, string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("read %s: %w", path, err)
+		return "", "", fmt.Errorf("read %s: %w", path, err)
 	}
 	jsonBytes, err := yaml.YAMLToJSON(data)
 	if err != nil {
-		return "", fmt.Errorf("parse %s: %w", path, err)
+		return "", "", fmt.Errorf("parse %s: %w", path, err)
 	}
 	var c composeShape
 	if err := yaml.Unmarshal(jsonBytes, &c); err != nil {
-		return "", fmt.Errorf("decode %s: %w", path, err)
+		return "", "", fmt.Errorf("decode %s: %w", path, err)
 	}
 	if len(c.Services) == 0 {
-		return "", fmt.Errorf("%s declares no services", path)
+		return "", "", fmt.Errorf("%s declares no services", path)
 	}
-	names := make([]string, 0, len(c.Services))
-	for n := range c.Services {
-		names = append(names, n)
+
+	type candidate struct {
+		name  string
+		score int
+		svc   composeService
 	}
-	sort.Strings(names)
-	// Honor an explicit container_name if set.
-	if cn := c.Services[names[0]].ContainerName; cn != "" {
-		return strings.TrimPrefix(cn, "/"), nil
+
+	candidates := make([]candidate, 0, len(c.Services))
+	for name, svc := range c.Services {
+		score := 0
+		if internalPort > 0 && serviceMatchesPort(svc, internalPort) {
+			score += 1000
+		}
+		if len(svc.Ports) > 0 {
+			score += 100
+		}
+		if svc.Build != nil {
+			score += 10
+		}
+		candidates = append(candidates, candidate{name: name, score: score, svc: svc})
 	}
-	return names[0], nil
+
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score
+		}
+		return candidates[i].name < candidates[j].name
+	})
+
+	winner := candidates[0]
+	cn := ""
+	if winner.svc.ContainerName != "" {
+		cn = strings.TrimPrefix(winner.svc.ContainerName, "/")
+	}
+	return winner.name, cn, nil
+}
+
+func serviceMatchesPort(svc composeService, targetPort int) bool {
+	for _, p := range svc.Ports {
+		switch v := p.(type) {
+		case int:
+			if v == targetPort {
+				return true
+			}
+		case float64:
+			if int(v) == targetPort {
+				return true
+			}
+		case string:
+			clean := strings.TrimSpace(v)
+			clean = strings.Split(clean, "/")[0]
+			parts := strings.Split(clean, ":")
+			portStr := parts[len(parts)-1]
+			if parsed, err := strconv.Atoi(portStr); err == nil && parsed == targetPort {
+				return true
+			}
+		case map[string]any:
+			if target, ok := v["target"]; ok {
+				if tFloat, ok := target.(float64); ok && int(tFloat) == targetPort {
+					return true
+				}
+				if tInt, ok := target.(int); ok && tInt == targetPort {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
