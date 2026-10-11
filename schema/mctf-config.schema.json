@@ -168,7 +168,13 @@
           "properties": {
             "kubeconfig": { "type": "string" },
             "namespace": { "type": "string", "default": "mctf" },
-            "ingress_class": { "type": "string", "default": "nginx" }
+            "ingress_class": { "type": "string", "default": "nginx" },
+            "node_port_base": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32767,
+              "description": "First NodePort for TCP challenges: nodePort = base + (deploy.port - category range min). Default 30000. 0 uses deploy.port verbatim (cluster needs a widened --service-node-port-range)."
+            }
           }
         }
       }
