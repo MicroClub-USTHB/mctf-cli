@@ -20,6 +20,8 @@ All features below are merged into `develop` and pass CI. Not yet released to `m
 
 - **`feat(platform)`: CTFd asset content-hash re-upload** — `mctf platform sync` now re-uploads CTFd assets when their content hash changes, not just when the filename changes. Prevents stale handout files on CTFd.
 
+- **`feat(deploy)`: immutable image-tag pinning** — `mctf deploy` now writes the resolved image tag **literally** into `docker-compose.mctf.yml` (e.g. `image: registry/evt-web-chall:a1b2c3d`) instead of a `${IMAGE_TAG}` variable. The generated compose is a self-contained, reproducible record of exactly what is deployed — no ambient env var required — which is what makes deterministic deploys and `--rollback` work. The tag is no longer threaded through the environment (`envForUnit` dropped `IMAGE_TAG`). Empty tag falls back to `:latest`. Closes #5.
+
 - **`feat(deploy)`: GitOps state sync + rollback** — `mctf deploy` gained a rollback system. On failure, the previous compose state is restored from git history. Registry push is now gated on `registry.url` presence to avoid crashes in registry-less setups.
 
 - **`feat(generate)`: `--json` output** — `mctf generate` and `mctf generate --check` support `--json` to emit a machine-parseable drift/apply report. Used by CI tooling.
