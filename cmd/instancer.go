@@ -21,7 +21,13 @@ import (
 
 var instancerCmd = &cobra.Command{
 	Use:   "instancer",
-	Short: "Run the per-team challenge instancer daemon",
+	Short: "Run the per-team challenge instancer daemon (local dev; deprecated)",
+	Long: "Runs the built-in, single-host instancer daemon.\n\n" +
+		"DEPRECATED: for production, run the dedicated MCTF Instancer service\n" +
+		"(github.com/MicroClub-USTHB/mctf-instancer) and point the CLI at it with\n" +
+		"instancer.url in mctf.config.yml — `mctf instance list` / `destroy` then\n" +
+		"drive it over its admin API. This built-in daemon remains for offline\n" +
+		"local development and will be removed in a future release.",
 }
 
 var (
