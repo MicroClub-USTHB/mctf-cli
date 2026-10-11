@@ -34,6 +34,10 @@ All features below are merged into `develop` and pass CI. Not yet released to `m
 - **`feat(kubernetes)`: TCP probes & startupProbe** — Added support for `type: tcp` socket probes, separate probe objects, and automatic `startupProbe` generation to eliminate CrashLoopBackOffs during slow startup.
 - **`feat(kubernetes)`: auto-namespace & rollout status wait** — `KubeRunner` now automatically creates missing namespaces idempotently and waits for deployment rollouts (`kubectl rollout status`) before reporting deployment success.
 
+### Distribution
+
+- **`feat`: goreleaser-based releases** — tagging `vX.Y.Z` builds cross-platform binaries (linux/macOS/windows × amd64/arm64), archives + checksums, Linux packages (`.deb`/`.rpm`), and a Homebrew cask pushed to `MicroClub-USTHB/homebrew-tap`. Version/commit/date are injected into `cmd.*` via ldflags. See `docs/RELEASING.md`. The cask push is skipped automatically until `HOMEBREW_TAP_TOKEN` is configured, so releases work before the tap exists.
+
 ### Fixes & Refactors
 
 - `fix(generate)`: `PrometheusConfig` no longer mutates the caller's challenge slice (defensive copy before sort).
