@@ -119,9 +119,16 @@ var (
 
 var instanceDestroyCmd = &cobra.Command{
 	Use:   "destroy <instance-id>",
-	Short: "Tear down a per-team instance and remove it from the store",
+	Short: "Tear down a per-team instance (remote instancer when instancer.url is set, else local store)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Remote instancer is the source of truth when configured: the server
+		// owns teardown (containers, volumes, routing), so --force/--volumes
+		// are local-only and do not apply.
+		if url, ok := remoteInstancerURL(); ok {
+			return destroyRemoteInstance(cmd.Context(), url, args[0])
+		}
+
 		store, err := openStore()
 		if err != nil {
 			return err
@@ -474,6 +481,22 @@ func remoteInstancerURL() (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// destroyRemoteInstance force-stops one instance via the remote instancer's
+// admin API. The server owns teardown; the local --force/--volumes flags do
+// not apply to this path.
+func destroyRemoteInstance(ctx context.Context, baseURL, id string) error {
+	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	msg, err := client.Destroy(ctx, id)
+	if err != nil {
+		return err
+	}
+	if msg == "" {
+		msg = "destroyed"
+	}
+	fmt.Printf("%s: %s\n", id, msg)
+	return nil
 }
 
 // listRemoteInstances lists instances from the remote instancer's admin API.
