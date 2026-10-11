@@ -6,7 +6,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 - **K8s deploy mode** — `mctf deploy --mode kubernetes`. Generate K8s Deployment / Service / Ingress manifests from per-challenge compose, `kubectl apply -f`. Honor `cfg.Deploy.Kubernetes.{Kubeconfig, Namespace, IngressClass}`.
 - **Plugin system** — subprocess + JSON-RPC over stdio (Terraform-style). Lifecycle hooks: `before_build`, `after_build`, `before_deploy`, `after_deploy`, `on_instance_spawn`, `on_health_failure`. Language-agnostic, crash-isolated.
-- **Prometheus / Grafana wiring** — `mctf monitoring up` brings up prom + grafana + cAdvisor with prebuilt dashboards. Generate scrape config from challenge labels.
+- ~~**Prometheus / Grafana wiring** — `mctf monitoring up` brings up prom + grafana + cAdvisor with prebuilt dashboards. Generate scrape config from challenge labels.~~ **Shipped:** `mctf monitoring up` / `down` render and run the stack under `monitoring/stack/` (see `docs/spec/monitoring.md`).
 - **Terraform wrapper** — `mctf infra plan|apply|destroy` for VPS, clusters, networking, DNS. Templates for DigitalOcean, Hetzner, DOKS, EKS, GKE.
 
 ## Medium features (1–2 days each)
