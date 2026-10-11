@@ -11,9 +11,19 @@ import (
 
 // TranslateCompose reads the docker-compose.yml file from the unit's
 // Cwd, removes 'build' sections, and injects the registry-pinned image
-// using the ${IMAGE_TAG} environment variable. It writes the result
-// to docker-compose.mctf.yml in the same directory.
+// with an immutable literal tag (u.ImageTag). It writes the result to
+// docker-compose.mctf.yml in the same directory.
+//
+// The tag is written literally (e.g. :a1b2c3d), not as a ${IMAGE_TAG}
+// variable, so the generated file is a self-contained, reproducible
+// record of exactly what is deployed — which is what makes deterministic
+// deploys and rollback work. When u.ImageTag is empty the tag falls back
+// to "latest".
 func TranslateCompose(u Unit, registryURL string) error {
+	tag := u.ImageTag
+	if tag == "" {
+		tag = "latest"
+	}
 	raw, err := os.ReadFile(u.ComposeFile)
 	if err != nil {
 		return fmt.Errorf("read compose file: %w", err)
@@ -65,13 +75,13 @@ func TranslateCompose(u Unit, registryURL string) error {
 					newServiceContent = append(newServiceContent, sKey, sVal)
 				}
 
-				// Inject image: <registryURL>/<event>-<cat>-<slug>:${IMAGE_TAG}
+				// Inject image: <registryURL>/<event>-<cat>-<slug>:<tag>
 				// ProjectName is mctf-<event>-<cat>-<slug>; strip the mctf- prefix
 				// to match the canonical image pushed by build.Plan.
 				imageName := strings.TrimPrefix(u.ProjectName, "mctf-")
 				imageNode := &yaml.Node{
 					Kind:  yaml.ScalarNode,
-					Value: fmt.Sprintf("%s/%s:${IMAGE_TAG}", registryURL, imageName),
+					Value: fmt.Sprintf("%s/%s:%s", registryURL, imageName, tag),
 				}
 				imageKey := &yaml.Node{
 					Kind:  yaml.ScalarNode,

@@ -258,3 +258,31 @@ func TestApplyUp_StopsOnError(t *testing.T) {
 		t.Errorf("expected only 'a' to have run, got %v", r.upOrder)
 	}
 }
+
+func TestEnvForUnit(t *testing.T) {
+	root := t.TempDir()
+
+	// Service challenge with port mapping: PORT_<internal> is stamped, and
+	// the pinned image tag is NOT carried through the env (it is written
+	// literally into the compose by TranslateCompose).
+	svc := newChall(t, root, "web", "svc", challenge.ArchetypeService, true, 8080, 80)
+	env := envForUnit(svc)
+	if got := env["PORT_80"]; got != "8080" {
+		t.Errorf("PORT_80 = %q, want 8080", got)
+	}
+	if _, ok := env["IMAGE_TAG"]; ok {
+		t.Error("env must not carry IMAGE_TAG — the tag is pinned literally in the compose")
+	}
+
+	// Service challenge without an explicit port: no env at all.
+	bare := newChall(t, root, "web", "bare", challenge.ArchetypeService, true, 0, 0)
+	if env := envForUnit(bare); env != nil {
+		t.Errorf("expected nil env for portless service, got %v", env)
+	}
+
+	// Static challenge (no deploy block): no env.
+	static := newChall(t, root, "misc", "stat", challenge.ArchetypeStatic, false, 0, 0)
+	if env := envForUnit(static); env != nil {
+		t.Errorf("expected nil env for static challenge, got %v", env)
+	}
+}

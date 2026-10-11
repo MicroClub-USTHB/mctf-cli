@@ -72,7 +72,7 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, o
 			ProjectName: ProjectName(cfg, c),
 			Cwd:         cwd,
 			ComposeFile: filepath.Join(cwd, "docker-compose.yml"),
-			Env:         envForUnit(c, opts.ImageTag),
+			Env:         envForUnit(c),
 			ImageTag:    opts.ImageTag,
 		}
 		out = append(out, u)
@@ -94,25 +94,20 @@ func ProjectName(cfg *config.Config, c *challenge.Challenge) string {
 // challenges with internal_port set, it stamps PORT_<internal> with
 // the manifest's port so the compose's ${PORT_N:-N} convention picks
 // the right host port.
-func envForUnit(c *challenge.Challenge, imageTag string) map[string]string {
-	env := make(map[string]string)
-	if imageTag != "" {
-		env["IMAGE_TAG"] = imageTag
-	}
+//
+// The pinned image tag is written literally into docker-compose.mctf.yml
+// by TranslateCompose, so it is not passed through the environment.
+func envForUnit(c *challenge.Challenge) map[string]string {
 	if c.Manifest.Deploy == nil {
-		if len(env) == 0 {
-			return nil
-		}
-		return env
+		return nil
 	}
 	d := c.Manifest.Deploy
 	if d.InternalPort != nil && d.Port != nil {
-		env[fmt.Sprintf("PORT_%d", *d.InternalPort)] = fmt.Sprintf("%d", *d.Port)
+		return map[string]string{
+			fmt.Sprintf("PORT_%d", *d.InternalPort): fmt.Sprintf("%d", *d.Port),
+		}
 	}
-	if len(env) == 0 {
-		return nil
-	}
-	return env
+	return nil
 }
 
 // UpArgs renders the docker CLI args for `docker compose up -d`.
