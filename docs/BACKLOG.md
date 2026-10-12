@@ -49,7 +49,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 - **SEC005: capability allowlist enforcement** — honor `deploy.security_opts.allow_caps` so SEC004 only fires on caps not in the allowlist.
 - **SEC006: image vulnerability scan** — opt-in `mctf build --scan-vulns` via trivy or similar.
-- **Secret hygiene** — git-history scan for `MCTF_*_TOKEN` patterns; warn under `mctf doctor`.
+- **Secret hygiene** — ~~warn under `mctf doctor` on `MCTF_*_TOKEN` patterns.~~ **Shipped** as `doctor` check `D043` (scans the tracked working tree for `MCTF_*_{TOKEN,KEY,SECRET,WEBHOOK}` values, filtering placeholders/env-refs; never prints the value). *Follow-up:* deep git-**history** scan (left to a dedicated tool like gitleaks).
 
 ---
 

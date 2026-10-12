@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -85,8 +86,99 @@ func Run(dir string, opts Options) []Check {
 	}
 
 	checks = append(checks, checkExpiredInstances(dir))
+	checks = append(checks, checkCommittedSecrets(dir))
 
 	return checks
+}
+
+// secretAssignRE matches an assignment of an MCTF_*_{TOKEN,KEY,SECRET,WEBHOOK}
+// to a value: `MCTF_FOO_TOKEN = value` or `MCTF_FOO_TOKEN: value`.
+var secretAssignRE = regexp.MustCompile(`MCTF_[A-Z0-9_]*(?:TOKEN|KEY|SECRET|WEBHOOK)[[:blank:]]*[:=][[:blank:]]*(.+)`)
+
+// secretPlaceholders mark a value as a non-secret sample, so an example or
+// template config doesn't trip the check.
+var secretPlaceholders = []string{
+	"changeme", "change-me", "your", "example", "placeholder", "redacted",
+	"dummy", "fixme", "todo", "replace", "xxxx", "<", ">", "...", "here",
+}
+
+// checkCommittedSecrets scans tracked files for an MCTF_* token/key/secret
+// committed with a real-looking value. It warns (never fails) and never
+// prints the value — only the location. Scope is the working tree; a deep
+// history scan is a job for a dedicated tool (e.g. gitleaks).
+func checkCommittedSecrets(dir string) Check {
+	id, name := "D043", "committed secrets"
+
+	if _, err := exec.LookPath("git"); err != nil {
+		return Check{ID: id, Name: name, Status: StatusSkip, Detail: "git not in $PATH"}
+	}
+	if err := exec.Command("git", "-C", dir, "rev-parse", "--is-inside-work-tree").Run(); err != nil {
+		return Check{ID: id, Name: name, Status: StatusSkip, Detail: "not a git repository"}
+	}
+
+	cmd := exec.Command("git", "-C", dir, "grep", "-I", "-n", "-E",
+		`MCTF_[A-Z0-9_]*(TOKEN|KEY|SECRET|WEBHOOK)[[:blank:]]*[:=]`,
+		"--",
+		".", ":(exclude)*.example", ":(exclude)*.md", ":(exclude)docs/",
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		// `git grep` exits 1 when there are no matches — the clean case.
+		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {
+			return Check{ID: id, Name: name, Status: StatusOK, Detail: "no committed MCTF_* secret values found"}
+		}
+		return Check{ID: id, Name: name, Status: StatusSkip, Detail: "git grep failed: " + err.Error()}
+	}
+
+	var hits []string
+	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
+		// format: path:lineno:content
+		parts := strings.SplitN(line, ":", 3)
+		if len(parts) < 3 {
+			continue
+		}
+		m := secretAssignRE.FindStringSubmatch(parts[2])
+		if m == nil {
+			continue
+		}
+		if looksLikeRealSecret(m[1]) {
+			hits = append(hits, parts[0]+":"+parts[1])
+		}
+	}
+
+	if len(hits) == 0 {
+		return Check{ID: id, Name: name, Status: StatusOK, Detail: "no committed MCTF_* secret values found"}
+	}
+	sort.Strings(hits)
+	return Check{
+		ID: id, Name: name, Status: StatusWarn,
+		Detail:  fmt.Sprintf("%d location(s) look like a committed secret: %s", len(hits), strings.Join(hits, ", ")),
+		Suggest: "rotate the exposed secret and load it from the environment (MCTF_*) or a secret store — never commit token values",
+	}
+}
+
+// looksLikeRealSecret heuristically decides whether an assigned value is a
+// real secret rather than a placeholder or an env reference.
+func looksLikeRealSecret(raw string) bool {
+	v := strings.TrimSpace(raw)
+	v = strings.Trim(v, `"'`)
+	if i := strings.IndexByte(v, '#'); i >= 0 { // strip trailing comment
+		v = strings.TrimSpace(v[:i])
+		v = strings.Trim(v, `"'`)
+	}
+	if len(v) < 8 {
+		return false
+	}
+	if strings.HasPrefix(v, "$") { // ${VAR} / $VAR reference, not a literal
+		return false
+	}
+	low := strings.ToLower(v)
+	for _, p := range secretPlaceholders {
+		if strings.Contains(low, p) {
+			return false
+		}
+	}
+	return true
 }
 
 // checkExpiredInstances surfaces stale entries in .mctf/instances.json
