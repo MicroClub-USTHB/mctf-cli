@@ -50,14 +50,14 @@ func TestHelperProcess(t *testing.T) {
 				fmt.Fprintln(os.Stdout, "this is not json") // desync the stream
 				continue
 			}
-			hooks := []string{"before_deploy", "after_deploy", "before_build", "after_build"}
+			hooks := []string{"before_deploy", "after_deploy", "before_build", "after_build", "on_instance_spawn"}
 			if mode == "nohooks" {
 				hooks = nil
 			}
 			reply(req.ID, map[string]any{"name": "helper-" + mode, "hooks": hooks})
 		case "shutdown":
 			os.Exit(0)
-		case "before_deploy", "after_deploy", "before_build", "after_build":
+		case "before_deploy", "after_deploy", "before_build", "after_build", "on_instance_spawn":
 			switch mode {
 			case "crash":
 				os.Exit(1)
@@ -169,6 +169,49 @@ func TestManager_BuildHooksDelivered(t *testing.T) {
 	}
 	if !strings.Contains(s, "after_build") || !strings.Contains(s, `"outcome":"success"`) {
 		t.Errorf("after_build payload not delivered:\n%s", s)
+	}
+}
+
+func TestManager_InstanceSpawnHookDelivered(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "spawn_hooks.log")
+	m := helperManager(t, "echo", out)
+	if m == nil {
+		t.Fatal("manager should have one live plugin")
+	}
+	defer m.Close()
+
+	ctx := context.Background()
+	expires := time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC)
+	m.Dispatch(ctx, HookOnInstanceSpawn, InstanceSpawnPayload{
+		Event:         "sample-event",
+		InstanceID:    "cub3-team1-abc",
+		ChallengeSlug: "web/cub3-clone",
+		TeamID:        "team-1",
+		Ports:         map[int]int{8000: 10042},
+		Flag:          "mctf{dynamic_flag_123}",
+		Containers:    []string{"c123456"},
+		ExpiresAt:     expires,
+	})
+
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("read hooks log: %v", err)
+	}
+	s := string(data)
+	if !strings.Contains(s, "on_instance_spawn") {
+		t.Errorf("on_instance_spawn not found in log:\n%s", s)
+	}
+	if !strings.Contains(s, `"instance_id":"cub3-team1-abc"`) {
+		t.Errorf("instance_id not delivered:\n%s", s)
+	}
+	if !strings.Contains(s, `"challenge_slug":"web/cub3-clone"`) {
+		t.Errorf("challenge_slug not delivered:\n%s", s)
+	}
+	if !strings.Contains(s, `"team_id":"team-1"`) {
+		t.Errorf("team_id not delivered:\n%s", s)
+	}
+	if !strings.Contains(s, `"flag":"mctf{dynamic_flag_123}"`) {
+		t.Errorf("flag not delivered:\n%s", s)
 	}
 }
 

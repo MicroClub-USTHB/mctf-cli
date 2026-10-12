@@ -12,7 +12,10 @@
 // aborts the MCTF command.
 package plugin
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // protocolVersion is bumped when the request/response contract changes.
 const protocolVersion = 1
@@ -61,10 +64,11 @@ type initResult struct {
 
 // Hook names.
 const (
-	HookBeforeDeploy = "before_deploy"
-	HookAfterDeploy  = "after_deploy"
-	HookBeforeBuild  = "before_build"
-	HookAfterBuild   = "after_build"
+	HookBeforeDeploy    = "before_deploy"
+	HookAfterDeploy     = "after_deploy"
+	HookBeforeBuild     = "before_build"
+	HookAfterBuild      = "after_build"
+	HookOnInstanceSpawn = "on_instance_spawn"
 )
 
 // DeployPayload is the JSON body for the before_/after_deploy hooks.
@@ -107,4 +111,16 @@ type BuildImage struct {
 	Slug      string            `json:"slug"`
 	Tags      []string          `json:"tags"`
 	Labels    map[string]string `json:"labels,omitempty"`
+}
+
+// InstanceSpawnPayload is the JSON body for the on_instance_spawn hook.
+type InstanceSpawnPayload struct {
+	Event         string      `json:"event"`
+	InstanceID    string      `json:"instance_id"`
+	ChallengeSlug string      `json:"challenge_slug"`
+	TeamID        string      `json:"team_id"`
+	Ports         map[int]int `json:"ports,omitempty"`
+	Flag          string      `json:"flag,omitempty"`
+	Containers    []string    `json:"containers,omitempty"`
+	ExpiresAt     time.Time   `json:"expires_at"`
 }
