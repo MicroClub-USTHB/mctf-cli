@@ -50,14 +50,14 @@ func TestHelperProcess(t *testing.T) {
 				fmt.Fprintln(os.Stdout, "this is not json") // desync the stream
 				continue
 			}
-			hooks := []string{"before_deploy", "after_deploy"}
+			hooks := []string{"before_deploy", "after_deploy", "before_build", "after_build"}
 			if mode == "nohooks" {
 				hooks = nil
 			}
 			reply(req.ID, map[string]any{"name": "helper-" + mode, "hooks": hooks})
 		case "shutdown":
 			os.Exit(0)
-		case "before_deploy", "after_deploy":
+		case "before_deploy", "after_deploy", "before_build", "after_build":
 			switch mode {
 			case "crash":
 				os.Exit(1)
@@ -126,6 +126,49 @@ func TestManager_HandshakeAndDispatch(t *testing.T) {
 	}
 	if !strings.Contains(s, "after_deploy") || !strings.Contains(s, `"outcome":"success"`) {
 		t.Errorf("after_deploy payload not delivered:\n%s", s)
+	}
+}
+
+func TestManager_BuildHooksDelivered(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "build_hooks.log")
+	m := helperManager(t, "echo", out)
+	if m == nil {
+		t.Fatal("manager should have one live plugin")
+	}
+	defer m.Close()
+
+	ctx := context.Background()
+	m.Dispatch(ctx, HookBeforeBuild, BuildPayload{
+		Event: "test-event",
+		Phase: "before",
+		SHA:   "abc1234",
+		Images: []BuildImage{
+			{
+				Challenge: "web/cub3-clone",
+				Category:  "web",
+				Slug:      "cub3-clone",
+				Tags:      []string{"registry.test/web:abc1234", "registry.test/web:latest"},
+				Labels:    map[string]string{"mctf.challenge": "web/cub3-clone"},
+			},
+		},
+	})
+	m.Dispatch(ctx, HookAfterBuild, BuildPayload{
+		Event:   "test-event",
+		Phase:   "after",
+		SHA:     "abc1234",
+		Outcome: "success",
+	})
+
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("read hooks log: %v", err)
+	}
+	s := string(data)
+	if !strings.Contains(s, "before_build") || !strings.Contains(s, `"web/cub3-clone"`) {
+		t.Errorf("before_build payload not delivered:\n%s", s)
+	}
+	if !strings.Contains(s, "after_build") || !strings.Contains(s, `"outcome":"success"`) {
+		t.Errorf("after_build payload not delivered:\n%s", s)
 	}
 }
 

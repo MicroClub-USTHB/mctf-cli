@@ -59,12 +59,12 @@ type initResult struct {
 	Hooks []string `json:"hooks"`
 }
 
-// Hook names. Only the deploy hooks are wired in this slice; the rest of the
-// backlog roster (before_build, after_build, on_instance_spawn,
-// on_health_failure) is added alongside its wiring in follow-ups.
+// Hook names.
 const (
 	HookBeforeDeploy = "before_deploy"
 	HookAfterDeploy  = "after_deploy"
+	HookBeforeBuild  = "before_build"
+	HookAfterBuild   = "after_build"
 )
 
 // DeployPayload is the JSON body for the before_/after_deploy hooks.
@@ -85,4 +85,26 @@ type DeployUnit struct {
 	Slug        string `json:"slug"`
 	ProjectName string `json:"project_name"`
 	ImageTag    string `json:"image_tag,omitempty"`
+}
+
+// BuildPayload is the JSON body for the before_/after_build hooks.
+type BuildPayload struct {
+	Event   string       `json:"event"`
+	Phase   string       `json:"phase"` // "before" | "after"
+	SHA     string       `json:"sha,omitempty"`
+	NoCache bool         `json:"no_cache"`
+	Push    bool         `json:"push"`
+	DryRun  bool         `json:"dry_run"`
+	Images  []BuildImage `json:"images"`
+	Outcome string       `json:"outcome,omitempty"` // after: "success" | "failed"
+	Error   string       `json:"error,omitempty"`
+}
+
+// BuildImage is one image in a build payload.
+type BuildImage struct {
+	Challenge string            `json:"challenge"`
+	Category  string            `json:"category"`
+	Slug      string            `json:"slug"`
+	Tags      []string          `json:"tags"`
+	Labels    map[string]string `json:"labels,omitempty"`
 }
