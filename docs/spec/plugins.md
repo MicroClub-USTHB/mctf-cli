@@ -79,7 +79,7 @@ killed. (This mirrors the `notify` package.)
 | `after_deploy` | deploy payload + `outcome` (`success`/`failed`) + `error` | **shipped** |
 | `before_build` | build payload (event, sha, dry_run, images) | **shipped** |
 | `after_build` | build payload + `outcome` (`success`/`failed`) + `error` | **shipped** |
-| `on_instance_spawn` | instance payload | planned |
+| `on_instance_spawn` | instance spawn payload (event, instance_id, challenge_slug, team_id, ports, flag, containers, expires_at) | **shipped** |
 | `on_health_failure` | — | planned (needs a health-monitoring loop) |
 
 ### Deploy payload
@@ -133,6 +133,29 @@ killed. (This mirrors the `notify` package.)
 
 `before_build` fires before `build.Apply` executes image builds.
 `after_build` fires after building, leak scanning, and optional registry pushing complete (with `outcome: "success"` or `outcome: "failed"` and `error`).
+
+### Instance spawn payload
+
+```json
+{
+  "event": "myctf",
+  "instance_id": "inst-a1b2c3d4e5f6",
+  "challenge_slug": "web-sqli",
+  "team_id": "team-42",
+  "ports": {
+    "80": 32768
+  },
+  "flag": "mctf{demo_flag}",
+  "containers": [
+    "mctf-myctf-web-sqli-inst-a1b2c3d4e5f6"
+  ],
+  "expires_at": "2026-10-12T16:00:00Z"
+}
+```
+
+`on_instance_spawn` fires whenever a new challenge instance is spawned (both via
+the `mctf instance spawn` CLI command and the `mctf instancer serve` HTTP daemon).
+Fields `ports`, `flag`, and `containers` are omitted when empty.
 
 ## Example
 
