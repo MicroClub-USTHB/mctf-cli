@@ -65,6 +65,16 @@ func splitPortString(s string) (host string, container int) {
 	return
 }
 
+// parseHostPort extracts the port number from a host port specification,
+// stripping any bind address (e.g. "127.0.0.1:14000" -> 14000, "14000" -> 14000).
+func parseHostPort(host string) (int, error) {
+	host = strings.TrimSpace(host)
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		host = strings.TrimSpace(host[i+1:])
+	}
+	return strconv.Atoi(host)
+}
+
 // dangerousCaps are Linux capabilities whose presence in `cap_add`
 // effectively undoes most container isolation. They warrant an
 // explicit author acknowledgement (we warn so authors can justify
@@ -115,8 +125,8 @@ func SecurityChecks(r *Report, cfg *config.Config, c *challenge.Challenge, event
 	composePath := filepath.Join(c.ChallengeDir, "docker-compose.yml")
 
 	if compose, ok := loadCompose(composePath); ok {
-		checkPrivileged(r, cfg, compose, manifestPath)
-		checkCapabilities(r, cfg, compose, manifestPath)
+		checkPrivileged(r, cfg, c, compose, manifestPath)
+		checkCapabilities(r, cfg, c, compose, manifestPath)
 		checkComposePorts(r, c, compose, manifestPath)
 	}
 
@@ -147,8 +157,8 @@ func checkComposePorts(r *Report, c *challenge.Challenge, compose *composeShape,
 				}
 				// D001 — host side must match deploy.port literally.
 				if d.Port != nil {
-					hostInt, _ := strconv.Atoi(port.Host)
-					if hostInt != *d.Port {
+					hostInt, err := parseHostPort(port.Host)
+					if err != nil || hostInt != *d.Port {
 						r.Errorf("D001", manifestPath,
 							"compose maps host %q -> %d but deploy.port is %d",
 							port.Host, port.Container, *d.Port)
@@ -181,9 +191,14 @@ func isInstancerPortPattern(host string, container int) bool {
 }
 
 // SEC002 — privileged: true. Always warn; fail under the pro profile.
-func checkPrivileged(r *Report, cfg *config.Config, compose *composeShape, manifestPath string) {
+func checkPrivileged(r *Report, cfg *config.Config, c *challenge.Challenge, compose *composeShape, manifestPath string) {
+	allowPrivileged := false
+	if c.Manifest.Deploy != nil && c.Manifest.Deploy.SecurityOpts != nil {
+		allowPrivileged = c.Manifest.Deploy.SecurityOpts.AllowPrivileged
+	}
+
 	for name, svc := range compose.Services {
-		if !svc.Privileged {
+		if !svc.Privileged || allowPrivileged {
 			continue
 		}
 		profile := config.ProfileSimple
@@ -244,13 +259,32 @@ func userAfterLastFrom(dockerfile []byte) bool {
 
 // SEC004 — `cap_add` contains a capability that defeats container
 // isolation. Warn under simple/instanced; fail under pro.
-func checkCapabilities(r *Report, cfg *config.Config, compose *composeShape, manifestPath string) {
+func checkCapabilities(r *Report, cfg *config.Config, c *challenge.Challenge, compose *composeShape, manifestPath string) {
+	var allowCaps []string
+	if c.Manifest.Deploy != nil && c.Manifest.Deploy.SecurityOpts != nil {
+		for _, ac := range c.Manifest.Deploy.SecurityOpts.AllowCaps {
+			allowCaps = append(allowCaps, strings.ToUpper(strings.TrimPrefix(strings.TrimSpace(ac), "CAP_")))
+		}
+	}
+
 	for name, svc := range compose.Services {
 		for _, cap := range svc.CapAdd {
 			normalized := strings.ToUpper(strings.TrimPrefix(strings.TrimSpace(cap), "CAP_"))
 			if _, dangerous := dangerousCaps[normalized]; !dangerous {
 				continue
 			}
+
+			allowed := false
+			for _, ac := range allowCaps {
+				if ac == normalized {
+					allowed = true
+					break
+				}
+			}
+			if allowed {
+				continue
+			}
+
 			msg := fmt.Sprintf("service %s requests cap_add: %s — review whether the challenge needs it", name, cap)
 			if profileIs(cfg, config.ProfilePro) {
 				r.Errorf("SEC004", manifestPath, "%s — disallowed under the pro profile", msg)

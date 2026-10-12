@@ -1,0 +1,109 @@
+# goreleaser configuration for the mctf CLI.
+# Cuts cross-platform binaries, archives, checksums, Linux packages, and a
+# Homebrew formula on every `vX.Y.Z` tag. Run `goreleaser check` to validate
+# and `goreleaser release --snapshot --clean` for a dry run.
+version: 2
+
+project_name: mctf
+
+# Generate man pages before building so the archives can bundle them.
+before:
+  hooks:
+    - sh -c 'mkdir -p manpages && go run . gen-man manpages'
+
+builds:
+  - id: mctf
+    main: .
+    binary: mctf
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    # Match the Makefile's ldflags: version/commit/date live in package cmd.
+    ldflags:
+      - -s -w
+      - -X github.com/MicroClub-USTHB/mctf-cli/cmd.version={{ .Version }}
+      - -X github.com/MicroClub-USTHB/mctf-cli/cmd.commit={{ .ShortCommit }}
+      - -X github.com/MicroClub-USTHB/mctf-cli/cmd.date={{ .Date }}
+
+archives:
+  - id: mctf
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - src: manpages/*.1
+        dst: man
+        info:
+          mode: 0644
+
+checksum:
+  name_template: checksums.txt
+
+# Docker image of the CLI itself, pushed to GHCR (for CI pipelines).
+# amd64 only for now; multi-arch can follow with buildx + docker_manifests.
+dockers:
+  - image_templates:
+      - "ghcr.io/microclub-usthb/mctf:{{ .Version }}"
+      - "ghcr.io/microclub-usthb/mctf:latest"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - "--label=org.opencontainers.image.title=mctf"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.source=https://github.com/MicroClub-USTHB/mctf-cli"
+      - "--label=org.opencontainers.image.licenses=MIT"
+
+# Linux packages (.deb / .rpm) attached to the release.
+nfpms:
+  - id: mctf
+    package_name: mctf
+    maintainer: MicroClub-USTHB <https://github.com/MicroClub-USTHB>
+    description: MCTF — Modern CTF Framework CLI
+    license: MIT
+    homepage: https://github.com/MicroClub-USTHB/mctf-cli
+    formats: [deb, rpm]
+    contents:
+      - src: manpages/*.1
+        dst: /usr/share/man/man1
+
+# Homebrew cask pushed to MicroClub-USTHB/homebrew-tap (installs the binary).
+# Requires a HOMEBREW_TAP_TOKEN secret with write access to that repo.
+homebrew_casks:
+  - name: mctf
+    # Skip the tap push until HOMEBREW_TAP_TOKEN is configured, so a release
+    # still succeeds (binaries/packages publish) before the tap is set up.
+    skip_upload: "{{ if .Env.HOMEBREW_TAP_TOKEN }}false{{ else }}true{{ end }}"
+    repository:
+      owner: MicroClub-USTHB
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/MicroClub-USTHB/mctf-cli
+    description: MCTF — Modern CTF Framework CLI
+    # Strip the quarantine attribute so the unsigned binary runs on macOS.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/mctf"]
+          end
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge pull request"
+
+release:
+  draft: false
+  prerelease: auto

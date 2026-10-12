@@ -35,6 +35,8 @@ my-event/                              # the event repo
 │   └── traefik/
 │       ├── traefik.yml
 │       └── dynamic/{http-routers,http-services,tcp-routers,tcp-services,middlewares,tls}.yml
+├── monitoring/                        # AUTO-GENERATED monitoring scrape targets
+│   └── prometheus.yml
 ├── infra/                             # OPTIONAL — terraform modules (`mctf init --infra`)
 ├── plugins/                           # OPTIONAL — local plugin binaries (v0.2+)
 └── .mctf/                             # CLI working dir (gitignored)
@@ -55,6 +57,7 @@ The single most important rule:
   - `challenges/challenges.csv` — event tracking sheet
   - `challenges/index.json` — machine-parseable manifest
   - `ingress/traefik/dynamic/*.yml` — routing rules
+  - `monitoring/prometheus.yml` — Prometheus scrape config for instanced challenges
 
 Both the author files and the derived files are **committed**. Reviewers see exactly what will be deployed; CI re-runs `mctf generate` on every push and fails if the committed derived files diverge from regenerated ones.
 

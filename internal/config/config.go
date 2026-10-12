@@ -126,6 +126,11 @@ type KubernetesDeploy struct {
 	Kubeconfig   string `json:"kubeconfig,omitempty"`
 	Namespace    string `json:"namespace,omitempty"`
 	IngressClass string `json:"ingress_class,omitempty"`
+	// NodePortBase is the first NodePort assigned to TCP challenges:
+	// nodePort = base + (deploy.port - category range min). nil means the
+	// default (30000); 0 disables the mapping and uses deploy.port verbatim
+	// (needs a widened --service-node-port-range on the cluster).
+	NodePortBase *int `json:"node_port_base,omitempty"`
 }
 
 // Platform identifies the CTF scoring/registration platform.

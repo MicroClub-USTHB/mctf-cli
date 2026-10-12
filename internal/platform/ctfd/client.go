@@ -69,11 +69,14 @@ type Tag struct {
 }
 
 // File is one CTFd-side file attachment. CTFd stores files at
-// "uploads/<sha>/<basename>"; we match local-vs-remote by Basename.
+// "uploads/<location-hash>/<basename>" and exposes the content digest
+// separately as sha1sum; we match local-vs-remote by Basename, then by
+// content via SHA1.
 type File struct {
 	ID          int    `json:"id,omitempty"`
 	Type        string `json:"type"`               // "challenge"
 	Location    string `json:"location,omitempty"` // server-set
+	SHA1        string `json:"sha1sum,omitempty"`  // content digest, server-set
 	ChallengeID int    `json:"challenge_id,omitempty"`
 }
 

@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -117,9 +119,16 @@ var (
 
 var instanceDestroyCmd = &cobra.Command{
 	Use:   "destroy <instance-id>",
-	Short: "Tear down a per-team instance and remove it from the store",
+	Short: "Tear down a per-team instance (remote instancer when instancer.url is set, else local store)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Remote instancer is the source of truth when configured: the server
+		// owns teardown (containers, volumes, routing), so --force/--volumes
+		// are local-only and do not apply.
+		if url, ok := remoteInstancerURL(); ok {
+			return destroyRemoteInstance(cmd.Context(), url, args[0])
+		}
+
 		store, err := openStore()
 		if err != nil {
 			return err
@@ -157,8 +166,14 @@ var instanceDestroyCmd = &cobra.Command{
 
 var instanceListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List live instances from the store",
+	Short: "List live instances (remote instancer when instancer.url is set, else local store)",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// When the event config points at a remote instancer, that is the
+		// source of truth — list from its admin API instead of the local store.
+		if url, ok := remoteInstancerURL(); ok {
+			return listRemoteInstances(cmd.Context(), url)
+		}
+
 		store, err := openStore()
 		if err != nil {
 			return err
@@ -450,6 +465,98 @@ func openStore() (*instancer.Store, error) {
 		return nil, err
 	}
 	return instancer.NewStore(filepath.Join(abs, ".mctf", "instances.json"))
+}
+
+// remoteInstancerURL returns the configured instancer API URL when the event
+// config sets instancer.url. A config-load failure falls back to the local
+// store (returns "", false), preserving the offline/local workflow.
+func remoteInstancerURL() (string, bool) {
+	cfg, err := config.Load(flagDir)
+	if err != nil {
+		return "", false
+	}
+	if cfg.Instancer != nil {
+		if u := strings.TrimSpace(cfg.Instancer.URL); u != "" {
+			return u, true
+		}
+	}
+	return "", false
+}
+
+// destroyRemoteInstance force-stops one instance via the remote instancer's
+// admin API. The server owns teardown; the local --force/--volumes flags do
+// not apply to this path.
+func destroyRemoteInstance(ctx context.Context, baseURL, id string) error {
+	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	msg, err := client.Destroy(ctx, id)
+	if err != nil {
+		return err
+	}
+	if msg == "" {
+		msg = "destroyed"
+	}
+	fmt.Printf("%s: %s\n", id, msg)
+	return nil
+}
+
+// listRemoteInstances lists instances from the remote instancer's admin API.
+// The admin key is read from MCTF_INSTANCER_ADMIN_KEY (a secret, never config).
+func listRemoteInstances(ctx context.Context, baseURL string) error {
+	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	instances, err := client.List(ctx)
+	if err != nil {
+		return err
+	}
+	if flagJSON {
+		body, err := json.MarshalIndent(instances, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(body))
+		return nil
+	}
+	fmt.Printf("instancer: %s\n\n", baseURL)
+	if len(instances) == 0 {
+		fmt.Println("no instances")
+		return nil
+	}
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "ID\tCHALLENGE\tTEAM\tSTATUS\tPORTS\tEXPIRES")
+	for _, i := range instances {
+		team := i.TeamName
+		if team == "" {
+			team = i.TeamID
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			i.InstanceID, i.ChallengeID, team, i.Status, remotePortsString(i.Ports), i.ExpiresAt)
+	}
+	tw.Flush()
+	fmt.Printf("\n%d instance(s)\n", len(instances))
+	return nil
+}
+
+// remotePortsString renders an internal:external port map (string JSON keys)
+// as "80->10234, 443->10235", sorted by internal port.
+func remotePortsString(ports map[string]int) string {
+	if len(ports) == 0 {
+		return "-"
+	}
+	internals := make([]int, 0, len(ports))
+	ext := make(map[int]int, len(ports))
+	for k, v := range ports {
+		n, err := strconv.Atoi(k)
+		if err != nil {
+			continue
+		}
+		internals = append(internals, n)
+		ext[n] = v
+	}
+	sort.Ints(internals)
+	parts := make([]string, 0, len(internals))
+	for _, in := range internals {
+		parts = append(parts, fmt.Sprintf("%d->%d", in, ext[in]))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func loadInstanced(category, slug string) (*config.Config, *challenge.Challenge, error) {

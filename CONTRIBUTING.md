@@ -30,17 +30,29 @@ If `make build` fails on a fresh checkout, run `go mod download` first.
 
 | Path | What it's for |
 |---|---|
-| `cmd/` | Cobra command definitions. One file per command; flags live next to the command. |
-| `internal/config/` | `mctf.config.yml` loader + typed `Config` struct. |
-| `internal/challenge/` | Per-challenge manifest loader, filesystem discovery, archetype derivation. |
-| `internal/validate/` | Cross-cutting checks beyond schema (uniqueness, leak guard, healthcheck rules). |
-| `internal/generate/` | Deterministic emitters for the four derived files. |
-| `internal/jsonschema/` | Thin wrapper around `santhosh-tekuri/jsonschema/v5` with our error formatting. |
+| `cmd/` | Cobra command definitions. One file per command; flags live next to the command. Keep `cmd/` thin — argument parsing and human/JSON output only. |
+| `internal/build/` | Plans and executes container image builds (`docker build` / `docker push`) for deployable challenges. |
+| `internal/challenge/` | Per-challenge manifest loader, filesystem discovery, archetype derivation (`ArchetypeStatic`, `ArchetypeService`, `ArchetypeInstanced`). |
+| `internal/config/` | `mctf.config.yml` loader + typed `Config` struct. Schema-validated on load. |
+| `internal/deploy/` | Plans and executes per-challenge `docker compose` runs. Covers docker and SSH deploy modes, GitOps state sync, and rollback on failure. |
+| `internal/doctor/` | Preflight checks against the host environment (port availability, Docker daemon, DNS resolution, disk space, storage driver). |
+| `internal/generate/` | Deterministic emitters for all derived files (CTFd manifest, `instance.toml`, CSV, `index.json`, Prometheus scrape config). Output must be byte-identical across runs. |
+| `internal/git/` | Thin shell wrapper around `git` for state-sync operations used by the deploy rollback system. |
+| `internal/info/` | Human- and machine-readable event summaries (`mctf info`). Renders category/archetype/difficulty breakdowns. |
+| `internal/ingress/` | Generates routing config for the deploy mode's reverse proxy (currently Traefik dynamic config). |
+| `internal/instancer/` | Manages per-team challenge instances: lifecycle planning (`PlanSpawn`), store persistence, HTTP daemon, reaper. Mints per-team dynamic flags at spawn time. |
+| `internal/jsonschema/` | Thin wrapper around `santhosh-tekuri/jsonschema/v5` with MCTF-specific error formatting. |
+| `internal/notify/` | Posts deploy/build outcome messages to optional notification channels (Slack, webhook). |
+| `internal/platform/ctfd/` | Typed REST client for the CTFd API. Scope: just the endpoints needed by `mctf platform sync` (challenges, flags, hints, files, visibility). |
+| `internal/scaffold/` | Renders embedded Go templates onto the filesystem for `mctf init`. |
 | `internal/schemas/` | **Embedded copy** of the JSON Schemas. Synced from `schema/` by `make schemas` — never edit directly. |
+| `internal/solve/` | Runs a challenge's solution script and verifies the flag. Supports `--against-instance` to target a live per-team instance. |
+| `internal/status/` | Reports the runtime state of an event's deployable challenges (container health, port bindings). |
+| `internal/validate/` | Cross-cutting checks beyond schema: uniqueness, flag leak guard, capability allowlists, healthcheck rules, archetype consistency. |
 | `schema/` | The **canonical** JSON Schemas. Edit these when the spec changes. |
-| `docs/spec/` | The spec itself. Move with the schemas. |
-| `examples/sample-event/` | Reference event that exercises every code path. |
-| `scripts/` | Python sanity-check validators (used by CI). |
+| `docs/spec/` | The spec itself. Moves with the schemas and code. |
+| `examples/sample-event/` | Reference event that exercises every code path. CI runs `validate` and `generate --check` against it on every push. |
+| `scripts/` | Python sanity-check validators (used by CI to catch schema drift). |
 
 ## Five rules that aren't negotiable
 
@@ -94,14 +106,15 @@ Two cases:
 
 - `go test ./...` runs the unit tests. Add new tests next to the package they cover.
 - Tests should not require network, Docker, or a running CTFd. If you need fixtures, put them under `internal/<pkg>/testdata/`.
+- For interactive prompts (e.g., `cmd/init.go`), inject test input via the `promptIn` variable — see `cmd/init_test.go` for the pattern.
 - The sample event under `examples/sample-event/` is the integration fixture; CI uses it directly.
 
 ## Branching & PRs
 
-- Branch off `main`. Name your branch `<area>/<short-description>` — examples: `validate/duplicate-port-check`, `generate/csv-utf8`, `cmd/init-skeleton`.
-- Open the PR against `main`. Request review from at least one other member.
+- Branch off `develop`. Name your branch `<area>/<short-description>` — examples: `validate/duplicate-port-check`, `generate/csv-utf8`, `cmd/init-skeleton`.
+- Open the PR against `develop`. Request review from at least one other member.
 - Squash-merge by default unless the branch contains intentionally separate logical commits.
-- Never push directly to `main` once branch protection is enabled.
+- Never push directly to `main` or `develop` once branch protection is enabled.
 
 ## Commit messages
 
@@ -114,11 +127,11 @@ Pulls challenge.hints[] into the auto-generated CTFd manifest under the
 "hints" key. Manifests without hints stay omitted from the output.
 ```
 
-Common scopes: `validate`, `generate`, `config`, `challenge`, `cmd`, `schema`, `docs`, `ci`, `chore`.
+Common scopes: `validate`, `generate`, `config`, `challenge`, `cmd`, `schema`, `docs`, `ci`, `chore`, `build`, `deploy`, `doctor`, `instancer`, `platform`, `solve`, `ingress`, `notify`, `status`, `info`.
 
 ## Code style
 
-- `gofmt` + `go vet ./...` clean. (We'll add `golangci-lint` once it stops bouncing on Go 1.23 toolchain.)
+- `gofmt` + `golangci-lint run ./...` clean. Run `golangci-lint run ./...` locally before pushing — CI enforces it.
 - Errors wrap with `fmt.Errorf("...: %w", err)`.
 - Comments explain *why*, not *what*. If you have to explain *what* the code does, the code probably needs to change instead.
 - No trailing summary blocks at the top of files (no `// Package X does Y, then Z, then W.` paragraphs). Keep package docs to one short paragraph.
@@ -126,12 +139,13 @@ Common scopes: `validate`, `generate`, `config`, `challenge`, `cmd`, `schema`, `
 
 ## CI gates
 
-GitHub Actions runs two jobs on every push and PR:
+GitHub Actions runs three jobs on every push and PR:
 
+- **`lint`** — `golangci-lint run ./...`. Must be clean before anything else.
 - **`go`** — `go vet`, `go test -race`, `make build`, `mctf validate`, `mctf generate --check` against the sample event.
 - **`schemas`** — Python sanity checks: source manifests vs `challenge.schema.json`, generated files vs their schemas.
 
-Both must be green. If you can't get them green locally, push the WIP branch and let CI tell you why — that's faster than guessing.
+All three must be green. If you can't get them green locally, push the WIP branch and let CI tell you why — that's faster than guessing.
 
 ## Reviewing PRs
 

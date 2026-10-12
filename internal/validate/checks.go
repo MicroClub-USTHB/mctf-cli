@@ -32,6 +32,7 @@ func Run(cfg *config.Config, eventRoot string, challs []*challenge.Challenge, lo
 		checkOne(r, cfg, cats, c, eventRoot)
 	}
 	checkUniqueness(r, challs)
+	checkKubernetes(r, cfg, eventRoot, challs)
 	return r
 }
 
@@ -73,6 +74,9 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 	}
 	flagRe := regexp.MustCompile(`^` + regexp.QuoteMeta(prefix) + `\{[^}]+\}$`)
 	for i, f := range m.Challenge.Flags {
+		if f.Dynamic {
+			continue // S008 doesn't apply to dynamic flags
+		}
 		if !flagRe.MatchString(f.Flag) {
 			r.Errorf("S008", manifestPath,
 				"flags[%d].flag %q does not match the event flag prefix %q",
@@ -308,6 +312,14 @@ func checkOne(r *Report, cfg *config.Config, cats map[string]CategoryInfo, c *ch
 				"service-archetype challenge has no deploy.internal_port — required for ingress and instancer wiring (the container's listening port)")
 		}
 	}
+
+	// A009 — dynamic flag requires dynamic instances (instanced archetype)
+	for i, f := range m.Challenge.Flags {
+		if f.Dynamic && archetype != challenge.ArchetypeInstanced {
+			r.Errorf("A009", manifestPath,
+				"flags[%d] is dynamic but the challenge is not instanced (set deploy.dynamic_instances=true)", i)
+		}
+	}
 }
 
 func fileExistsNonEmpty(path string) bool {
@@ -346,6 +358,9 @@ func checkUniqueness(r *Report, challs []*challenge.Challenge) {
 			}
 		}
 		for _, f := range m.Challenge.Flags {
+			if f.Dynamic || f.Flag == "" {
+				continue
+			}
 			fkey := f.Flag
 			if !f.CaseSensitive {
 				fkey = strings.ToLower(fkey)

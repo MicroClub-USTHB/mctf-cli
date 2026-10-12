@@ -70,6 +70,14 @@ func Plan(cfg *config.Config, eventRoot string, challs []*challenge.Challenge) (
 		out.Files[filepath.Join(ingressDir, "dynamic", "dynamic.yml")] = ingress.TraefikDynamic(entries)
 	}
 
+	if shouldEmitPrometheus(cfg, challs) {
+		prom, err := PrometheusConfig(challs)
+		if err != nil {
+			return nil, fmt.Errorf("prometheus: %w", err)
+		}
+		out.Files[filepath.Join(eventRoot, "monitoring", "prometheus.yml")] = prom
+	}
+
 	return out, nil
 }
 
@@ -86,25 +94,46 @@ func shouldEmitTraefik(cfg *config.Config) bool {
 	return cfg.Deploy.Docker.Ingress == "traefik"
 }
 
+// shouldEmitPrometheus reports whether the prometheus scrape config
+// should be emitted for this event.
+//
+// It is true when:
+//   - at least one challenge uses the instanced archetype (there is something
+//     to scrape), OR
+//   - cfg.Monitoring is explicitly set (the organizer opted in).
+//
+// Static-only events (profile "simple") produce no monitoring/ directory.
+func shouldEmitPrometheus(cfg *config.Config, challs []*challenge.Challenge) bool {
+	if cfg != nil && len(cfg.Monitoring) > 0 {
+		return true
+	}
+	for _, c := range challs {
+		if c.Archetype == challenge.ArchetypeInstanced {
+			return true
+		}
+	}
+	return false
+}
+
 // Apply writes every planned file. Files that already match on disk are
 // skipped (so `git status` stays quiet when nothing changed).
 //
 // Also removes stale instance.toml from challenges that are no longer
 // instanced — staleness is the silent-bug source we're guarding against.
-func (o *Outputs) Apply() (written []string, removed []string, err error) {
+func (o *Outputs) Apply() (written []string, err error) {
 	for path, data := range o.Files {
 		if existing, e := os.ReadFile(path); e == nil && bytes.Equal(existing, data) {
 			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return written, removed, err
+			return written, err
 		}
 		if err := os.WriteFile(path, data, 0o644); err != nil {
-			return written, removed, err
+			return written, err
 		}
 		written = append(written, path)
 	}
-	return written, removed, nil
+	return written, nil
 }
 
 // CleanStale removes derived files that exist on disk but are not in the

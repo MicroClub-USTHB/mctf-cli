@@ -53,7 +53,7 @@ Every rule MCTF enforces, with rationale and severity. Hard-fails block the buil
 | ID | Rule | Severity by profile |
 |---|---|---|
 | `SEC001` | Static flag value found inside any file under `challenge/src/` (image-leak guard) — exempt: `flag.txt`, files explicitly env-loaded | always hard |
-| `SEC002` | `privileged: true` in `docker-compose.yml` | warn / warn / **hard** |
+| `SEC002` | `privileged: true` in `docker-compose.yml` without `deploy.security_opts.allow_privileged` allowlisting it | warn / warn / **hard** |
 | `SEC003` | `pwn` or `jailbreak` Dockerfile lacks a non-root `USER` directive after the last `FROM` | warn / warn / **hard** |
 | `SEC004` | `cap_add` lists privileged caps (`SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE`, `SYS_MODULE`) without `deploy.security_opts.allow_caps` allowlisting them | warn / warn / **hard** |
 | `SEC005` | Unique flag value not present at all (e.g. challenge ships unflagged) | always hard |
@@ -71,6 +71,20 @@ Every rule MCTF enforces, with rationale and severity. Hard-fails block the buil
 | `D007` | `assets/files` path resolves outside the challenge directory | always hard |
 | `D008` | Any file under `assets/` exceeds 100 MB | warn / warn / **hard** |
 | `D009` | Total `assets/` directory size exceeds 500 MB | warn / warn / **hard** |
+
+### Kubernetes (only when `deploy.mode: kubernetes`)
+
+A TCP challenge's public `deploy.port` is mapped to a NodePort deterministically:
+`nodePort = deploy.kubernetes.node_port_base + (deploy.port − category range min)`.
+`node_port_base` defaults to `30000` (stock NodePort range `30000–32767`); `0` uses
+`deploy.port` verbatim and requires a cluster started with a widened
+`--service-node-port-range`.
+
+| ID | Rule | Severity |
+|---|---|---|
+| `K001` | TCP challenge has no `deploy.port`, or its port cannot be mapped to a NodePort (outside the category range, or derived NodePort outside `30000–32767`) | always hard |
+| `K002` | Derived resource name `mctf-<event>-<category>-<slug>` is not a valid DNS-1123 label (lowercase `a-z0-9-`) or exceeds 63 characters | always hard |
+| `K003` | Two TCP challenges map to the same NodePort (e.g. `pwn` 11001 and `jailbreak` 16001) | always hard |
 
 ### Solution
 
@@ -102,6 +116,18 @@ Every rule MCTF enforces, with rationale and severity. Hard-fails block the buil
 |---|---|
 | `I001` | Category-typical tag missing (e.g. `web` challenge with no sub-tag like `sqli`/`xss`/`ssrf`) |
 | `I002` | Manifest uses deprecated field (none in v1; reserved for future migrations) |
+
+## Doctor checks (`mctf doctor`)
+
+These checks are evaluated by the `mctf doctor` command to verify the host environment's health, rather than the challenge manifests.
+
+| ID | Rule | Severity |
+|---|---|---|
+| `D030` | Host ports free (verifies required category/deploy ports are not already bound) | hard |
+| `D031` | Expired instances (detects leaked/zombie per-team dynamic containers) | hard |
+| `D040` | DNS resolution (verifies that the event `subdomain.domain` resolves correctly) | hard |
+| `D041` | Free disk space (warns if < 15GB, fails if < 5GB) | warn / hard |
+| `D042` | Docker storage driver (warns if using slow drivers like `vfs`) | warn |
 
 ## Disabling rules
 

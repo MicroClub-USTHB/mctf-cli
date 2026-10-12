@@ -168,7 +168,13 @@
           "properties": {
             "kubeconfig": { "type": "string" },
             "namespace": { "type": "string", "default": "mctf" },
-            "ingress_class": { "type": "string", "default": "nginx" }
+            "ingress_class": { "type": "string", "default": "nginx" },
+            "node_port_base": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32767,
+              "description": "First NodePort for TCP challenges: nodePort = base + (deploy.port - category range min). Default 30000. 0 uses deploy.port verbatim (cluster needs a widened --service-node-port-range)."
+            }
           }
         }
       }
@@ -205,6 +211,21 @@
     },
     "notifications": { "type": "object" },
     "monitoring": { "type": "object" },
-    "plugins": { "type": "array", "items": { "type": "object" } }
+    "plugins": {
+      "type": "array",
+      "description": "External plugin processes invoked at lifecycle hooks (JSON-RPC 2.0 over newline-delimited JSON on stdin/stdout).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "command"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "command": { "type": "string", "minLength": 1 },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "enabled": { "type": "boolean", "default": true },
+          "config": { "type": "object" }
+        }
+      }
+    }
   }
 }

@@ -154,6 +154,45 @@ func TestPlanSpawn_FallsBackToManifestFlag(t *testing.T) {
 	}
 }
 
+func TestPlanSpawn_MintsDynamicFlag(t *testing.T) {
+	c := instancedChall("x", "web", 8000)
+	c.Manifest.Challenge.Flags[0].Dynamic = true
+	c.Manifest.Challenge.Flags[0].Flag = "" // should not be used
+
+	spec1, _ := PlanSpawn(cfgWithInstancer(), c, "team1", nil, SpawnOptions{})
+	spec2, _ := PlanSpawn(cfgWithInstancer(), c, "team1", nil, SpawnOptions{})
+
+	f1 := spec1.Env["FLAG"]
+	f2 := spec2.Env["FLAG"]
+
+	if !strings.HasPrefix(f1, "mctf{team1_") || !strings.HasSuffix(f1, "}") {
+		t.Errorf("FLAG = %q, does not match expected dynamic format", f1)
+	}
+	if f1 == f2 {
+		t.Errorf("two calls produced the same dynamic flag: %q", f1)
+	}
+}
+
+func TestMintFlag(t *testing.T) {
+	f, err := mintFlag("mctf", "team42")
+	if err != nil {
+		t.Fatalf("mintFlag error: %v", err)
+	}
+	if !strings.HasPrefix(f, "mctf{team42_") || !strings.HasSuffix(f, "}") {
+		t.Errorf("mintFlag = %q, unexpected format", f)
+	}
+	// entropy: 16 bytes = 32 hex chars + prefix + suffix
+	// total length: len("mctf{team42_") + 32 + 1 = 45
+	if len(f) != len("mctf{team42_")+32+1 {
+		t.Errorf("mintFlag = %q, unexpected length %d", f, len(f))
+	}
+	// uniqueness
+	f2, _ := mintFlag("mctf", "team42")
+	if f == f2 {
+		t.Errorf("mintFlag produced identical values: %q", f)
+	}
+}
+
 func TestPlanSpawn_IDIsUniquePerCall(t *testing.T) {
 	c := instancedChall("x", "web", 8000)
 	a, _ := PlanSpawn(cfgWithInstancer(), c, "team", nil, SpawnOptions{})
@@ -201,5 +240,19 @@ func TestEnvSlice_Sorted(t *testing.T) {
 	want := []string{"A=2", "M=3", "Z=1"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("EnvSlice = %v, want %v", got, want)
+	}
+}
+
+func TestPlanSpawn_ChallengeSlugFormat(t *testing.T) {
+	c := instancedChall("chall", "web", 8000)
+	spec, err := PlanSpawn(cfgWithInstancer(), c, "team1", nil, SpawnOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.ChallengeSlug != "web/chall" {
+		t.Errorf("expected ChallengeSlug 'web/chall', got %q", spec.ChallengeSlug)
+	}
+	if strings.Contains(spec.ChallengeSlug, "\\") {
+		t.Errorf("ChallengeSlug contains backslash: %q", spec.ChallengeSlug)
 	}
 }

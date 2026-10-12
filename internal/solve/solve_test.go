@@ -194,6 +194,104 @@ echo mctf{victory}
 	}
 }
 
+func TestRun_StampsEnvForInstance(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("sh-based fixtures don't run on windows")
+	}
+	root := t.TempDir()
+	c := mkChall(t, root, "web", "stateful")
+	c.Manifest.Challenge.NeedDeploy = true
+	internal := 8000
+	c.Manifest.Deploy = &challenge.DeployBlock{InternalPort: &internal}
+	c.Archetype = challenge.ArchetypeInstanced
+	writeSolver(t, c, "solve.sh", `#!/bin/sh
+echo HOST=$HOST
+echo PORT=$PORT
+echo URL=$URL
+echo INSTANCE_ID=$INSTANCE_ID
+echo TEAM_ID=$TEAM_ID
+echo $FLAG
+`)
+	inst := &InstanceTarget{
+		ID:     "mctf-inst-stateful-team1-ab12cd34",
+		TeamID: "team1",
+		Ports:  map[int]int{internal: 31044},
+		Flag:   "mctf{per_team_dynamic}",
+	}
+	res, err := Run(context.Background(), nil, c, Options{Timeout: 5 * time.Second, Instance: inst})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := res.Stdout
+	for _, want := range []string{
+		"HOST=127.0.0.1",
+		"PORT=31044",
+		"URL=http://127.0.0.1:31044",
+		"INSTANCE_ID=mctf-inst-stateful-team1-ab12cd34",
+		"TEAM_ID=team1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("env missing %q in output:\n%s", want, out)
+		}
+	}
+	// The per-team flag is recovered even though it isn't in the manifest.
+	if res.Flag != "mctf{per_team_dynamic}" {
+		t.Errorf("flag = %q, want per-team flag", res.Flag)
+	}
+	if !res.Pass {
+		t.Errorf("want pass, got %+v", res)
+	}
+}
+
+func TestRun_InstanceTCPOmitsURL(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("sh-based fixtures don't run on windows")
+	}
+	root := t.TempDir()
+	c := mkChall(t, root, "pwn", "tcpchal")
+	c.Manifest.Challenge.NeedDeploy = true
+	internal := 9000
+	c.Manifest.Deploy = &challenge.DeployBlock{InternalPort: &internal, TCP: true}
+	c.Archetype = challenge.ArchetypeInstanced
+	writeSolver(t, c, "solve.sh", "#!/bin/sh\necho \"URL=[$URL]\"\necho PORT=$PORT\necho mctf{victory}\n")
+	inst := &InstanceTarget{ID: "x", Ports: map[int]int{internal: 30500}}
+	res, err := Run(context.Background(), nil, c, Options{Timeout: 5 * time.Second, Instance: inst})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Stdout, "URL=[]") {
+		t.Errorf("tcp challenge should not set URL, got:\n%s", res.Stdout)
+	}
+	if !strings.Contains(res.Stdout, "PORT=30500") {
+		t.Errorf("tcp challenge should still set PORT, got:\n%s", res.Stdout)
+	}
+}
+
+func TestInstanceHostPort(t *testing.T) {
+	internal := 8000
+	withPort := &challenge.Challenge{
+		Manifest: challenge.Manifest{Deploy: &challenge.DeployBlock{InternalPort: &internal}},
+	}
+	cases := []struct {
+		name  string
+		c     *challenge.Challenge
+		ports map[int]int
+		want  int
+	}{
+		{"declared internal port", withPort, map[int]int{8000: 31044}, 31044},
+		{"sole mapping fallback", &challenge.Challenge{}, map[int]int{1234: 40000}, 40000},
+		{"no ports", withPort, nil, 0},
+		{"ambiguous, no declared port", &challenge.Challenge{}, map[int]int{1: 2, 3: 4}, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := instanceHostPort(tc.c, tc.ports); got != tc.want {
+				t.Errorf("instanceHostPort = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestRun_ErrNoSolver(t *testing.T) {
 	root := t.TempDir()
 	c := mkChall(t, root, "misc", "nope")

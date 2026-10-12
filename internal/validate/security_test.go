@@ -67,6 +67,24 @@ func TestSEC002_PrivilegedFailsUnderPro(t *testing.T) {
 	}
 }
 
+func TestSEC002_AllowedPrivilegedClean(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "pwn", "x", "FROM scratch\nUSER ctf\n",
+		`services:
+  app:
+    privileged: true
+`)
+	c.Manifest.Deploy.SecurityOpts = &challenge.SecurityOpts{
+		AllowPrivileged: true,
+	}
+	r := &Report{}
+	cfg := &config.Config{Profile: config.ProfilePro}
+	SecurityChecks(r, cfg, c, root)
+	if hasRule(r, "SEC002", SeverityError) || hasRule(r, "SEC002", SeverityWarn) {
+		t.Errorf("SEC002 should not fire when allow_privileged is true: %s", r.String())
+	}
+}
+
 func TestSEC003_PwnRequiresUserDirective(t *testing.T) {
 	root := t.TempDir()
 	noUser := makeChallenge(t, root, "pwn", "rootful", "FROM scratch\n", `services:
@@ -164,6 +182,25 @@ func TestSEC004_DangerousCapabilities(t *testing.T) {
 	}
 }
 
+func TestSEC004_AllowedCapabilityClean(t *testing.T) {
+	root := t.TempDir()
+	c := makeChallenge(t, root, "misc", "x", "FROM scratch\n",
+		`services:
+  app:
+    cap_add:
+      - SYS_ADMIN
+      - NET_RAW
+`)
+	c.Manifest.Deploy.SecurityOpts = &challenge.SecurityOpts{
+		AllowCaps: []string{"SYS_ADMIN"},
+	}
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if hasRule(r, "SEC004", SeverityWarn) || hasRule(r, "SEC004", SeverityError) {
+		t.Errorf("SEC004 should not fire when cap is in allow_caps: %s", r.String())
+	}
+}
+
 func TestD008_LargeFileWarns(t *testing.T) {
 	root := t.TempDir()
 	c := makeChallenge(t, root, "misc", "huge", "", "")
@@ -248,6 +285,25 @@ func TestD001_ServiceMatchingPortsClean(t *testing.T) {
 	SecurityChecks(r, nil, c, root)
 	if hasRule(r, "D001", SeverityError) || hasRule(r, "D002", SeverityError) {
 		t.Errorf("matching ports should not fire D001/D002: %s", r.String())
+	}
+}
+
+func TestD001_ServiceHostBindIPClean(t *testing.T) {
+	root := t.TempDir()
+	port := 14000
+	internal := 8000
+	c := makeChallenge(t, root, "misc", "x", "FROM scratch\nUSER ctf\n",
+		`services:
+  app:
+    ports:
+      - "127.0.0.1:14000:8000"
+`)
+	c.Manifest.Deploy = &challenge.DeployBlock{Port: &port, InternalPort: &internal}
+	c.Archetype = challenge.ArchetypeService
+	r := &Report{}
+	SecurityChecks(r, nil, c, root)
+	if hasRule(r, "D001", SeverityError) || hasRule(r, "D002", SeverityError) {
+		t.Errorf("matching ports with bind IP should not fire D001/D002: %s", r.String())
 	}
 }
 

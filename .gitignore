@@ -21,3 +21,9 @@ Thumbs.db
 /dist/
 *.test
 *.out
+
+# goreleaser build output
+dist/
+
+# generated man pages (built at release time)
+manpages/

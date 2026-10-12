@@ -86,12 +86,21 @@ var buildCmd = &cobra.Command{
 		}
 
 		ctx := context.Background()
-		if err := build.Apply(ctx, runner, plan, opts); err != nil {
+		buildOpts := opts
+		buildOpts.Push = false
+		if err := build.Apply(ctx, runner, plan, buildOpts); err != nil {
 			return err
 		}
 
 		if !flagBuildDryRun && flagBuildScan {
 			if err := scanBuiltImages(ctx, plan); err != nil {
+				return err
+			}
+		}
+
+		if flagBuildPush {
+			fmt.Printf("\npushing %d image(s) to registry...\n", len(plan))
+			if err := build.ApplyPush(ctx, runner, plan, opts); err != nil {
 				return err
 			}
 		}
