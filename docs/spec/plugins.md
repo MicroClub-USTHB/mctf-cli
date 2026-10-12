@@ -77,7 +77,8 @@ killed. (This mirrors the `notify` package.)
 | --- | --- | --- |
 | `before_deploy` | deploy payload (event, mode, units, dry_run) | **shipped** |
 | `after_deploy` | deploy payload + `outcome` (`success`/`failed`) + `error` | **shipped** |
-| `before_build` / `after_build` | build payload | planned |
+| `before_build` | build payload (event, sha, dry_run, images) | **shipped** |
+| `after_build` | build payload + `outcome` (`success`/`failed`) + `error` | **shipped** |
 | `on_instance_spawn` | instance payload | planned |
 | `on_health_failure` | — | planned (needs a health-monitoring loop) |
 
@@ -100,6 +101,38 @@ killed. (This mirrors the `notify` package.)
 
 `after_deploy(success)` fires only on a real (non-dry-run) deploy;
 `after_deploy(failed)` fires whenever the deploy errors.
+
+### Build payload
+
+```json
+{
+  "event": "myctf",
+  "phase": "before",           // "before" | "after"
+  "sha": "a1b2c3d",
+  "no_cache": false,
+  "push": false,
+  "dry_run": false,
+  "images": [
+    {
+      "challenge": "web/echo",
+      "category": "web",
+      "slug": "echo",
+      "tags": [
+        "ghcr.io/example/myctf-web-echo:a1b2c3d",
+        "ghcr.io/example/myctf-web-echo:latest"
+      ],
+      "labels": {
+        "mctf.challenge": "web/echo"
+      }
+    }
+  ],
+  "outcome": "success",        // after only
+  "error": ""                  // after + failed only
+}
+```
+
+`before_build` fires before `build.Apply` executes image builds.
+`after_build` fires after building, leak scanning, and optional registry pushing complete (with `outcome: "success"` or `outcome: "failed"` and `error`).
 
 ## Example
 
