@@ -15,6 +15,19 @@ publishes, for linux/macOS/windows on amd64 + arm64:
 - archives (`.tar.gz`, `.zip` on Windows) + `checksums.txt`
 - Linux packages (`.deb`, `.rpm`)
 - a Homebrew cask pushed to `MicroClub-USTHB/homebrew-tap`
+- a Docker image at `ghcr.io/microclub-usthb/mctf:<version>` and `:latest`
+
+## Docker image
+
+`ghcr.io/microclub-usthb/mctf` is published on each release (amd64). It bundles
+`git` + `ssh`; mount a Docker socket for `build`/`deploy`:
+
+```bash
+docker run --rm -v "$PWD:/event" -w /event ghcr.io/microclub-usthb/mctf:latest validate
+```
+
+GHCR auth uses the workflow's `GITHUB_TOKEN` (needs `packages: write`, already
+set) — no extra secret required.
 
 Version/commit/date are injected into `cmd.version` / `cmd.commit` /
 `cmd.date` via ldflags, so `mctf version` reports the tagged build.
