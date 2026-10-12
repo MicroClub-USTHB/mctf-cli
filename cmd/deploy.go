@@ -15,6 +15,7 @@ import (
 	mctfgit "github.com/MicroClub-USTHB/mctf-cli/internal/git"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/kubernetes"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/notify"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/plugin"
 )
 
 var (
@@ -183,7 +184,14 @@ var deployCmd = &cobra.Command{
 		}
 
 		ctx := context.Background()
+
+		// Lifecycle plugins (best-effort; a no-op without a `plugins:` block).
+		pm := plugin.Load(ctx, cfg.Plugins, plugin.Options{HostVersion: version, Dir: flagDir})
+		defer pm.Close()
+		pm.Dispatch(ctx, plugin.HookBeforeDeploy, deployHookPayload(cfg, mode, "before", flagDeployDryRun, plan, "", nil))
+
 		if err := deploy.ApplyUp(ctx, runner, plan); err != nil {
+			pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", flagDeployDryRun, plan, "failed", err))
 			notifyDiscord(ctx, "deploy failed", "error", fmt.Sprintf("%s: %v", planSlugs(plan), err))
 			return err
 		}
@@ -222,10 +230,35 @@ var deployCmd = &cobra.Command{
 
 		fmt.Println("\ndeploy complete")
 		if !flagDeployDryRun {
+			pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", false, plan, "success", nil))
 			notifyDiscord(ctx, "deploy succeeded", "success", fmt.Sprintf("%d challenge(s) up:\n%s", len(plan), planSlugs(plan)))
 		}
 		return nil
 	},
+}
+
+// deployHookPayload builds the plugin hook body for a deploy run.
+func deployHookPayload(cfg *config.Config, mode, phase string, dryRun bool, plan []deploy.Unit, outcome string, err error) plugin.DeployPayload {
+	p := plugin.DeployPayload{
+		Event:   cfg.Event.Slug,
+		Phase:   phase,
+		Mode:    mode,
+		DryRun:  dryRun,
+		Outcome: outcome,
+	}
+	if err != nil {
+		p.Error = err.Error()
+	}
+	for _, u := range plan {
+		p.Units = append(p.Units, plugin.DeployUnit{
+			Challenge:   u.Challenge,
+			Category:    u.Category,
+			Slug:        u.Slug,
+			ProjectName: u.ProjectName,
+			ImageTag:    u.ImageTag,
+		})
+	}
+	return p
 }
 
 func loadPlanAndRunner(dir, sha string, dryRun bool) ([]deploy.Unit, deploy.Runner, *config.Config, error) {

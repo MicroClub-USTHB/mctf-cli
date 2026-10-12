@@ -211,6 +211,21 @@
     },
     "notifications": { "type": "object" },
     "monitoring": { "type": "object" },
-    "plugins": { "type": "array", "items": { "type": "object" } }
+    "plugins": {
+      "type": "array",
+      "description": "External plugin processes invoked at lifecycle hooks (JSON-RPC 2.0 over newline-delimited JSON on stdin/stdout).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "command"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "command": { "type": "string", "minLength": 1 },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "enabled": { "type": "boolean", "default": true },
+          "config": { "type": "object" }
+        }
+      }
+    }
   }
 }
