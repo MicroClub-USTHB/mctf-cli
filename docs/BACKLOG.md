@@ -26,7 +26,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 - **Update `docs/spec/validation.md`** to reflect every rule that shipped (D001–D003, SEC002–004, W006–W010, A007, etc.).
 - **Update `docs/spec/CHANGELOG.md`** with the v0 → v0.1 delta.
 - **Architecture doc** (`docs/spec/architecture.md`) — how the packages fit together (`config` + `challenge` + `validate` → `generate`, `build` → `deploy` + `ingress`, `instancer` state store + lifecycle + server + reaper).
-- **Per-command man pages** — `cobra` can generate them; ship under `docs/man/`.
+- ~~**Per-command man pages** — `cobra` can generate them; ship under `docs/man/`.~~ **Shipped** via `mctf gen-man` / `make man`; generated at release time and bundled in the archives + `.deb`/`.rpm` (not committed, to avoid build-date drift).
 - **Update CONTRIBUTING.md** — new packages (`instancer`, `ingress`, `notify`, `solve`, `status`, `info`, `platform/ctfd`).
 - **Refresh `examples/sample-event/`** — add one challenge per core category (currently 5 challenges, 10 categories). Helps new contributors.
 

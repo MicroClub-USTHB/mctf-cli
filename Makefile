@@ -5,10 +5,17 @@ LDFLAGS := -X github.com/MicroClub-USTHB/mctf-cli/cmd.version=$(VERSION) \
            -X github.com/MicroClub-USTHB/mctf-cli/cmd.commit=$(COMMIT) \
            -X github.com/MicroClub-USTHB/mctf-cli/cmd.date=$(DATE)
 
-.PHONY: build test test-integration lint tidy run clean schemas
+.PHONY: build test test-integration lint tidy run clean schemas man
 
 build: schemas
 	go build -ldflags "$(LDFLAGS)" -o mctf .
+
+# Generate man pages (one per command) into manpages/. Release archives and
+# the .deb/.rpm packages bundle these; goreleaser runs the same generator.
+man:
+	@mkdir -p manpages
+	@go run . gen-man manpages
+	@echo "man pages written to manpages/"
 
 # Sync the canonical /schema/ JSON files into the embed package so the
 # binary stays self-contained. Errors out if drift is detected after sync,
