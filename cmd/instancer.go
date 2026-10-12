@@ -17,6 +17,7 @@ import (
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/instancer"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/plugin"
 )
 
 var instancerCmd = &cobra.Command{
@@ -77,6 +78,12 @@ var instancerServeCmd = &cobra.Command{
 			return err
 		}
 
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+
+		pm := plugin.Load(ctx, cfg.Plugins, plugin.Options{HostVersion: version, Dir: flagDir})
+		defer pm.Close()
+
 		var runner instancer.Runner
 		if flagServeQuiet {
 			runner = instancer.NewQuietDockerRunner()
@@ -84,7 +91,10 @@ var instancerServeCmd = &cobra.Command{
 			runner = instancer.NewDockerRunner()
 		}
 
-		srv := instancer.NewServer(cfg, store, runner, challs, instancer.Options{Tokens: tokens})
+		srv := instancer.NewServer(cfg, store, runner, challs, instancer.Options{
+			Tokens:        tokens,
+			PluginManager: pm,
+		})
 
 		// Build the catalog for the reaper.
 		idx := map[string]*challenge.Challenge{}
@@ -98,9 +108,6 @@ var instancerServeCmd = &cobra.Command{
 			Interval: flagServeInterval,
 			Logger:   os.Stdout,
 		}
-
-		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-		defer stop()
 
 		go func() {
 			if err := reaper.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
