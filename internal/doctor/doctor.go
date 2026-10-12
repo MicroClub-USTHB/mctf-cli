@@ -104,8 +104,10 @@ var secretPlaceholders = []string{
 
 // checkCommittedSecrets scans tracked files for an MCTF_* token/key/secret
 // committed with a real-looking value. It warns (never fails) and never
-// prints the value — only the location. Scope is the working tree; a deep
-// history scan is a job for a dedicated tool (e.g. gitleaks).
+// prints the value — only the location. Scope is the working tree (not a deep
+// history scan — that is a job for a dedicated tool like gitleaks), and
+// excludes examples, docs, and *_test.go fixtures where fake token values are
+// expected.
 func checkCommittedSecrets(dir string) Check {
 	id, name := "D043", "committed secrets"
 
@@ -119,7 +121,7 @@ func checkCommittedSecrets(dir string) Check {
 	cmd := exec.Command("git", "-C", dir, "grep", "-I", "-n", "-E",
 		`MCTF_[A-Z0-9_]*(TOKEN|KEY|SECRET|WEBHOOK)[[:blank:]]*[:=]`,
 		"--",
-		".", ":(exclude)*.example", ":(exclude)*.md", ":(exclude)docs/",
+		".", ":(exclude)*.example", ":(exclude)*.md", ":(exclude)docs/", ":(exclude)*_test.go",
 	)
 	out, err := cmd.Output()
 	if err != nil {

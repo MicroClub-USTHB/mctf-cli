@@ -76,12 +76,13 @@ func TestCheckCommittedSecrets_IgnoresPlaceholdersAndRefs(t *testing.T) {
 
 func TestCheckCommittedSecrets_ExcludesExampleAndDocs(t *testing.T) {
 	dir := gitRepoWith(t, map[string]string{
-		".env.example": "MCTF_DISCORD_TOKEN=aB3xQ9zLmN0pK7wR\n",
-		"docs/x.md":    "MCTF_CTFD_TOKEN=aB3xQ9zLmN0pK7wR\n",
-		"README.md":    "MCTF_REGISTRY_TOKEN=aB3xQ9zLmN0pK7wR\n",
+		".env.example":       "MCTF_DISCORD_TOKEN=aB3xQ9zLmN0pK7wR\n",
+		"docs/x.md":          "MCTF_CTFD_TOKEN=aB3xQ9zLmN0pK7wR\n",
+		"README.md":          "MCTF_REGISTRY_TOKEN=aB3xQ9zLmN0pK7wR\n",
+		"internal/x_test.go": "const tok = \"MCTF_DISCORD_TOKEN=aB3xQ9zLmN0pK7wR\"\n",
 	})
 	if got := checkCommittedSecrets(dir); got.Status != StatusOK {
-		t.Errorf("status = %q, want ok — example/docs/md excluded (detail: %s)", got.Status, got.Detail)
+		t.Errorf("status = %q, want ok — example/docs/md/_test.go excluded (detail: %s)", got.Status, got.Detail)
 	}
 }
 
