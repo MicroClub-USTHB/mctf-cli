@@ -36,7 +36,7 @@ All features below are merged into `develop` and pass CI. Not yet released to `m
 
 ### Distribution
 
-- **`feat`: goreleaser-based releases** — tagging `vX.Y.Z` builds cross-platform binaries (linux/macOS/windows × amd64/arm64), archives + checksums, Linux packages (`.deb`/`.rpm`), and a Homebrew cask pushed to `MicroClub-USTHB/homebrew-tap`. Version/commit/date are injected into `cmd.*` via ldflags. See `docs/RELEASING.md`. The cask push is skipped automatically until `HOMEBREW_TAP_TOKEN` is configured, so releases work before the tap exists.
+- **`feat`: goreleaser-based releases** — tagging `vX.Y.Z` builds cross-platform binaries (linux/macOS/windows × amd64/arm64), archives + checksums, Linux packages (`.deb`/`.rpm`), a Homebrew cask pushed to `MicroClub-USTHB/homebrew-tap`, and a Docker image at `ghcr.io/microclub-usthb/mctf:<version>` (and `:latest`) for CI pipelines. Version/commit/date are injected into `cmd.*` via ldflags. See `docs/RELEASING.md`. The cask push is skipped automatically until `HOMEBREW_TAP_TOKEN` is configured, so releases work before the tap exists.
 
 ### Fixes & Refactors
 

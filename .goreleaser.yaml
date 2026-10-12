@@ -33,6 +33,22 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# Docker image of the CLI itself, pushed to GHCR (for CI pipelines).
+# amd64 only for now; multi-arch can follow with buildx + docker_manifests.
+dockers:
+  - image_templates:
+      - "ghcr.io/microclub-usthb/mctf:{{ .Version }}"
+      - "ghcr.io/microclub-usthb/mctf:latest"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - "--label=org.opencontainers.image.title=mctf"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.source=https://github.com/MicroClub-USTHB/mctf-cli"
+      - "--label=org.opencontainers.image.licenses=MIT"
+
 # Linux packages (.deb / .rpm) attached to the release.
 nfpms:
   - id: mctf
