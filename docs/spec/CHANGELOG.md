@@ -6,6 +6,8 @@ All features below are merged into `develop` and pass CI. Not yet released to `m
 
 ### Features
 
+- **`feat(plugin)`: plugin system foundation + deploy hooks** — external, language-agnostic plugins run as subprocesses speaking JSON-RPC 2.0 over newline-delimited JSON on stdio (`internal/plugin`). `mctf deploy` fires `before_deploy` / `after_deploy` hooks to configured plugins (`plugins:` in `mctf.config.yml`). Best-effort and crash-isolated: a plugin that fails/crashes/hangs is logged and dropped, never aborting the command. Schema gains a typed `plugins[]` item shape; see `docs/spec/plugins.md` and the `examples/sample-event/plugins/logger.sh` reference plugin. Remaining hooks (`before_build`/`after_build`/`on_instance_spawn`/`on_health_failure`) and `down`/kubernetes dispatch are follow-ups.
+
 - **`feat(instancer)`: per-team dynamic flags** — the instancer now mints a unique flag per spawn when `flags[].dynamic: true` is set on a challenge. `SpawnOptions.FlagOverride` lets callers pass a pre-generated value; `Instance.Flag` persists it in the store. Schema extended with `flags[].dynamic` and `flags[].generator` (reserved). Validation rules added: `A010` (dynamic flag on non-instanced challenge) and `A011` (static flag + `dynamic: true` conflict).
 
 - **`feat(generate)`: Prometheus scrape config generator** — `mctf generate` now emits `monitoring/prometheus.yml` with one scrape job per instanced challenge (sorted, deterministic). Only emitted when the event has at least one instanced challenge or `monitoring:` is explicitly set in `mctf.config.yml`. Previously the field was reserved and unconditionally written; it is now fully conditional via `shouldEmitPrometheus()`.
