@@ -1,0 +1,17 @@
+schema: 1
+
+challenge:
+  name: "serial-dump"
+  author: "alice"
+  category: hardware
+  difficulty: easy
+  description: |
+    We captured a logic analyzer trace `capture.logicdata` from an embedded UART pin. Decode the transmission.
+  wave: 1
+  flags:
+    - { flag: "mctf{u4rt_l0g_p4rs3d_s1gn4l}", case_sensitive: true }
+  need_deploy: false
+  tags: ["uart", "logic-analyzer"]
+  hints:
+    - cost: 0
+      content: "Baud rate is standard 115200 8N1."

@@ -3,6 +3,19 @@
   "event": "sample-event",
   "challenges": [
     {
+      "category": "ai",
+      "slug": "prompt-leak",
+      "name": "prompt-leak",
+      "author": "alice",
+      "difficulty": "easy",
+      "wave": 1,
+      "archetype": "static",
+      "flag_count": 1,
+      "has_writeup": true,
+      "has_hints": true,
+      "asset_count": 1
+    },
+    {
       "category": "crypto",
       "slug": "rsa-baby",
       "name": "rsa-baby",
@@ -29,6 +42,38 @@
       "asset_count": 0
     },
     {
+      "category": "hardware",
+      "slug": "serial-dump",
+      "name": "serial-dump",
+      "author": "alice",
+      "difficulty": "easy",
+      "wave": 1,
+      "archetype": "static",
+      "flag_count": 1,
+      "has_writeup": true,
+      "has_hints": true,
+      "asset_count": 1
+    },
+    {
+      "category": "jailbreak",
+      "slug": "pyjail-escape",
+      "name": "pyjail-escape",
+      "author": "alice",
+      "difficulty": "medium",
+      "wave": 1,
+      "archetype": "service",
+      "deploy": {
+        "subdomain": "pyjail",
+        "port": 16000,
+        "internal_port": 8000,
+        "tcp": true
+      },
+      "flag_count": 1,
+      "has_writeup": true,
+      "has_hints": true,
+      "asset_count": 0
+    },
+    {
       "category": "misc",
       "slug": "welcome",
       "name": "welcome",
@@ -47,6 +92,19 @@
       "asset_count": 0
     },
     {
+      "category": "osint",
+      "slug": "satellite-spot",
+      "name": "satellite-spot",
+      "author": "bob",
+      "difficulty": "easy",
+      "wave": 1,
+      "archetype": "static",
+      "flag_count": 1,
+      "has_writeup": true,
+      "has_hints": true,
+      "asset_count": 1
+    },
+    {
       "category": "pwn",
       "slug": "baby-overflow",
       "name": "baby-overflow",
@@ -63,6 +121,19 @@
       "has_writeup": true,
       "has_hints": false,
       "asset_count": 0
+    },
+    {
+      "category": "reverse",
+      "slug": "crackme-101",
+      "name": "crackme-101",
+      "author": "alice",
+      "difficulty": "easy",
+      "wave": 1,
+      "archetype": "static",
+      "flag_count": 1,
+      "has_writeup": true,
+      "has_hints": true,
+      "asset_count": 1
     },
     {
       "category": "web",

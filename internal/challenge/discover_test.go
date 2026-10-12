@@ -18,10 +18,15 @@ func TestDiscoverSampleEvent(t *testing.T) {
 		category, slug string
 		archetype      Archetype
 	}{
+		{"ai", "prompt-leak", ArchetypeStatic},
 		{"crypto", "rsa-baby", ArchetypeStatic},
 		{"forensics", "pcap-101", ArchetypeStatic},
+		{"hardware", "serial-dump", ArchetypeStatic},
+		{"jailbreak", "pyjail-escape", ArchetypeService},
 		{"misc", "welcome", ArchetypeService},
+		{"osint", "satellite-spot", ArchetypeStatic},
 		{"pwn", "baby-overflow", ArchetypeInstanced},
+		{"reverse", "crackme-101", ArchetypeStatic},
 		{"web", "cub3-clone", ArchetypeInstanced},
 	}
 	if len(got) != len(want) {

@@ -36,8 +36,9 @@ Every rule MCTF enforces, with rationale and severity. Hard-fails block the buil
 | `A004` | `dynamic_instances: false` and `port` is null | always hard |
 | `A005` | `dynamic_instances: false` and `internal_port` is not null | always hard |
 | `A006` | Deployable category (`web`/`pwn`/`jailbreak`) without `Dockerfile` AND `docker-compose.yml` in `challenge/` | always hard |
-| `A007` | `subdomain` missing or empty (required for all deployable challenges; used for HTTP routing and TLS-SNI on TCP) | always hard |
-| `A008` | `subdomain` violates DNS label regex `^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$` | always hard |
+| `A007` | Service-archetype challenge has no `deploy.internal_port` (required for ingress and instancer wiring) | always hard |
+| `A008` | `subdomain` missing or violates DNS label regex `^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$` | always hard |
+| `A009` | Flag declares `dynamic: true` but challenge is not instanced (`deploy.dynamic_instances: false` or omitted) | always hard |
 
 ### Event-wide uniqueness
 
@@ -119,15 +120,26 @@ A TCP challenge's public `deploy.port` is mapped to a NodePort deterministically
 
 ## Doctor checks (`mctf doctor`)
 
-These checks are evaluated by the `mctf doctor` command to verify the host environment's health, rather than the challenge manifests.
+These checks are evaluated by the `mctf doctor` command to verify repository integrity and host environment health prior to deployment.
 
-| ID | Rule | Severity |
-|---|---|---|
-| `D030` | Host ports free (verifies required category/deploy ports are not already bound) | hard |
-| `D031` | Expired instances (detects leaked/zombie per-team dynamic containers) | hard |
-| `D040` | DNS resolution (verifies that the event `subdomain.domain` resolves correctly) | hard |
-| `D041` | Free disk space (warns if < 15GB, fails if < 5GB) | warn / hard |
-| `D042` | Docker storage driver (warns if using slow drivers like `vfs`) | warn |
+| ID | Check | What it verifies | Severity |
+|---|---|---|---|
+| `D001` | Event config | `mctf.config.yml` exists, is valid YAML, and validates against schema v1 | hard |
+| `D002` | Challenges directory | `challenges/` directory exists and contains at least 1 discoverable challenge | hard |
+| `D003` | Challenge validation | Runs `mctf validate` preflight — zero validation errors | hard / warn |
+| `D010` | Docker binary | `docker` executable is present in `$PATH` | hard |
+| `D011` | Docker daemon | Docker daemon is running and reachable via socket / named pipe | warn |
+| `D012` | Docker Compose v2 | `docker compose` plugin (v2) is installed | hard |
+| `D013` | Git binary | `git` executable is present in `$PATH` | hard |
+| `D020` | Registry credentials | `MCTF_REGISTRY_USER` and `MCTF_REGISTRY_TOKEN` are set (required for `build --push`) | warn |
+| `D021` | CTFd token | `MCTF_CTFD_TOKEN` is set in environment (required for `platform sync`) | warn |
+| `D030` | Host ports free | Verified that required category/deploy ports are not already bound on host | hard |
+| `D031` | Expired instances | Detects leaked/zombie per-team dynamic containers pending reap | warn / hard |
+| `D040` | DNS resolution | Verifies that the event domain and challenge subdomains resolve | warn |
+| `D041` | Free disk space | Verifies available disk space (warns if < 15GB, fails if < 5GB) | warn / hard |
+| `D042` | Docker storage driver | Warns if Docker is using a slow/problematic storage driver (e.g. `vfs`) | warn |
+| `D043` | Committed secrets | Scans tracked git files for real `MCTF_*_{TOKEN,KEY,SECRET,WEBHOOK}` values | warn |
+
 
 ## Disabling rules
 
@@ -138,7 +150,7 @@ A challenge can opt out of specific warnings via a `# mctf-disable: W001 W005` c
 The `validate.yml` workflow reports validation results as a job summary on the PR. On hard-fails, the summary lists each violation with rule ID, file, and line number for easy navigation.
 
 ```
-❌ challenges/web/leaky-app/challenge/challenge.yml:14
+ challenges/web/leaky-app/challenge/challenge.yml:14
    SEC001: static flag value "mctf{...}" found in challenge/src/app.py
    This bakes the flag into the public image. Move it to flag.txt or load from env.
 ```

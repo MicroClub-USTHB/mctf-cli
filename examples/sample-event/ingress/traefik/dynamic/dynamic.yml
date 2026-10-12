@@ -11,3 +11,16 @@ http:
       loadBalancer:
         servers:
           - url: http://mctf-sample-event-misc-welcome-app-1:8000
+tcp:
+  routers:
+    mctf-sample-event-jailbreak-pyjail-escape:
+      rule: HostSNI(`pyjail.ctf.example.com`)
+      service: mctf-sample-event-jailbreak-pyjail-escape
+      entryPoints: [tcp]
+      tls:
+        passthrough: true
+  services:
+    mctf-sample-event-jailbreak-pyjail-escape:
+      loadBalancer:
+        servers:
+          - address: mctf-sample-event-jailbreak-pyjail-escape-app-1:8000
