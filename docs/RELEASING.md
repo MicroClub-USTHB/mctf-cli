@@ -16,6 +16,10 @@ publishes, for linux/macOS/windows on amd64 + arm64:
 - Linux packages (`.deb`, `.rpm`)
 - a Homebrew cask pushed to `MicroClub-USTHB/homebrew-tap`
 - a Docker image at `ghcr.io/microclub-usthb/mctf:<version>` and `:latest`
+- man pages (one per command), bundled in the archives (`man/`) and installed to `/usr/share/man/man1` by the `.deb`/`.rpm` packages
+
+Man pages are generated at build time (goreleaser `before` hook, same as
+`make man`), so there are no generated files committed to the repo.
 
 ## Docker image
 

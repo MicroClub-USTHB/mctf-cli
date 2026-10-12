@@ -6,6 +6,11 @@ version: 2
 
 project_name: mctf
 
+# Generate man pages before building so the archives can bundle them.
+before:
+  hooks:
+    - sh -c 'mkdir -p manpages && go run . gen-man manpages'
+
 builds:
   - id: mctf
     main: .
@@ -29,6 +34,11 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
+    files:
+      - src: manpages/*.1
+        dst: man
+        info:
+          mode: 0644
 
 checksum:
   name_template: checksums.txt
@@ -58,6 +68,9 @@ nfpms:
     license: MIT
     homepage: https://github.com/MicroClub-USTHB/mctf-cli
     formats: [deb, rpm]
+    contents:
+      - src: manpages/*.1
+        dst: /usr/share/man/man1
 
 # Homebrew cask pushed to MicroClub-USTHB/homebrew-tap (installs the binary).
 # Requires a HOMEBREW_TAP_TOKEN secret with write access to that repo.
