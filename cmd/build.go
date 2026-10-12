@@ -11,6 +11,7 @@ import (
 	"github.com/MicroClub-USTHB/mctf-cli/internal/build"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/plugin"
 )
 
 var (
@@ -86,14 +87,22 @@ var buildCmd = &cobra.Command{
 		}
 
 		ctx := context.Background()
+
+		// Lifecycle plugins (best-effort; a no-op without a `plugins:` block).
+		pm := plugin.Load(ctx, cfg.Plugins, plugin.Options{HostVersion: version, Dir: flagDir})
+		defer pm.Close()
+		pm.Dispatch(ctx, plugin.HookBeforeBuild, buildHookPayload(cfg, opts, "before", flagBuildDryRun, plan, "", nil))
+
 		buildOpts := opts
 		buildOpts.Push = false
 		if err := build.Apply(ctx, runner, plan, buildOpts); err != nil {
+			pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
 			return err
 		}
 
 		if !flagBuildDryRun && flagBuildScan {
 			if err := scanBuiltImages(ctx, plan); err != nil {
+				pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
 				return err
 			}
 		}
@@ -101,13 +110,45 @@ var buildCmd = &cobra.Command{
 		if flagBuildPush {
 			fmt.Printf("\npushing %d image(s) to registry...\n", len(plan))
 			if err := build.ApplyPush(ctx, runner, plan, opts); err != nil {
+				pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
 				return err
 			}
 		}
 
+		pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "success", nil))
 		fmt.Println("\nbuild complete")
 		return nil
 	},
+}
+
+// buildHookPayload builds the plugin hook body for a build run.
+func buildHookPayload(cfg *config.Config, opts build.Options, phase string, dryRun bool, plan []build.ImageSpec, outcome string, err error) plugin.BuildPayload {
+	eventSlug := ""
+	if cfg != nil {
+		eventSlug = cfg.Event.Slug
+	}
+	p := plugin.BuildPayload{
+		Event:   eventSlug,
+		Phase:   phase,
+		SHA:     opts.SHA,
+		NoCache: opts.NoCache,
+		Push:    opts.Push,
+		DryRun:  dryRun,
+		Outcome: outcome,
+	}
+	if err != nil {
+		p.Error = err.Error()
+	}
+	for _, spec := range plan {
+		p.Images = append(p.Images, plugin.BuildImage{
+			Challenge: spec.Challenge,
+			Category:  spec.Category,
+			Slug:      spec.Slug,
+			Tags:      spec.Tags,
+			Labels:    spec.Labels,
+		})
+	}
+	return p
 }
 
 // scanBuiltImages runs the post-build leak scan for every spec in
