@@ -29,12 +29,12 @@ while IFS= read -r line; do
       cfgfile=$(field file "$line")
       [ -n "$cfgfile" ] && logfile="$cfgfile"
       echo "[logger] initialized, logging to $logfile" >&2
-      printf '{"jsonrpc":"2.0","id":%s,"result":{"name":"logger","hooks":["before_deploy","after_deploy"]}}\n' "$id"
+      printf '{"jsonrpc":"2.0","id":%s,"result":{"name":"logger","hooks":["before_deploy","after_deploy","before_build","after_build"]}}\n' "$id"
       ;;
     shutdown)
       exit 0
       ;;
-    before_deploy|after_deploy)
+    before_deploy|after_deploy|before_build|after_build)
       echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $method $line" >> "$logfile"
       printf '{"jsonrpc":"2.0","id":%s,"result":{"ok":true}}\n' "$id"
       ;;
