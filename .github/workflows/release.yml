@@ -36,3 +36,6 @@ jobs:
           # Optional: set this secret (write access to MicroClub-USTHB/homebrew-tap)
           # to publish the Homebrew cask. Without it the cask push is skipped.
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          # Optional: set this secret (write access to MicroClub-USTHB/scoop-bucket)
+          # to publish the Scoop manifest. Without it the manifest push is skipped.
+          SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}

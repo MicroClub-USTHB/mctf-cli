@@ -1,7 +1,8 @@
 # goreleaser configuration for the mctf CLI.
-# Cuts cross-platform binaries, archives, checksums, Linux packages, and a
-# Homebrew formula on every `vX.Y.Z` tag. Run `goreleaser check` to validate
-# and `goreleaser release --snapshot --clean` for a dry run.
+# Cuts cross-platform binaries, archives, checksums, Linux packages, a
+# Homebrew cask, and a Scoop manifest on every `vX.Y.Z` tag. Run
+# `goreleaser check` to validate and `goreleaser release --snapshot --clean`
+# for a dry run.
 version: 2
 
 project_name: mctf
@@ -78,11 +79,11 @@ homebrew_casks:
   - name: mctf
     # Skip the tap push until HOMEBREW_TAP_TOKEN is configured, so a release
     # still succeeds (binaries/packages publish) before the tap is set up.
-    skip_upload: "{{ if .Env.HOMEBREW_TAP_TOKEN }}false{{ else }}true{{ end }}"
+    skip_upload: '{{ if index .Env "HOMEBREW_TAP_TOKEN" }}false{{ else }}true{{ end }}'
     repository:
       owner: MicroClub-USTHB
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      token: '{{ index .Env "HOMEBREW_TAP_TOKEN" }}'
     homepage: https://github.com/MicroClub-USTHB/mctf-cli
     description: MCTF — Modern CTF Framework CLI
     # Strip the quarantine attribute so the unsigned binary runs on macOS.
@@ -92,6 +93,25 @@ homebrew_casks:
           if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/mctf"]
           end
+
+# Scoop bucket manifest pushed to MicroClub-USTHB/scoop-bucket (Windows).
+# Requires a SCOOP_BUCKET_TOKEN secret with write access to that repo.
+scoops:
+  - name: mctf
+    # Skip the bucket push until SCOOP_BUCKET_TOKEN is configured, so a release
+    # still succeeds (binaries/packages publish) before the bucket is set up.
+    skip_upload: '{{ if index .Env "SCOOP_BUCKET_TOKEN" }}false{{ else }}true{{ end }}'
+    repository:
+      owner: MicroClub-USTHB
+      name: scoop-bucket
+      token: '{{ index .Env "SCOOP_BUCKET_TOKEN" }}'
+    commit_author:
+      name: microclub-bot
+      email: dev@microclub.info
+    commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: https://github.com/MicroClub-USTHB/mctf-cli
+    description: MCTF — Modern CTF Framework CLI
+    license: MIT
 
 changelog:
   use: git

@@ -35,7 +35,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 - ~~**goreleaser** — cross-platform binaries (darwin-arm64 / amd64, linux-amd64 / arm64, windows-amd64).~~ **Shipped** (`.goreleaser.yaml` + release workflow; see `docs/RELEASING.md`).
 - ~~**Homebrew tap** — formula in `MicroClub-USTHB/homebrew-tap`.~~ **Shipped** (Homebrew cask; needs one-time tap repo + `HOMEBREW_TAP_TOKEN`).
 - ~~**`.deb` / `.rpm`** — via goreleaser.~~ **Shipped** (nfpms).
-- **Scoop bucket** — for Windows (needs a bucket repo; config to follow).
+- ~~**Scoop bucket** — for Windows (needs a bucket repo; config to follow).~~ **Shipped** (GoReleaser `scoops`; needs one-time bucket repo + `SCOOP_BUCKET_TOKEN`).
 - ~~**Docker image of `mctf` itself** — `ghcr.io/microclub-usthb/mctf:<version>` for CI use.~~ **Shipped** (goreleaser `dockers` → GHCR; amd64, multi-arch to follow).
 
 ## CI / quality
