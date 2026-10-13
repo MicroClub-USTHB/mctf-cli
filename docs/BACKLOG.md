@@ -41,7 +41,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 ## CI / quality
 
 - **golangci-lint** in CI (`go vet` is currently the only static check).
-- **Coverage reporting** — `go test -coverprofile` upload to Codecov / similar.
+- ~~**Coverage reporting** — `go test -coverprofile` upload to Codecov / similar.~~ **Shipped:** CI runs atomic coverprofile, reports step summary, uploads to Codecov + artifacts, with local `make test-coverage`.
 - **Fuzz tests** for the manifest loader and the compose port parser.
 - **End-to-end integration test** — sample-event fixture: validate → generate → build → scan → deploy → solve → down. Real docker daemon, gated on an `e2e` build tag.
 
