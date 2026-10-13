@@ -42,8 +42,11 @@ If `make build` fails on a fresh checkout, run `go mod download` first.
 | `internal/ingress/` | Generates routing config for the deploy mode's reverse proxy (currently Traefik dynamic config). |
 | `internal/instancer/` | Manages per-team challenge instances: lifecycle planning (`PlanSpawn`), store persistence, HTTP daemon, reaper. Mints per-team dynamic flags at spawn time. |
 | `internal/jsonschema/` | Thin wrapper around `santhosh-tekuri/jsonschema/v5` with MCTF-specific error formatting. |
+| `internal/kubernetes/` | Planning, manifest generation, NodePort derivation, and `kubectl` execution for Kubernetes deploy mode. |
+| `internal/monitoring/` | Orchestrates the observability stack (Prometheus + Grafana + cAdvisor) and prebuilt dashboards for `mctf monitoring up/down`. |
 | `internal/notify/` | Posts deploy/build outcome messages to optional notification channels (Slack, webhook). |
 | `internal/platform/ctfd/` | Typed REST client for the CTFd API. Scope: just the endpoints needed by `mctf platform sync` (challenges, flags, hints, files, visibility). |
+| `internal/plugin/` | Plugin manager, protocol definition, and subprocess execution for lifecycle hooks (`before_deploy`, `after_deploy`). |
 | `internal/scaffold/` | Renders embedded Go templates onto the filesystem for `mctf init`. |
 | `internal/schemas/` | **Embedded copy** of the JSON Schemas. Synced from `schema/` by `make schemas` — never edit directly. |
 | `internal/solve/` | Runs a challenge's solution script and verifies the flag. Supports `--against-instance` to target a live per-team instance. |
@@ -102,16 +105,28 @@ Two cases:
 4. Document the format under `docs/spec/derived-files.md` with an example and the input → output mapping table.
 5. Add a Python sanity check in `scripts/validate-generated.py` so CI catches schema drift in generated output.
 
-## Tests
+## Tests & Make targets
+
+| Target | Description |
+|---|---|
+| `make build` | Builds the `mctf` binary with embedded version and commit metadata (runs `schemas` first). |
+| `make test` | Runs all unit tests (`go test ./...`). |
+| `make test-integration` | Runs integration tests (`go test -tags integration ./...`). Requires Docker. |
+| `make lint` | Runs `go vet ./...` and `golangci-lint run ./...`. |
+| `make schemas` | Syncs canonical `schema/*.json` files into `internal/schemas/` and guards against drift. |
+| `make man` | Generates manual pages for all commands into `manpages/` via `mctf gen-man`. |
+| `make tidy` | Runs `go mod tidy` to clean dependencies. |
+| `make clean` | Removes the compiled `mctf` binary. |
 
 - `go test ./...` runs the unit tests. Add new tests next to the package they cover.
 - Tests should not require network, Docker, or a running CTFd. If you need fixtures, put them under `internal/<pkg>/testdata/`.
 - For interactive prompts (e.g., `cmd/init.go`), inject test input via the `promptIn` variable — see `cmd/init_test.go` for the pattern.
 - The sample event under `examples/sample-event/` is the integration fixture; CI uses it directly.
 
-## Branching & PRs
+## Branching & PRs (develop-not-main convention)
 
-- Branch off `develop`. Name your branch `<area>/<short-description>` — examples: `validate/duplicate-port-check`, `generate/csv-utf8`, `cmd/init-skeleton`.
+- **Always branch off `develop`.** Never branch from or target `main`. `main` is reserved strictly for official tagged releases.
+- Name your branch `<area>/<short-description>` — examples: `validate/duplicate-port-check`, `generate/csv-utf8`, `cmd/init-skeleton`.
 - Open the PR against `develop`. Request review from at least one other member.
 - Squash-merge by default unless the branch contains intentionally separate logical commits.
 - Never push directly to `main` or `develop` once branch protection is enabled.
@@ -127,7 +142,7 @@ Pulls challenge.hints[] into the auto-generated CTFd manifest under the
 "hints" key. Manifests without hints stay omitted from the output.
 ```
 
-Common scopes: `validate`, `generate`, `config`, `challenge`, `cmd`, `schema`, `docs`, `ci`, `chore`, `build`, `deploy`, `doctor`, `instancer`, `platform`, `solve`, `ingress`, `notify`, `status`, `info`.
+Common scopes: `validate`, `generate`, `config`, `challenge`, `cmd`, `schema`, `docs`, `ci`, `chore`, `build`, `deploy`, `doctor`, `instancer`, `platform`, `solve`, `ingress`, `notify`, `status`, `info`, `kubernetes`, `monitoring`, `plugin`.
 
 ## Code style
 
@@ -156,9 +171,7 @@ All three must be green. If you can't get them green locally, push the WIP branc
 
 ## Releases
 
-Pre-v0.1, releases are git tags only — no published artifacts. Tag format `v0.0.<N>`. Use `make build` to produce a binary locally.
-
-Once v0.1 ships, `goreleaser` takes over for cross-compiled binaries.
+Releases are published automatically via **GoReleaser** on git tags `vX.Y.Z`. Releases produce cross-compiled binaries, `.deb` and `.rpm` packages, Homebrew taps, and Docker images on GHCR. See [`docs/RELEASING.md`](docs/RELEASING.md) for the release checklist and process.
 
 ## Questions
 

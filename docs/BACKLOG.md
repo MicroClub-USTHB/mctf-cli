@@ -23,12 +23,12 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 ## Polish & docs
 
-- **Update `docs/spec/validation.md`** to reflect every rule that shipped (D001–D003, SEC002–004, W006–W010, A007, etc.).
+- ~~**Update `docs/spec/validation.md`**~~ to reflect every rule that shipped (`D001`–`D043`, `K001`–`K003`, `SEC001`–`SEC004`, `A001`–`A009`, `W001`–`W012`). **Shipped**.
 - **Update `docs/spec/CHANGELOG.md`** with the v0 → v0.1 delta.
 - ~~**Architecture doc** (`docs/spec/architecture.md`) — how the packages fit together.~~ **Shipped** — pipeline diagram, package map, archetypes, deploy modes, and the two instancer implementations.
 - ~~**Per-command man pages** — `cobra` can generate them; ship under `docs/man/`.~~ **Shipped** via `mctf gen-man` / `make man`; generated at release time and bundled in the archives + `.deb`/`.rpm` (not committed, to avoid build-date drift).
-- **Update CONTRIBUTING.md** — new packages (`instancer`, `ingress`, `notify`, `solve`, `status`, `info`, `platform/ctfd`).
-- **Refresh `examples/sample-event/`** — add one challenge per core category (currently 5 challenges, 10 categories). Helps new contributors.
+- ~~**Update CONTRIBUTING.md**~~ — new packages (`instancer`, `ingress`, `notify`, `solve`, `status`, `info`, `platform/ctfd`, `kubernetes`, `monitoring`, `plugin`), make targets, and develop-not-main convention. **Shipped**.
+- ~~**Refresh `examples/sample-event/`**~~ — add one challenge per core category (10 core categories covered), including service archetype in `jailbreak`. **Shipped**.
 
 ## Distribution
 

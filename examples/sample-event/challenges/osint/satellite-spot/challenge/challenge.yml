@@ -1,0 +1,17 @@
+schema: 1
+
+challenge:
+  name: "satellite-spot"
+  author: "bob"
+  category: osint
+  difficulty: easy
+  description: |
+    A reconnaissance satellite snapped `satellite.png`. Identify the coordinates.
+  wave: 1
+  flags:
+    - { flag: "mctf{c00rd1n4t3s_f0und_42_3}", case_sensitive: true }
+  need_deploy: false
+  tags: ["geolocation", "imagery"]
+  hints:
+    - cost: 0
+      content: "Look at the unique landmark shapes in the image."

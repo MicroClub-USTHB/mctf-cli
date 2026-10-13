@@ -1,0 +1,17 @@
+schema: 1
+
+challenge:
+  name: "prompt-leak"
+  author: "alice"
+  category: ai
+  difficulty: easy
+  description: |
+    A company deployed an AI assistant with confidential instructions. We obtained `instructions.txt`. Can you analyze the system prompt and recover the flag?
+  wave: 1
+  flags:
+    - { flag: "mctf{pr0mpt_1nj3ct10n_s3cr3t_l34k}", case_sensitive: true }
+  need_deploy: false
+  tags: ["prompt-injection"]
+  hints:
+    - cost: 0
+      content: "Inspect the system instructions and boundary delimiters."
