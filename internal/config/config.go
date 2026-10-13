@@ -53,6 +53,9 @@ type Config struct {
 type Event struct {
 	Name        string   `json:"name"`
 	Slug        string   `json:"slug"`
+	Description string   `json:"description,omitempty"`
+	StartAt     string   `json:"start_at,omitempty"`
+	EndAt       string   `json:"end_at,omitempty"`
 	Domain      string   `json:"domain,omitempty"`
 	FlagPrefix  string   `json:"flag_prefix,omitempty"`
 	WavesNumber int      `json:"waves_number,omitempty"`

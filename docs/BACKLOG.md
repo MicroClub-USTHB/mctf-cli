@@ -14,7 +14,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 - **rCTF + generic-webhook platforms** — second + third platform targets behind the existing platform interface, ideally via plugin once the system lands.
 - **Per-team auth on the instancer** — currently bearer tokens have full power; add team-scoped tokens (`POST /spawn` only allows the request when the token's team_id matches the body).
 - **Native instancer: docker-network isolation** — currently spawns share the event network; isolate each per-team instance to its own bridge.
-- **`mctf platform configure` extensions** — sync `start` / `end` timestamps (needs schema addition `event.start_at` / `event.end_at`), `ctf_description`.
+- ~~**`mctf platform configure` extensions** — sync `start` / `end` timestamps (needs schema addition `event.start_at` / `event.end_at`), `ctf_description`.~~ **Shipped** (schema v1 event metadata + CTFd sync; see `docs/spec/CHANGELOG.md`).
 - **`mctf release`** — tag git, build via goreleaser, draft a release notes file from conventional-commits since last tag.
 
 ## Small wins (~half-day each)

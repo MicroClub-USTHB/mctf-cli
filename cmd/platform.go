@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -141,11 +142,11 @@ var (
 
 var platformConfigureCmd = &cobra.Command{
 	Use:   "configure",
-	Short: "Sync event-level CTFd config (ctf_name) from mctf.config.yml",
-	Long: "Pushes ctf_name to CTFd's /api/v1/configs from the loaded\n" +
-		"event config. Theme settings (theme_name, theme_color, custom\n" +
-		"HTML) are intentionally not synced — those are typically a one-\n" +
-		"time UI setup, not per-event automation.\n\n" +
+	Short: "Sync event-level CTFd config (ctf_name, ctf_description, start, end) from mctf.config.yml",
+	Long: "Pushes ctf_name, ctf_description, start, and end timestamps to CTFd's\n" +
+		"/api/v1/configs from the loaded event config. Theme settings\n" +
+		"(theme_name, theme_color, custom HTML) are intentionally not synced —\n" +
+		"those are typically a one-time UI setup, not per-event automation.\n\n" +
 		"Token: export MCTF_CTFD_TOKEN=<your-token> before running.\n\n" +
 		"Examples:\n" +
 		"  mctf platform configure --dry-run\n" +
@@ -169,16 +170,44 @@ var platformConfigureCmd = &cobra.Command{
 			return fmt.Errorf("event.name is empty in mctf.config.yml — nothing to push")
 		}
 
+		if cfg.Event.StartAt != "" && cfg.Event.EndAt != "" {
+			start, err := time.Parse(time.RFC3339, cfg.Event.StartAt)
+			if err != nil {
+				return fmt.Errorf("invalid event.start_at: %w", err)
+			}
+			end, err := time.Parse(time.RFC3339, cfg.Event.EndAt)
+			if err != nil {
+				return fmt.Errorf("invalid event.end_at: %w", err)
+			}
+			if !start.Before(end) {
+				return fmt.Errorf("event.start_at (%s) must be before event.end_at (%s)", cfg.Event.StartAt, cfg.Event.EndAt)
+			}
+		}
+
 		fmt.Printf("planned config:\n")
 		fmt.Printf("  ctf_name = %q\n", cfg.Event.Name)
+		if cfg.Event.Description != "" {
+			fmt.Printf("  ctf_description = %q\n", cfg.Event.Description)
+		}
+		if cfg.Event.StartAt != "" {
+			fmt.Printf("  start = %q\n", cfg.Event.StartAt)
+		}
+		if cfg.Event.EndAt != "" {
+			fmt.Printf("  end = %q\n", cfg.Event.EndAt)
+		}
 		if flagConfigureDryRun {
 			return nil
 		}
 
 		client := ctfd.New(cfg.Platform.URL, token)
 		ctx := context.Background()
-		if err := client.SetConfig(ctx, "ctf_name", cfg.Event.Name); err != nil {
-			return fmt.Errorf("set ctf_name: %w", err)
+		if err := client.Configure(ctx, ctfd.EventConfig{
+			Name:        cfg.Event.Name,
+			Description: cfg.Event.Description,
+			StartAt:     cfg.Event.StartAt,
+			EndAt:       cfg.Event.EndAt,
+		}); err != nil {
+			return err
 		}
 		fmt.Println("\nconfig pushed")
 		return nil

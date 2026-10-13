@@ -320,3 +320,91 @@ func TestUpdateChallenge_PATCH(t *testing.T) {
 		t.Errorf("name = %q", out.Name)
 	}
 }
+
+func TestConfigure_AllFields(t *testing.T) {
+	f, c, _ := newFake(t)
+	calls := make(map[string]string)
+	f.handler = func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "PATCH" {
+			t.Errorf("method = %s", r.Method)
+		}
+		var b map[string]string
+		_ = json.Unmarshal(f.bodies[len(f.bodies)-1], &b)
+		calls[r.URL.Path] = b["value"]
+		_, _ = w.Write([]byte(`{"success": true, "data": {}}`))
+	}
+
+	cfg := EventConfig{
+		Name:        "Test CTF",
+		Description: "A great CTF",
+		StartAt:     "2026-10-15T10:00:00Z",
+		EndAt:       "2026-10-17T18:00:00Z",
+	}
+	if err := c.Configure(context.Background(), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]string{
+		"/api/v1/configs/ctf_name":        "Test CTF",
+		"/api/v1/configs/ctf_description": "A great CTF",
+		"/api/v1/configs/start":           "2026-10-15T10:00:00Z",
+		"/api/v1/configs/end":             "2026-10-17T18:00:00Z",
+	}
+	if len(calls) != len(want) {
+		t.Fatalf("got %d calls, want %d", len(calls), len(want))
+	}
+	for k, v := range want {
+		if calls[k] != v {
+			t.Errorf("calls[%q] = %q, want %q", k, calls[k], v)
+		}
+	}
+}
+
+func TestConfigure_PartialFields(t *testing.T) {
+	f, c, _ := newFake(t)
+	var paths []string
+	f.handler = func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		_, _ = w.Write([]byte(`{"success": true, "data": {}}`))
+	}
+
+	// Only name and description, no timestamps
+	cfg := EventConfig{
+		Name:        "Only Name",
+		Description: "Only Desc",
+	}
+	if err := c.Configure(context.Background(), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(paths) != 2 {
+		t.Fatalf("got %d calls, want 2: %v", len(paths), paths)
+	}
+	if paths[0] != "/api/v1/configs/ctf_name" || paths[1] != "/api/v1/configs/ctf_description" {
+		t.Errorf("unexpected paths: %v", paths)
+	}
+}
+
+func TestConfigure_ErrorPropagation(t *testing.T) {
+	f, c, _ := newFake(t)
+	f.handler = func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/configs/start" {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"success": false, "message": "database error"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"success": true, "data": {}}`))
+	}
+
+	cfg := EventConfig{
+		Name:    "Test CTF",
+		StartAt: "2026-10-15T10:00:00Z",
+	}
+	err := c.Configure(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "set start:") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
