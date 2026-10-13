@@ -37,16 +37,16 @@ END {
   for (p in pkg_stmts) {
     if (pkg_stmts[p] == 0) continue
     pct = (pkg_covered[p] / pkg_stmts[p]) * 100
-    icon = "🔴"
-    if (pct >= 70.0) icon = "🟢"
-    else if (pct >= 30.0) icon = "🟡"
-    printf "| `%s` | %.1f%% | %s |\n", p, pct, icon
+    status = "LOW"
+    if (pct >= 70.0) status = "GOOD"
+    else if (pct >= 30.0) status = "WARN"
+    printf "| `%s` | %.1f%% | %s |\n", p, pct, status
   }
 }
 ' "$COV_FILE" | sort)
 
 SUMMARY_MD=$(cat <<EOF
-## 📊 Go Test Coverage Report
+## Go Test Coverage Report
 
 **Overall Statement Coverage:** \`$TOTAL\`
 
@@ -54,7 +54,7 @@ SUMMARY_MD=$(cat <<EOF
 | :--- | :---: | :---: |
 $PKG_ROWS
 
-*Legend: 🟢 &ge; 70% &nbsp;|&nbsp; 🟡 30%–69% &nbsp;|&nbsp; 🔴 &lt; 30%*
+*Thresholds: GOOD &ge; 70% | WARN 30%–69% | LOW &lt; 30%*
 EOF
 )
 
