@@ -5,7 +5,7 @@ LDFLAGS := -X github.com/MicroClub-USTHB/mctf-cli/cmd.version=$(VERSION) \
            -X github.com/MicroClub-USTHB/mctf-cli/cmd.commit=$(COMMIT) \
            -X github.com/MicroClub-USTHB/mctf-cli/cmd.date=$(DATE)
 
-.PHONY: build test test-integration lint tidy run clean schemas man
+.PHONY: build test test-coverage coverage-html test-integration lint tidy run clean schemas man
 
 build: schemas
 	go build -ldflags "$(LDFLAGS)" -o mctf .
@@ -27,6 +27,14 @@ schemas:
 
 test:
 	go test ./...
+
+test-coverage:
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	@./scripts/coverage-summary.sh coverage.out
+
+coverage-html: test-coverage
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "HTML coverage report written to coverage.html"
 
 # Integration tests (gated by the `integration` build tag). Boots a real
 # sshd container + exercises the SSH runner end-to-end. Requires docker

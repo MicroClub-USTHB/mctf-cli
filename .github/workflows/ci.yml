@@ -34,7 +34,31 @@ jobs:
           cache: true
 
       - run: go vet ./...
-      - run: go test -race ./...
+      - name: test with race detector and coverage
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: report coverage summary
+        run: ./scripts/coverage-summary.sh coverage.out
+
+      - name: upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out
+          fail_ci_if_error: false
+
+      - name: generate html coverage report
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.out
+            coverage.html
+          retention-days: 14
+
       - run: make build
 
       - name: validate the sample event
