@@ -101,8 +101,9 @@ deterministic deploys and `deploy --rollback`.
   for production; kept for offline local dev.
 - **Remote ([MCTF Instancer](https://github.com/MicroClub-USTHB/mctf-instancer))** —
   the production Python service (CTFd-integrated, per-team auth, Traefik
-  routing). When `instancer.url` is set, `mctf instance list` / `destroy` drive
-  it over its admin API (`internal/instancer.APIClient`).
+  routing). When `instancer.url` is set, all `mctf instance` subcommands
+  (`spawn`, `list`, `destroy`, `extend`, `flag`, `ps`) drive it over its admin
+  API (`internal/instancer.APIClient`).
 
 ## Design notes
 

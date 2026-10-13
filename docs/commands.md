@@ -39,11 +39,11 @@ deterministic deploys and `deploy --rollback`.
 
 | Command | Purpose |
 | --- | --- |
-| `mctf instancer` | Run the per-team instancer daemon |
-| `mctf instance spawn` | Spawn a per-team instance of an instanced challenge |
-| `mctf instance list` / `ps` / `flag` | Inspect live instances |
-| `mctf instance extend` | Bump an instance's expiry (`--by`, default 15m) |
-| `mctf instance destroy` / `reap` | Tear down one / all expired instances |
+| `mctf instancer` | Run the per-team instancer daemon (local dev; deprecated) |
+| `mctf instance spawn` | Spawn a per-team instance (remote when `instancer.url` is set, else local) |
+| `mctf instance list` / `ps` / `flag` | Inspect live instances (remote when `instancer.url` is set, else local) |
+| `mctf instance extend` | Bump an instance's expiry (`--by`, default 15m; remote or local) |
+| `mctf instance destroy` / `reap` | Tear down one / all expired instances (remote or local) |
 
 ## Platform (CTFd)
 

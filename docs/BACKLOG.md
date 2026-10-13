@@ -11,6 +11,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 ## Medium features (1–2 days each)
 
+- ~~**Remote instancer control plane** — wire `mctf instance spawn/extend/flag/ps` to remote API.~~ **Shipped:** all subcommands drive the remote instancer when `instancer.url` is set with fallback to local store.
 - **rCTF + generic-webhook platforms** — second + third platform targets behind the existing platform interface, ideally via plugin once the system lands.
 - **Per-team auth on the instancer** — currently bearer tokens have full power; add team-scoped tokens (`POST /spawn` only allows the request when the token's team_id matches the body).
 - **Native instancer: docker-network isolation** — currently spawns share the event network; isolate each per-team instance to its own bridge.
