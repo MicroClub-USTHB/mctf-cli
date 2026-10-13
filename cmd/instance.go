@@ -19,6 +19,7 @@ import (
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/instancer"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/plugin"
 )
 
 var instanceCmd = &cobra.Command{
@@ -107,9 +108,33 @@ var instanceSpawnCmd = &cobra.Command{
 		if err := store.Put(inst); err != nil {
 			return fmt.Errorf("persist instance: %w", err)
 		}
+
+		// Lifecycle plugins (best-effort; a no-op without a `plugins:` block).
+		pm := plugin.Load(ctx, cfg.Plugins, plugin.Options{HostVersion: version, Dir: flagDir})
+		defer pm.Close()
+		pm.Dispatch(ctx, plugin.HookOnInstanceSpawn, instanceSpawnPayload(cfg, inst))
+
 		fmt.Printf("\nspawn complete (expires %s)\n", inst.ExpiresAt.Format(time.RFC3339))
 		return nil
 	},
+}
+
+// instanceSpawnPayload converts an instancer.Instance into the plugin hook body.
+func instanceSpawnPayload(cfg *config.Config, inst instancer.Instance) plugin.InstanceSpawnPayload {
+	eventSlug := ""
+	if cfg != nil {
+		eventSlug = cfg.Event.Slug
+	}
+	return plugin.InstanceSpawnPayload{
+		Event:         eventSlug,
+		InstanceID:    inst.ID,
+		ChallengeSlug: inst.ChallengeSlug,
+		TeamID:        inst.TeamID,
+		Ports:         inst.Ports,
+		Flag:          inst.Flag,
+		Containers:    inst.Containers,
+		ExpiresAt:     inst.ExpiresAt,
+	}
 }
 
 var (

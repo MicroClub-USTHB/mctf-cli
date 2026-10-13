@@ -12,6 +12,7 @@ import (
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/plugin"
 )
 
 // Server is the HTTP daemon. It owns the store, runner, and challenge
@@ -25,6 +26,7 @@ type Server struct {
 	spawns        keyLock
 	portMu        sync.Mutex
 	reservedPorts map[int]bool
+	pm            *plugin.Manager
 }
 
 // Options configures the Server.
@@ -32,6 +34,9 @@ type Options struct {
 	// Tokens are the bearer tokens accepted on every authed route.
 	// At least one token must be set; an empty set means "deny all".
 	Tokens []string
+	// PluginManager dispatches lifecycle hooks (e.g. on_instance_spawn)
+	// to registered plugins. Optional; nil disables plugin dispatch.
+	PluginManager *plugin.Manager
 }
 
 // NewServer constructs a Server from the given config + challenges +
@@ -57,6 +62,7 @@ func NewServer(cfg *config.Config, store *Store, runner Runner, challs []*challe
 		chalIdx:       idx,
 		spawns:        keyLock{m: make(map[string]*refLock)},
 		reservedPorts: make(map[int]bool),
+		pm:            opts.PluginManager,
 	}
 }
 
@@ -180,6 +186,24 @@ func (s *Server) spawn(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "persist: "+err.Error())
 		return
 	}
+
+	if s.pm != nil {
+		eventSlug := ""
+		if s.cfg != nil {
+			eventSlug = s.cfg.Event.Slug
+		}
+		s.pm.Dispatch(r.Context(), plugin.HookOnInstanceSpawn, plugin.InstanceSpawnPayload{
+			Event:         eventSlug,
+			InstanceID:    inst.ID,
+			ChallengeSlug: inst.ChallengeSlug,
+			TeamID:        inst.TeamID,
+			Ports:         inst.Ports,
+			Flag:          inst.Flag,
+			Containers:    inst.Containers,
+			ExpiresAt:     inst.ExpiresAt,
+		})
+	}
+
 	writeJSON(w, http.StatusCreated, inst)
 }
 
@@ -314,5 +338,12 @@ func (l *keyLock) Lock(key string) func() {
 			delete(l.m, key)
 		}
 		entry.mu.Unlock()
+	}
+}
+
+// Close terminates any active plugin subprocesses owned by the server.
+func (s *Server) Close() {
+	if s.pm != nil {
+		s.pm.Close()
 	}
 }

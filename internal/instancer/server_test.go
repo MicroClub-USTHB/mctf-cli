@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/plugin"
 )
 
 func newTestServer(t *testing.T) (*Server, *httptest.Server, *FakeRunner) {
@@ -325,6 +328,87 @@ func TestServer_ConcurrentDuplicateSpawn(t *testing.T) {
 	}
 	if len(runner.UpCalls) != 1 {
 		t.Errorf("expected Up to be called exactly once, got %d", len(runner.UpCalls))
+	}
+}
+
+func TestServer_Spawn_DispatchesPluginHook(t *testing.T) {
+	tmp := t.TempDir()
+	logFile := filepath.Join(tmp, "spawn.log")
+	script := filepath.Join(tmp, "plugin.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/sh
+while IFS= read -r line; do
+  method=$(printf '%%s' "$line" | sed -n 's/.*"method":"\([^"]*\)".*/\1/p')
+  id=$(printf '%%s' "$line" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+  case "$method" in
+    initialize)
+      printf '{"jsonrpc":"2.0","id":%%s,"result":{"name":"test-plugin","hooks":["on_instance_spawn"]}}\n' "$id"
+      ;;
+    shutdown)
+      exit 0
+      ;;
+    on_instance_spawn)
+      echo "$line" >> "%s"
+      printf '{"jsonrpc":"2.0","id":%%s,"result":{"ok":true}}\n' "$id"
+      ;;
+  esac
+done
+`, logFile)
+	if err := os.WriteFile(script, []byte(scriptContent), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	raw := []map[string]any{{
+		"name":    "test",
+		"command": script,
+	}}
+	pm := plugin.Load(context.Background(), raw, plugin.Options{
+		HostVersion:  "test",
+		StartTimeout: 5 * time.Second,
+	})
+	if pm == nil {
+		t.Fatal("expected live plugin manager")
+	}
+	defer pm.Close()
+
+	cfg := &config.Config{
+		Version:   1,
+		Event:     config.Event{Slug: "test-event"},
+		Instancer: &config.Instancer{DefaultTimeout: 600},
+	}
+	store, err := NewStore(filepath.Join(tmp, "instances.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := NewFakeRunner()
+	c := instancedChall("cub3", "web", 8000)
+	srv := NewServer(cfg, store, runner, []*challenge.Challenge{c}, Options{
+		Tokens:        []string{"secret"},
+		PluginManager: pm,
+	})
+	defer srv.Close()
+
+	httpSrv := httptest.NewServer(srv.Handler())
+	defer httpSrv.Close()
+
+	body := `{"team_id": "team-42", "challenge_slug": "web/cub3"}`
+	resp := authedPOST(t, httpSrv.URL, "/spawn", "secret", body)
+	if resp.StatusCode != 201 {
+		t.Fatalf("expected 201, got %d", resp.StatusCode)
+	}
+
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("failed to read plugin log: %v", err)
+	}
+	s := string(data)
+	if !strings.Contains(s, "on_instance_spawn") {
+		t.Errorf("on_instance_spawn hook not found in plugin log: %s", s)
+	}
+	if !strings.Contains(s, `"team_id":"team-42"`) {
+		t.Errorf("team_id not found in plugin log: %s", s)
+	}
+	if !strings.Contains(s, `"challenge_slug":"web/cub3"`) {
+		t.Errorf("challenge_slug not found in plugin log: %s", s)
 	}
 }
 
