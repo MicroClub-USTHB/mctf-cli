@@ -325,6 +325,40 @@ func (c *Client) SetConfig(ctx context.Context, key, value string) error {
 	return c.do(ctx, "PATCH", "/api/v1/configs/"+key, body, nil)
 }
 
+// EventConfig defines event-level metadata pushed to CTFd configs.
+type EventConfig struct {
+	Name        string
+	Description string
+	StartAt     string
+	EndAt       string
+}
+
+// Configure pushes event-level settings (ctf_name, ctf_description, start, end)
+// to CTFd's /api/v1/configs. Non-empty fields are updated sequentially.
+func (c *Client) Configure(ctx context.Context, cfg EventConfig) error {
+	if cfg.Name != "" {
+		if err := c.SetConfig(ctx, "ctf_name", cfg.Name); err != nil {
+			return fmt.Errorf("set ctf_name: %w", err)
+		}
+	}
+	if cfg.Description != "" {
+		if err := c.SetConfig(ctx, "ctf_description", cfg.Description); err != nil {
+			return fmt.Errorf("set ctf_description: %w", err)
+		}
+	}
+	if cfg.StartAt != "" {
+		if err := c.SetConfig(ctx, "start", cfg.StartAt); err != nil {
+			return fmt.Errorf("set start: %w", err)
+		}
+	}
+	if cfg.EndAt != "" {
+		if err := c.SetConfig(ctx, "end", cfg.EndAt); err != nil {
+			return fmt.Errorf("set end: %w", err)
+		}
+	}
+	return nil
+}
+
 // GetConfig fetches a single config key.
 func (c *Client) GetConfig(ctx context.Context, key string) (string, error) {
 	var env envelope[ConfigEntry]
