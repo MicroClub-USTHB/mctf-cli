@@ -39,7 +39,7 @@ var (
 
 var instanceSpawnCmd = &cobra.Command{
 	Use:   "spawn <category>/<slug>",
-	Short: "Spawn a per-team instance of an instanced challenge",
+	Short: "Spawn a per-team instance of an instanced challenge (remote instancer when instancer.url is set, else local store)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		category, slug, ok := splitCategorySlug(args[0])
@@ -48,6 +48,10 @@ var instanceSpawnCmd = &cobra.Command{
 		}
 		if flagInstSpawnTeam == "" {
 			return fmt.Errorf("--team is required")
+		}
+
+		if url, ok := remoteInstancerURL(); ok {
+			return spawnRemoteInstance(cmd.Context(), url, category, slug, flagInstSpawnTeam, flagInstSpawnFlag)
 		}
 
 		cfg, ch, err := loadInstanced(category, slug)
@@ -237,9 +241,13 @@ var flagInstExtendBy time.Duration
 
 var instanceExtendCmd = &cobra.Command{
 	Use:   "extend <instance-id>",
-	Short: "Bump an instance's expiry by --by (default 15m)",
+	Short: "Bump an instance's expiry by --by (remote instancer when instancer.url is set, else local store)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if url, ok := remoteInstancerURL(); ok {
+			return extendRemoteInstance(cmd.Context(), url, args[0], flagInstExtendBy)
+		}
+
 		store, err := openStore()
 		if err != nil {
 			return err
@@ -265,12 +273,16 @@ var instanceExtendCmd = &cobra.Command{
 
 var instanceFlagCmd = &cobra.Command{
 	Use:   "flag <instance-id>",
-	Short: "Print the flag for a live instance",
+	Short: "Print the flag for a live instance (remote instancer when instancer.url is set, else local store)",
 	Long: "Reads the per-team flag captured when the instance was spawned\n" +
 		"(`--flag` override or the manifest's static flag). Falls back to\n" +
 		"the manifest if the store record predates the flag field.",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if url, ok := remoteInstancerURL(); ok {
+			return flagRemoteInstance(cmd.Context(), url, args[0])
+		}
+
 		store, err := openStore()
 		if err != nil {
 			return err
@@ -356,13 +368,17 @@ func inspectContainersViaDocker(ctx context.Context, ids []string) ([]containerS
 
 var instancePsCmd = &cobra.Command{
 	Use:   "ps <instance-id>",
-	Short: "Show live docker state for an instance",
+	Short: "Show live state for an instance (remote instancer when instancer.url is set, else local store)",
 	Long: "Looks up the instance in the store and queries `docker ps` for\n" +
 		"each container in it. Reports up-time / health status, image, and\n" +
 		"the host-port mapping captured at spawn.\n\n" +
 		"The flag is intentionally not printed — use `mctf instance flag <id>`.",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if url, ok := remoteInstancerURL(); ok {
+			return psRemoteInstance(cmd.Context(), url, args[0])
+		}
+
 		store, err := openStore()
 		if err != nil {
 			return err
@@ -506,6 +522,112 @@ func remoteInstancerURL() (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// spawnRemoteInstance requests the remote instancer's admin API to spawn a new instance.
+func spawnRemoteInstance(ctx context.Context, baseURL, category, slug, teamID, flagOverride string) error {
+	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	challengeID := category + "/" + slug
+	req := instancer.AdminSpawnRequest{
+		ChallengeID: challengeID,
+		TeamID:      teamID,
+		UserID:      teamID,
+		Flag:        flagOverride,
+	}
+	inst, err := client.Spawn(ctx, req)
+	if err != nil {
+		return err
+	}
+	if flagJSON {
+		body, err := json.MarshalIndent(inst, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(body))
+		return nil
+	}
+	fmt.Printf("spawning %s for team %q (remote: %s)\n", challengeID, teamID, baseURL)
+	fmt.Printf("  id:     %s\n", inst.InstanceID)
+	if inst.PublicURL != "" {
+		fmt.Printf("  url:    %s\n", inst.PublicURL)
+	}
+	if len(inst.Ports) > 0 {
+		fmt.Printf("  ports:  %s\n", remotePortsString(inst.Ports))
+	}
+	if inst.ExpiresAt != "" {
+		fmt.Printf("\nspawn complete (expires %s)\n", inst.ExpiresAt)
+	} else {
+		fmt.Printf("\nspawn complete\n")
+	}
+	return nil
+}
+
+// extendRemoteInstance extends an instance's lifetime via the remote instancer's admin API.
+func extendRemoteInstance(ctx context.Context, baseURL, id string, by time.Duration) error {
+	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	durationMinutes := int(by.Minutes())
+	if durationMinutes <= 0 {
+		durationMinutes = 1
+	}
+	expires, err := client.Extend(ctx, id, durationMinutes)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("extended %s (remote: %s) — now expires %s\n", id, baseURL, expires)
+	return nil
+}
+
+// flagRemoteInstance reads the per-team flag via the remote instancer's admin API.
+func flagRemoteInstance(ctx context.Context, baseURL, id string) error {
+	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	flag, err := client.Flag(ctx, id)
+	if err != nil {
+		return err
+	}
+	fmt.Println(flag)
+	return nil
+}
+
+// psRemoteInstance fetches instance status via the remote instancer's admin API.
+func psRemoteInstance(ctx context.Context, baseURL, id string) error {
+	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	instances, err := client.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, inst := range instances {
+		if inst.InstanceID == id {
+			if flagJSON {
+				body, err := json.MarshalIndent(inst, "", "  ")
+				if err != nil {
+					return err
+				}
+				fmt.Println(string(body))
+				return nil
+			}
+			fmt.Printf("instance:   %s\n", inst.InstanceID)
+			fmt.Printf("challenge:  %s\n", inst.ChallengeID)
+			team := inst.TeamName
+			if team == "" {
+				team = inst.TeamID
+			}
+			if team != "" {
+				fmt.Printf("team:       %s\n", team)
+			}
+			fmt.Printf("status:     %s\n", inst.Status)
+			if inst.PublicURL != "" {
+				fmt.Printf("url:        %s\n", inst.PublicURL)
+			}
+			if len(inst.Ports) > 0 {
+				fmt.Printf("ports:      %s\n", remotePortsString(inst.Ports))
+			}
+			if inst.ExpiresAt != "" {
+				fmt.Printf("expires:    %s\n", inst.ExpiresAt)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("no instance with id %q found on remote instancer", id)
 }
 
 // destroyRemoteInstance force-stops one instance via the remote instancer's
