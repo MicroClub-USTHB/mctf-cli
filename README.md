@@ -24,6 +24,10 @@ generated, never hand-edited.
 # Homebrew (macOS / Linux)
 brew install MicroClub-USTHB/tap/mctf
 
+# Scoop (Windows)
+scoop bucket add microclub https://github.com/MicroClub-USTHB/scoop-bucket
+scoop install mctf
+
 # Go
 go install github.com/MicroClub-USTHB/mctf-cli@latest
 
@@ -94,8 +98,8 @@ Run `mctf --help` for the full command set, or see
 - **Plugin system** — language-agnostic plugins (subprocess + JSON-RPC over stdio)
   receive lifecycle hooks (`before_deploy` / `after_deploy` today); best-effort and
   crash-isolated. See [`docs/spec/plugins.md`](docs/spec/plugins.md).
-- Releases ship cross-platform binaries, `.deb`/`.rpm`, a Homebrew cask, and a
-  GHCR image via goreleaser.
+- Releases ship cross-platform binaries, `.deb`/`.rpm`, a Homebrew cask, a
+  Scoop manifest, and a GHCR image via goreleaser.
 
 See the [backlog issues](https://github.com/MicroClub-USTHB/mctf-cli/issues) for
 what's planned (Terraform `mctf infra`, rCTF/webhook platforms, more plugin

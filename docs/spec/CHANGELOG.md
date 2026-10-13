@@ -42,7 +42,7 @@ All features below are merged into `develop` and pass CI. Not yet released to `m
 
 - **`feat`: man pages** — a hidden `mctf gen-man <dir>` (cobra `GenManTree`) generates one man page per command. `make man` writes them to `manpages/`; releases generate them at build time and bundle them in the archives (under `man/`) and install them to `/usr/share/man/man1` in the `.deb`/`.rpm` packages. Not committed (they carry a build date), so no drift.
 
-- **`feat`: goreleaser-based releases** — tagging `vX.Y.Z` builds cross-platform binaries (linux/macOS/windows × amd64/arm64), archives + checksums, Linux packages (`.deb`/`.rpm`), a Homebrew cask pushed to `MicroClub-USTHB/homebrew-tap`, and a Docker image at `ghcr.io/microclub-usthb/mctf:<version>` (and `:latest`) for CI pipelines. Version/commit/date are injected into `cmd.*` via ldflags. See `docs/RELEASING.md`. The cask push is skipped automatically until `HOMEBREW_TAP_TOKEN` is configured, so releases work before the tap exists.
+- **`feat`: goreleaser-based releases** — tagging `vX.Y.Z` builds cross-platform binaries (linux/macOS/windows × amd64/arm64), archives + checksums, Linux packages (`.deb`/`.rpm`), a Homebrew cask pushed to `MicroClub-USTHB/homebrew-tap`, a Scoop manifest pushed to `MicroClub-USTHB/scoop-bucket`, and a Docker image at `ghcr.io/microclub-usthb/mctf:<version>` (and `:latest`) for CI pipelines. Version/commit/date are injected into `cmd.*` via ldflags. See `docs/RELEASING.md`. The cask and Scoop manifest pushes are skipped automatically until `HOMEBREW_TAP_TOKEN` and `SCOOP_BUCKET_TOKEN` are configured, so releases work before the tap/bucket exist.
 
 ### Fixes & Refactors
 

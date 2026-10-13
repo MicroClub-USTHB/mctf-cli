@@ -15,6 +15,7 @@ publishes, for linux/macOS/windows on amd64 + arm64:
 - archives (`.tar.gz`, `.zip` on Windows) + `checksums.txt`
 - Linux packages (`.deb`, `.rpm`)
 - a Homebrew cask pushed to `MicroClub-USTHB/homebrew-tap`
+- a Scoop manifest pushed to `MicroClub-USTHB/scoop-bucket`
 - a Docker image at `ghcr.io/microclub-usthb/mctf:<version>` and `:latest`
 - man pages (one per command), bundled in the archives (`man/`) and installed to `/usr/share/man/man1` by the `.deb`/`.rpm` packages
 
@@ -47,6 +48,20 @@ packages still publish. Once set up:
 
 ```bash
 brew install MicroClub-USTHB/tap/mctf
+```
+
+## One-time setup for Scoop (Windows)
+
+1. Create the bucket repo **`MicroClub-USTHB/scoop-bucket`**.
+2. Add a repo secret **`SCOOP_BUCKET_TOKEN`** (a PAT with `contents:write` on
+   the bucket) to `mctf-cli`.
+
+Until that secret exists the manifest push is skipped automatically — binaries and
+packages still publish. Once set up:
+
+```powershell
+scoop bucket add microclub https://github.com/MicroClub-USTHB/scoop-bucket
+scoop install mctf
 ```
 
 ## Dry run
