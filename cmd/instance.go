@@ -524,9 +524,13 @@ func remoteInstancerURL() (string, bool) {
 	return "", false
 }
 
+func newRemoteClient(baseURL string) *instancer.APIClient {
+	return instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+}
+
 // spawnRemoteInstance requests the remote instancer's admin API to spawn a new instance.
 func spawnRemoteInstance(ctx context.Context, baseURL, category, slug, teamID, flagOverride string) error {
-	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	client := newRemoteClient(baseURL)
 	challengeID := category + "/" + slug
 	req := instancer.AdminSpawnRequest{
 		ChallengeID: challengeID,
@@ -564,7 +568,7 @@ func spawnRemoteInstance(ctx context.Context, baseURL, category, slug, teamID, f
 
 // extendRemoteInstance extends an instance's lifetime via the remote instancer's admin API.
 func extendRemoteInstance(ctx context.Context, baseURL, id string, by time.Duration) error {
-	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	client := newRemoteClient(baseURL)
 	durationMinutes := int(by.Minutes())
 	if durationMinutes <= 0 {
 		durationMinutes = 1
@@ -579,7 +583,7 @@ func extendRemoteInstance(ctx context.Context, baseURL, id string, by time.Durat
 
 // flagRemoteInstance reads the per-team flag via the remote instancer's admin API.
 func flagRemoteInstance(ctx context.Context, baseURL, id string) error {
-	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	client := newRemoteClient(baseURL)
 	flag, err := client.Flag(ctx, id)
 	if err != nil {
 		return err
@@ -590,7 +594,7 @@ func flagRemoteInstance(ctx context.Context, baseURL, id string) error {
 
 // psRemoteInstance fetches instance status via the remote instancer's admin API.
 func psRemoteInstance(ctx context.Context, baseURL, id string) error {
-	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	client := newRemoteClient(baseURL)
 	instances, err := client.List(ctx)
 	if err != nil {
 		return err
@@ -634,7 +638,7 @@ func psRemoteInstance(ctx context.Context, baseURL, id string) error {
 // admin API. The server owns teardown; the local --force/--volumes flags do
 // not apply to this path.
 func destroyRemoteInstance(ctx context.Context, baseURL, id string) error {
-	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	client := newRemoteClient(baseURL)
 	msg, err := client.Destroy(ctx, id)
 	if err != nil {
 		return err
@@ -649,7 +653,7 @@ func destroyRemoteInstance(ctx context.Context, baseURL, id string) error {
 // listRemoteInstances lists instances from the remote instancer's admin API.
 // The admin key is read from MCTF_INSTANCER_ADMIN_KEY (a secret, never config).
 func listRemoteInstances(ctx context.Context, baseURL string) error {
-	client := instancer.NewAPIClient(baseURL, os.Getenv("MCTF_INSTANCER_ADMIN_KEY"))
+	client := newRemoteClient(baseURL)
 	instances, err := client.List(ctx)
 	if err != nil {
 		return err

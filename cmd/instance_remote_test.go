@@ -169,3 +169,42 @@ func TestRemoteInstanceMissingAdminKeyFailsCleanly(t *testing.T) {
 		t.Errorf("expected error mentioning MCTF_INSTANCER_ADMIN_KEY is not set, got %v", err)
 	}
 }
+
+func TestRemoteInstancePsNotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"instances":[]}`))
+	}))
+	defer srv.Close()
+
+	t.Setenv("MCTF_INSTANCER_ADMIN_KEY", "admin-key")
+
+	err := psRemoteInstance(context.Background(), srv.URL, "nonexistent-id")
+	if err == nil || !strings.Contains(err.Error(), "no instance with id \"nonexistent-id\" found") {
+		t.Errorf("expected not found error, got %v", err)
+	}
+}
+
+func TestRemoteInstanceSpawnJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"success": true,
+			"instance_id": "inst-json-456",
+			"challenge_id": "pwn/bof",
+			"team_id": "team-99",
+			"status": "running"
+		}`))
+	}))
+	defer srv.Close()
+
+	t.Setenv("MCTF_INSTANCER_ADMIN_KEY", "admin-key-json")
+	prevJSON := flagJSON
+	flagJSON = true
+	defer func() { flagJSON = prevJSON }()
+
+	err := spawnRemoteInstance(context.Background(), srv.URL, "pwn", "bof", "team-99", "")
+	if err != nil {
+		t.Fatalf("unexpected error in JSON mode: %v", err)
+	}
+}
