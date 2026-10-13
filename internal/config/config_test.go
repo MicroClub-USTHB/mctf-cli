@@ -56,6 +56,56 @@ profile: chaos
 	}
 }
 
+func TestLoadEventMetadata(t *testing.T) {
+	dir := t.TempDir()
+	cfg := []byte(`
+version: 1
+event:
+  name: "My CTF"
+  slug: "my-ctf"
+  description: "Annual security competition"
+  start_at: "2026-10-15T10:00:00Z"
+  end_at: "2026-10-17T18:00:00Z"
+`)
+	if err := writeFile(filepath.Join(dir, FileName), cfg); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.Event.Description != "Annual security competition" {
+		t.Errorf("description = %q", c.Event.Description)
+	}
+	if c.Event.StartAt != "2026-10-15T10:00:00Z" {
+		t.Errorf("start_at = %q", c.Event.StartAt)
+	}
+	if c.Event.EndAt != "2026-10-17T18:00:00Z" {
+		t.Errorf("end_at = %q", c.Event.EndAt)
+	}
+}
+
+func TestLoadInvalidEventTimestamps(t *testing.T) {
+	dir := t.TempDir()
+	bad := []byte(`
+version: 1
+event:
+  name: "Bad"
+  slug: "bad"
+  start_at: "not-a-rfc3339-timestamp"
+`)
+	if err := writeFile(filepath.Join(dir, FileName), bad); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(dir)
+	if err == nil {
+		t.Fatal("expected schema error for invalid date-time format")
+	}
+	if !contains(err.Error(), "/event/start_at") {
+		t.Errorf("error missing /event/start_at path: %v", err)
+	}
+}
+
 // trivial helpers (kept here to avoid importing extra packages just for tests)
 func writeFile(path string, data []byte) error {
 	return _writeFile(path, data)
