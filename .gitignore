@@ -21,6 +21,7 @@ Thumbs.db
 /dist/
 *.test
 *.out
+coverage.html
 
 # goreleaser build output
 dist/
