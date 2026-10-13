@@ -51,7 +51,7 @@ deterministic deploys and `deploy --rollback`.
 | --- | --- |
 | `mctf platform sync` | Sync challenges to the configured platform (re-uploads assets on content change) |
 | `mctf platform unsync` | Remove a challenge from the platform |
-| `mctf platform configure` | Sync event-level config (e.g. `ctf_name`) |
+| `mctf platform configure` | Sync event-level config (`ctf_name`, `ctf_description`, `start`, `end`) |
 
 ## Inspect
 
