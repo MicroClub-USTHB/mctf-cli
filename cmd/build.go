@@ -15,13 +15,15 @@ import (
 )
 
 var (
-	flagBuildDryRun  bool
-	flagBuildNoCache bool
-	flagBuildPush    bool
-	flagBuildCat     string
-	flagBuildSlug    string
-	flagBuildSHA     string
-	flagBuildScan    bool
+	flagBuildDryRun       bool
+	flagBuildNoCache      bool
+	flagBuildPush         bool
+	flagBuildCat          string
+	flagBuildSlug         string
+	flagBuildSHA          string
+	flagBuildScan         bool
+	flagBuildScanVulns    bool
+	flagBuildVulnSeverity string
 )
 
 var buildCmd = &cobra.Command{
@@ -39,7 +41,9 @@ var buildCmd = &cobra.Command{
 		"  mctf build --dry-run\n" +
 		"  mctf build --category web\n" +
 		"  mctf build --slug cub3-clone --no-cache\n" +
-		"  mctf build --push",
+		"  mctf build --push\n" +
+		"  mctf build --scan-vulns\n" +
+		"  mctf build --scan-vulns --vuln-severity HIGH,CRITICAL",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(flagDir)
 		if err != nil {
@@ -66,6 +70,11 @@ var buildCmd = &cobra.Command{
 		plan, err := build.Plan(cfg, flagDir, challs, opts)
 		if err != nil {
 			return err
+		}
+		if flagBuildScanVulns {
+			if _, err := build.ParseSeverityThreshold(flagBuildVulnSeverity); err != nil {
+				return fmt.Errorf("invalid --vuln-severity: %w", err)
+			}
 		}
 		if len(plan) == 0 {
 			fmt.Println("nothing to build — no deployable challenges matched the filters")
@@ -102,6 +111,13 @@ var buildCmd = &cobra.Command{
 
 		if !flagBuildDryRun && flagBuildScan {
 			if err := scanBuiltImages(ctx, plan); err != nil {
+				pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
+				return err
+			}
+		}
+
+		if !flagBuildDryRun && flagBuildScanVulns {
+			if err := scanBuiltImagesForVulnerabilities(ctx, plan, flagBuildVulnSeverity); err != nil {
 				pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
 				return err
 			}
@@ -175,6 +191,62 @@ func scanBuiltImages(ctx context.Context, plan []build.ImageSpec) error {
 	return nil
 }
 
+// scanBuiltImagesForVulnerabilities scans every built image with Trivy.
+func scanBuiltImagesForVulnerabilities(
+	ctx context.Context,
+	plan []build.ImageSpec,
+	severity string,
+) error {
+	threshold, err := build.ParseSeverityThreshold(severity)
+	if err != nil {
+		return fmt.Errorf("invalid --vuln-severity: %w", err)
+	}
+
+	scannedAny := false
+	for _, spec := range plan {
+		if len(spec.Tags) == 0 {
+			continue
+		}
+
+		fmt.Printf("\nscanning %s for vulnerabilities...\n", spec.Tags[0])
+		findings, scanned, err := build.ScanVulnerabilities(ctx, spec.Tags[0], threshold)
+		if err != nil {
+			return fmt.Errorf("%s: vulnerability scan failed: %w", spec.Challenge, err)
+		}
+		if !scanned {
+			fmt.Println("  skipped — Trivy is not installed; install Trivy to enable vulnerability scanning")
+			return nil
+		}
+		scannedAny = true
+
+		if len(findings) == 0 {
+			fmt.Println("  ok — no vulnerabilities at the configured severity threshold")
+			continue
+		}
+
+		for _, finding := range findings {
+			fmt.Fprintf(
+				os.Stderr,
+				"  VULNERABILITY %s: %s (%s) — %s\n",
+				spec.Challenge,
+				finding.ID,
+				finding.Severity,
+				finding.PkgName,
+			)
+		}
+
+		return fmt.Errorf(
+			"%s: found %d vulnerability finding(s) at or above the configured threshold",
+			spec.Challenge,
+			len(findings),
+		)
+	}
+
+	if !scannedAny {
+		fmt.Println("vulnerability scan skipped — no images to scan")
+	}
+	return nil
+}
 func init() {
 	buildCmd.Flags().BoolVar(&flagBuildDryRun, "dry-run", false, "print the docker commands instead of running them")
 	buildCmd.Flags().BoolVar(&flagBuildNoCache, "no-cache", false, "pass --no-cache to docker build")
@@ -183,5 +255,7 @@ func init() {
 	buildCmd.Flags().StringVar(&flagBuildSlug, "slug", "", "build only the challenge with this slug")
 	buildCmd.Flags().StringVar(&flagBuildSHA, "sha", "", "image tag sha override (default: short HEAD or 'dev')")
 	buildCmd.Flags().BoolVar(&flagBuildScan, "scan", true, "post-build scan for manifest flag values inside the image (use --scan=false to disable)")
+	buildCmd.Flags().BoolVar(&flagBuildScanVulns, "scan-vulns", false, "scan built images for vulnerabilities using Trivy")
+	buildCmd.Flags().StringVar(&flagBuildVulnSeverity, "vuln-severity", "HIGH,CRITICAL", "fail on vulnerabilities at or above these severities")
 	rootCmd.AddCommand(buildCmd)
 }
