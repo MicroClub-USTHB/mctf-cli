@@ -6,8 +6,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/MicroClub-USTHB/mctf-cli/internal/release"
 	"github.com/spf13/cobra"
+
+	"github.com/MicroClub-USTHB/mctf-cli/internal/release"
 )
 
 var releaseCmd = &cobra.Command{
@@ -101,7 +102,7 @@ func runRelease(cmd *cobra.Command, version string, dryRun bool) error {
 		cmd.ErrOrStderr(),
 		fmt.Sprintf("Create annotated tag %s and push it to origin?", version),
 	) {
-		fmt.Fprintln(out, "Release cancelled. No tag was created or pushed.")
+		fmt.Fprintln(out, "Release canceled. No tag was created or pushed.")
 		return nil
 	}
 
