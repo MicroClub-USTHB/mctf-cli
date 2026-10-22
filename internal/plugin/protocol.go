@@ -66,6 +66,8 @@ type initResult struct {
 const (
 	HookBeforeDeploy    = "before_deploy"
 	HookAfterDeploy     = "after_deploy"
+	HookBeforeDown      = "before_down"
+	HookAfterDown       = "after_down"
 	HookBeforeBuild     = "before_build"
 	HookAfterBuild      = "after_build"
 	HookOnInstanceSpawn = "on_instance_spawn"
@@ -75,7 +77,7 @@ const (
 type DeployPayload struct {
 	Event   string       `json:"event"`
 	Phase   string       `json:"phase"` // "before" | "after"
-	Mode    string       `json:"mode"`  // "docker" | "ssh"
+	Mode    string       `json:"mode"`  // "docker" | "ssh" | "kubernetes"
 	DryRun  bool         `json:"dry_run"`
 	Units   []DeployUnit `json:"units"`
 	Outcome string       `json:"outcome,omitempty"` // after: "success" | "failed"

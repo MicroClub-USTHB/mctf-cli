@@ -50,14 +50,14 @@ func TestHelperProcess(t *testing.T) {
 				fmt.Fprintln(os.Stdout, "this is not json") // desync the stream
 				continue
 			}
-			hooks := []string{"before_deploy", "after_deploy", "before_build", "after_build", "on_instance_spawn"}
+			hooks := []string{"before_deploy", "after_deploy", "before_down", "after_down", "before_build", "after_build", "on_instance_spawn"}
 			if mode == "nohooks" {
 				hooks = nil
 			}
 			reply(req.ID, map[string]any{"name": "helper-" + mode, "hooks": hooks})
 		case "shutdown":
 			os.Exit(0)
-		case "before_deploy", "after_deploy", "before_build", "after_build", "on_instance_spawn":
+		case "before_deploy", "after_deploy", "before_down", "after_down", "before_build", "after_build", "on_instance_spawn":
 			switch mode {
 			case "crash":
 				os.Exit(1)
@@ -320,5 +320,43 @@ func TestManager_RequiredPluginCanVetoDeploy(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "deployment rejected by policy") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestManager_DownHooksDelivered(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "down_hooks.log")
+	m := helperManager(t, "echo", out)
+	if m == nil {
+		t.Fatal("manager should have one live plugin")
+	}
+	defer m.Close()
+
+	ctx := context.Background()
+	m.Dispatch(ctx, HookBeforeDown, DeployPayload{
+		Event: "test-event",
+		Phase: "before",
+		Mode:  "docker",
+	})
+	m.Dispatch(ctx, HookAfterDown, DeployPayload{
+		Event:   "test-event",
+		Phase:   "after",
+		Mode:    "docker",
+		Outcome: "success",
+	})
+
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("read hooks log: %v", err)
+	}
+
+	s := string(data)
+	if !strings.Contains(s, "before_down") {
+		t.Errorf("before_down hook not delivered:\n%s", s)
+	}
+	if !strings.Contains(s, "after_down") {
+		t.Errorf("after_down hook not delivered:\n%s", s)
+	}
+	if !strings.Contains(s, `"outcome":"success"`) {
+		t.Errorf("after_down outcome not delivered:\n%s", s)
 	}
 }
