@@ -63,6 +63,20 @@ func TestHelperProcess(t *testing.T) {
 				os.Exit(1)
 			case "timeout":
 				time.Sleep(30 * time.Second)
+			case "veto":
+				if req.Method == HookBeforeDeploy {
+					fmt.Fprintf(os.Stdout,
+						"{\"jsonrpc\":\"2.0\",\"id\":%d,\"error\":{\"code\":-32000,\"message\":\"deployment rejected by policy\"}}\n",
+						req.ID,
+					)
+					continue
+				}
+				if outfile != "" {
+					f, _ := os.OpenFile(outfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+					fmt.Fprintf(f, "%s %s\n", req.Method, strings.TrimSpace(string(req.Params)))
+					_ = f.Close()
+				}
+				reply(req.ID, map[string]any{"ok": true})
 			default:
 				if outfile != "" {
 					f, _ := os.OpenFile(outfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -91,9 +105,10 @@ func helperManager(t *testing.T, mode, outfile string) *Manager {
 		return cmd
 	}
 	raw := []map[string]any{{
-		"name":    "helper",
-		"command": os.Args[0],
-		"args":    []any{"-test.run=TestHelperProcess"},
+		"name":     "helper",
+		"command":  os.Args[0],
+		"args":     []any{"-test.run=TestHelperProcess"},
+		"required": mode == "veto",
 	}}
 	return Load(context.Background(), raw, Options{
 		HostVersion:     "test",
@@ -286,4 +301,24 @@ func TestManager_NilIsSafe(t *testing.T) {
 	var m *Manager
 	m.Dispatch(context.Background(), HookBeforeDeploy, nil) // must not panic
 	m.Close()
+}
+
+func TestManager_RequiredPluginCanVetoDeploy(t *testing.T) {
+	m := helperManager(t, "veto", "")
+	if m == nil {
+		t.Fatal("expected manager for required plugin")
+	}
+	defer m.Close()
+
+	err := m.Dispatch(
+		context.Background(),
+		HookBeforeDeploy,
+		DeployPayload{Phase: "before"},
+	)
+	if err == nil {
+		t.Fatal("expected required plugin to veto deployment")
+	}
+	if !strings.Contains(err.Error(), "deployment rejected by policy") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }

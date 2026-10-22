@@ -239,6 +239,11 @@
           "command": { "type": "string", "minLength": 1 },
           "args": { "type": "array", "items": { "type": "string" } },
           "enabled": { "type": "boolean", "default": true },
+          "required": {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, failures in required plugin startup or blocking hooks can abort the command."
+          },
           "config": { "type": "object" }
         }
       }

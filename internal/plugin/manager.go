@@ -30,6 +30,7 @@ type Manager struct {
 	opts       Options
 	log        io.Writer
 	procCancel context.CancelFunc // cancels every plugin's process on Close
+	loadErr    error
 }
 
 // Load parses raw plugin config, starts each enabled plugin, and runs the
@@ -69,6 +70,9 @@ func Load(ctx context.Context, raw []map[string]any, opts Options) *Manager {
 		}
 		if err := p.start(procCtx, opts.Dir); err != nil {
 			fmt.Fprintf(log, "warning: plugin %q failed to start: %v\n", c.Name, err)
+			if c.Required && m.loadErr == nil {
+				m.loadErr = fmt.Errorf("required plugin %q failed to start: %w", c.Name, err)
+			}
 			continue
 		}
 		hctx, cancel := context.WithTimeout(ctx, opts.StartTimeout)
@@ -77,11 +81,14 @@ func Load(ctx context.Context, raw []map[string]any, opts Options) *Manager {
 		if err != nil {
 			fmt.Fprintf(log, "warning: plugin %q handshake failed: %v\n", c.Name, err)
 			p.markDeadAndKill()
+			if c.Required && m.loadErr == nil {
+				m.loadErr = fmt.Errorf("required plugin %q handshake failed: %w", c.Name, err)
+			}
 			continue
 		}
 		m.plugins = append(m.plugins, p)
 	}
-	if len(m.plugins) == 0 {
+	if len(m.plugins) == 0 && m.loadErr == nil {
 		procCancel()
 		return nil
 	}
@@ -91,22 +98,43 @@ func Load(ctx context.Context, raw []map[string]any, opts Options) *Manager {
 // Dispatch sends a hook to every subscribing plugin, sequentially, each under
 // its own DispatchTimeout. A plugin that errors, crashes, or times out is
 // logged and dropped from future dispatch. It never returns an error.
-func (m *Manager) Dispatch(ctx context.Context, hook string, payload any) {
+// Dispatch sends a hook to every subscribing plugin, sequentially, each under
+// its own DispatchTimeout. Optional plugin failures are logged and dropped.
+// Failures from required plugins are also returned so blocking hooks can veto
+// the host operation.
+func (m *Manager) Dispatch(ctx context.Context, hook string, payload any) error {
 	if m == nil {
-		return
+		return nil
 	}
+
+	if m.loadErr != nil {
+		return m.loadErr
+	}
+
+	var requiredErr error
 	live := m.plugins[:0]
+
 	for _, p := range m.plugins {
 		dctx, cancel := context.WithTimeout(ctx, m.opts.DispatchTimeout)
 		err := p.dispatch(dctx, hook, payload)
 		cancel()
+
 		if err != nil {
 			fmt.Fprintf(m.log, "warning: plugin %q hook %q: %v\n", p.name, hook, err)
-			continue // drop it
+			if p.cfg.Required && requiredErr == nil {
+				requiredErr = fmt.Errorf(
+					"required plugin %q failed on hook %q: %w",
+					p.name, hook, err,
+				)
+			}
+			continue
 		}
+
 		live = append(live, p)
 	}
+
 	m.plugins = live
+	return requiredErr
 }
 
 // Close shuts every plugin down and reaps it. Safe to call on a nil Manager.
