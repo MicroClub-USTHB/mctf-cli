@@ -116,7 +116,7 @@ var instanceSpawnCmd = &cobra.Command{
 		// Lifecycle plugins (best-effort; a no-op without a `plugins:` block).
 		pm := plugin.Load(ctx, cfg.Plugins, plugin.Options{HostVersion: version, Dir: flagDir})
 		defer pm.Close()
-		pm.Dispatch(ctx, plugin.HookOnInstanceSpawn, instanceSpawnPayload(cfg, inst))
+		_ = pm.Dispatch(ctx, plugin.HookOnInstanceSpawn, instanceSpawnPayload(cfg, inst))
 
 		fmt.Printf("\nspawn complete (expires %s)\n", inst.ExpiresAt.Format(time.RFC3339))
 		return nil

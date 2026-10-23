@@ -192,7 +192,7 @@ func (s *Server) spawn(w http.ResponseWriter, r *http.Request) {
 		if s.cfg != nil {
 			eventSlug = s.cfg.Event.Slug
 		}
-		s.pm.Dispatch(r.Context(), plugin.HookOnInstanceSpawn, plugin.InstanceSpawnPayload{
+		_ = s.pm.Dispatch(r.Context(), plugin.HookOnInstanceSpawn, plugin.InstanceSpawnPayload{
 			Event:         eventSlug,
 			InstanceID:    inst.ID,
 			ChallengeSlug: inst.ChallengeSlug,

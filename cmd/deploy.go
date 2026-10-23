@@ -194,7 +194,7 @@ var deployCmd = &cobra.Command{
 		}
 
 		if err := deploy.ApplyUp(ctx, runner, plan); err != nil {
-			pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", flagDeployDryRun, plan, "failed", err))
+			_ = pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", flagDeployDryRun, plan, "failed", err))
 			notifyDiscord(ctx, "deploy failed", "error", fmt.Sprintf("%s: %v", planSlugs(plan), err))
 			return err
 		}
@@ -233,7 +233,7 @@ var deployCmd = &cobra.Command{
 
 		fmt.Println("\ndeploy complete")
 		if !flagDeployDryRun {
-			pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", false, plan, "success", nil))
+			_ = pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", false, plan, "success", nil))
 			notifyDiscord(ctx, "deploy succeeded", "success", fmt.Sprintf("%d challenge(s) up:\n%s", len(plan), planSlugs(plan)))
 		}
 		return nil
@@ -409,7 +409,7 @@ var downCmd = &cobra.Command{
 		}
 
 		if err := deploy.ApplyDown(ctx, runner, plan, flagDownVolumes); err != nil {
-			pm.Dispatch(ctx, plugin.HookAfterDown,
+			_ = pm.Dispatch(ctx, plugin.HookAfterDown,
 				deployHookPayload(cfg, mode, "after", flagDownDryRun, plan, "failed", err))
 			notifyDiscord(ctx, "teardown failed", "error",
 				fmt.Sprintf("%s: %v", planSlugs(plan), err))
@@ -417,7 +417,7 @@ var downCmd = &cobra.Command{
 		}
 
 		if !flagDownDryRun {
-			pm.Dispatch(ctx, plugin.HookAfterDown,
+			_ = pm.Dispatch(ctx, plugin.HookAfterDown,
 				deployHookPayload(cfg, mode, "after", false, plan, "success", nil))
 		}
 		fmt.Println("\ndown complete")
@@ -557,7 +557,7 @@ func applyKube(ctx context.Context, cfg *config.Config, challs []*challenge.Chal
 	}
 
 	if applyErr != nil {
-		pm.Dispatch(ctx, afterHook,
+		_ = pm.Dispatch(ctx, afterHook,
 			kubeDeployHookPayload(cfg, "after", dry, plan, "failed", applyErr))
 
 		if verb == "up" {
@@ -569,7 +569,7 @@ func applyKube(ctx context.Context, cfg *config.Config, challs []*challenge.Chal
 	}
 
 	if !dry {
-		pm.Dispatch(ctx, afterHook,
+		_ = pm.Dispatch(ctx, afterHook,
 			kubeDeployHookPayload(cfg, "after", false, plan, "success", nil))
 
 		if verb == "up" {
