@@ -69,6 +69,7 @@ const (
 	HookBeforeBuild     = "before_build"
 	HookAfterBuild      = "after_build"
 	HookOnInstanceSpawn = "on_instance_spawn"
+	HookOnHealthFailure = "on_health_failure"
 )
 
 // DeployPayload is the JSON body for the before_/after_deploy hooks.
@@ -123,4 +124,14 @@ type InstanceSpawnPayload struct {
 	Flag          string      `json:"flag,omitempty"`
 	Containers    []string    `json:"containers,omitempty"`
 	ExpiresAt     time.Time   `json:"expires_at"`
+}
+
+// HealthFailurePayload is the JSON body for the on_health_failure hook.
+type HealthFailurePayload struct {
+	Event         string    `json:"event,omitempty"`
+	InstanceID    string    `json:"instance_id"`
+	ChallengeSlug string    `json:"challenge_slug"`
+	Container     string    `json:"container"`
+	Status        string    `json:"status"`
+	Timestamp     time.Time `json:"timestamp"`
 }

@@ -50,14 +50,14 @@ func TestHelperProcess(t *testing.T) {
 				fmt.Fprintln(os.Stdout, "this is not json") // desync the stream
 				continue
 			}
-			hooks := []string{"before_deploy", "after_deploy", "before_build", "after_build", "on_instance_spawn"}
+			hooks := []string{"before_deploy", "after_deploy", "before_build", "after_build", "on_instance_spawn", "on_health_failure"}
 			if mode == "nohooks" {
 				hooks = nil
 			}
 			reply(req.ID, map[string]any{"name": "helper-" + mode, "hooks": hooks})
 		case "shutdown":
 			os.Exit(0)
-		case "before_deploy", "after_deploy", "before_build", "after_build", "on_instance_spawn":
+		case "before_deploy", "after_deploy", "before_build", "after_build", "on_instance_spawn", "on_health_failure":
 			switch mode {
 			case "crash":
 				os.Exit(1)
