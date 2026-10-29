@@ -96,8 +96,7 @@ remain isolated.
 | `before_build` | Build payload (event, sha, dry_run, images) | **Shipped** |
 | `after_build` | Build payload plus `outcome` (`success` / `failed`) and `error` | **Shipped** |
 | `on_instance_spawn` | Instance spawn payload (event, instance_id, challenge_slug, team_id, ports, flag, containers, expires_at) | **Shipped** |
-| `on_health_failure` | — | Planned (needs a health-monitoring loop) |
-
+| `on_health_failure` | Health failure payload (event, instance_id, challenge_slug, container, status, timestamp) | **Shipped** |
 ### Deploy payload
 
 ```json
