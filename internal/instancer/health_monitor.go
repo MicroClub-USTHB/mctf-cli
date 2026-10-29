@@ -39,7 +39,7 @@ type HealthMonitor struct {
 	unhealthy map[string]bool
 }
 
-// Run checks health immediately, then repeats until the context is cancelled.
+// Run checks health immediately, then repeats until the context is canceled.
 func (m *HealthMonitor) Run(ctx context.Context) error {
 	if m.Store == nil {
 		return fmt.Errorf("health monitor: store is nil")
