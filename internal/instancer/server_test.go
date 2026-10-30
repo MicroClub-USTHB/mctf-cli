@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -357,9 +358,18 @@ done
 		t.Fatal(err)
 	}
 
+	command := script
+	var args []string
+
+	if runtime.GOOS == "windows" {
+		command = "bash"
+		args = []string{script}
+	}
+
 	raw := []map[string]any{{
 		"name":    "test",
-		"command": script,
+		"command": command,
+		"args":    args,
 	}}
 	pm := plugin.Load(context.Background(), raw, plugin.Options{
 		HostVersion:  "test",

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 )
 
@@ -26,6 +27,7 @@ type Options struct {
 // A nil *Manager is valid and all methods no-op, so call sites don't branch
 // when no plugins are configured.
 type Manager struct {
+	dispatchMu sync.Mutex
 	plugins    []*Plugin
 	opts       Options
 	log        io.Writer
@@ -95,6 +97,10 @@ func (m *Manager) Dispatch(ctx context.Context, hook string, payload any) {
 	if m == nil {
 		return
 	}
+
+	m.dispatchMu.Lock()
+	defer m.dispatchMu.Unlock()
+
 	live := m.plugins[:0]
 	for _, p := range m.plugins {
 		dctx, cancel := context.WithTimeout(ctx, m.opts.DispatchTimeout)
@@ -114,6 +120,10 @@ func (m *Manager) Close() {
 	if m == nil {
 		return
 	}
+
+	m.dispatchMu.Lock()
+	defer m.dispatchMu.Unlock()
+
 	for _, p := range m.plugins {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		p.shutdown(ctx)

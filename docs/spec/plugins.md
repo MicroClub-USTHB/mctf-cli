@@ -80,8 +80,7 @@ killed. (This mirrors the `notify` package.)
 | `before_build` | build payload (event, sha, dry_run, images) | **shipped** |
 | `after_build` | build payload + `outcome` (`success`/`failed`) + `error` | **shipped** |
 | `on_instance_spawn` | instance spawn payload (event, instance_id, challenge_slug, team_id, ports, flag, containers, expires_at) | **shipped** |
-| `on_health_failure` | — | planned (needs a health-monitoring loop) |
-
+| `on_health_failure` | health failure payload (event, instance_id, challenge_slug, container, status, timestamp) | **shipped** |
 ### Deploy payload
 
 ```json
