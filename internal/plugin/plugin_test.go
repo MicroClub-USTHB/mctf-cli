@@ -94,7 +94,12 @@ func TestHelperProcess(t *testing.T) {
 // helperManager starts a Manager whose single plugin is the test binary
 // running as TestHelperProcess in the given mode.
 func helperManager(t *testing.T, mode, outfile string) *Manager {
+	return helperManagerWithRequired(t, mode, outfile, mode == "veto")
+}
+
+func helperManagerWithRequired(t *testing.T, mode, outfile string, required bool) *Manager {
 	t.Helper()
+
 	newCmd := func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		cmd := exec.CommandContext(ctx, name, args...)
 		cmd.Env = append(os.Environ(),
@@ -104,12 +109,14 @@ func helperManager(t *testing.T, mode, outfile string) *Manager {
 		)
 		return cmd
 	}
+
 	raw := []map[string]any{{
 		"name":     "helper",
 		"command":  os.Args[0],
 		"args":     []any{"-test.run=TestHelperProcess"},
-		"required": mode == "veto",
+		"required": required,
 	}}
+
 	return Load(context.Background(), raw, Options{
 		HostVersion:     "test",
 		DispatchTimeout: 2 * time.Second,
@@ -358,5 +365,77 @@ func TestManager_DownHooksDelivered(t *testing.T) {
 	}
 	if !strings.Contains(s, `"outcome":"success"`) {
 		t.Errorf("after_down outcome not delivered:\n%s", s)
+	}
+}
+
+func TestManager_RequiredPluginStartupFailureBlocksDispatch(t *testing.T) {
+	raw := []map[string]any{{
+		"name":     "missing",
+		"command":  filepath.Join(t.TempDir(), "missing-plugin.exe"),
+		"required": true,
+	}}
+
+	m := Load(context.Background(), raw, Options{Log: os.Stderr})
+	if m == nil {
+		t.Fatal("expected manager when required plugin fails to start")
+	}
+	defer m.Close()
+
+	err := m.Dispatch(
+		context.Background(),
+		HookBeforeDeploy,
+		DeployPayload{Phase: "before"},
+	)
+	if err == nil {
+		t.Fatal("expected required plugin startup failure to block dispatch")
+	}
+	if !strings.Contains(err.Error(), "failed to start") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestManager_RequiredPluginHandshakeFailureBlocksDispatch(t *testing.T) {
+	m := helperManagerWithRequired(t, "badhandshake", "", true)
+	if m == nil {
+		t.Fatal("expected manager when required plugin handshake fails")
+	}
+	defer m.Close()
+
+	err := m.Dispatch(
+		context.Background(),
+		HookBeforeDeploy,
+		DeployPayload{Phase: "before"},
+	)
+	if err == nil {
+		t.Fatal("expected required plugin handshake failure to block dispatch")
+	}
+	if !strings.Contains(err.Error(), "handshake failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestManager_RequiredPluginInvalidConfigBlocksDispatch(t *testing.T) {
+	raw := []map[string]any{{
+		"name":     "invalid",
+		"required": true,
+		// Deliberately missing the required command field.
+	}}
+
+	m := Load(context.Background(), raw, Options{Log: os.Stderr})
+	if m == nil {
+		t.Fatal("expected manager for invalid required plugin configuration")
+	}
+	defer m.Close()
+
+	err := m.Dispatch(
+		context.Background(),
+		HookBeforeDeploy,
+		DeployPayload{Phase: "before"},
+	)
+	if err == nil {
+		t.Fatal("expected invalid required plugin configuration to block dispatch")
+	}
+	if !strings.Contains(err.Error(), "configuration is invalid") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
