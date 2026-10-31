@@ -50,19 +50,33 @@ func TestHelperProcess(t *testing.T) {
 				fmt.Fprintln(os.Stdout, "this is not json") // desync the stream
 				continue
 			}
-			hooks := []string{"before_deploy", "after_deploy", "before_build", "after_build", "on_instance_spawn"}
+			hooks := []string{"before_deploy", "after_deploy", "before_down", "after_down", "before_build", "after_build", "on_instance_spawn"}
 			if mode == "nohooks" {
 				hooks = nil
 			}
 			reply(req.ID, map[string]any{"name": "helper-" + mode, "hooks": hooks})
 		case "shutdown":
 			os.Exit(0)
-		case "before_deploy", "after_deploy", "before_build", "after_build", "on_instance_spawn":
+		case "before_deploy", "after_deploy", "before_down", "after_down", "before_build", "after_build", "on_instance_spawn":
 			switch mode {
 			case "crash":
 				os.Exit(1)
 			case "timeout":
 				time.Sleep(30 * time.Second)
+			case "veto":
+				if req.Method == HookBeforeDeploy {
+					fmt.Fprintf(os.Stdout,
+						"{\"jsonrpc\":\"2.0\",\"id\":%d,\"error\":{\"code\":-32000,\"message\":\"deployment rejected by policy\"}}\n",
+						req.ID,
+					)
+					continue
+				}
+				if outfile != "" {
+					f, _ := os.OpenFile(outfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+					fmt.Fprintf(f, "%s %s\n", req.Method, strings.TrimSpace(string(req.Params)))
+					_ = f.Close()
+				}
+				reply(req.ID, map[string]any{"ok": true})
 			default:
 				if outfile != "" {
 					f, _ := os.OpenFile(outfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -80,7 +94,12 @@ func TestHelperProcess(t *testing.T) {
 // helperManager starts a Manager whose single plugin is the test binary
 // running as TestHelperProcess in the given mode.
 func helperManager(t *testing.T, mode, outfile string) *Manager {
+	return helperManagerWithRequired(t, mode, outfile, mode == "veto")
+}
+
+func helperManagerWithRequired(t *testing.T, mode, outfile string, required bool) *Manager {
 	t.Helper()
+
 	newCmd := func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		cmd := exec.CommandContext(ctx, name, args...)
 		cmd.Env = append(os.Environ(),
@@ -90,11 +109,14 @@ func helperManager(t *testing.T, mode, outfile string) *Manager {
 		)
 		return cmd
 	}
+
 	raw := []map[string]any{{
-		"name":    "helper",
-		"command": os.Args[0],
-		"args":    []any{"-test.run=TestHelperProcess"},
+		"name":     "helper",
+		"command":  os.Args[0],
+		"args":     []any{"-test.run=TestHelperProcess"},
+		"required": required,
 	}}
+
 	return Load(context.Background(), raw, Options{
 		HostVersion:     "test",
 		DispatchTimeout: 2 * time.Second,
@@ -286,4 +308,134 @@ func TestManager_NilIsSafe(t *testing.T) {
 	var m *Manager
 	m.Dispatch(context.Background(), HookBeforeDeploy, nil) // must not panic
 	m.Close()
+}
+
+func TestManager_RequiredPluginCanVetoDeploy(t *testing.T) {
+	m := helperManager(t, "veto", "")
+	if m == nil {
+		t.Fatal("expected manager for required plugin")
+	}
+	defer m.Close()
+
+	err := m.Dispatch(
+		context.Background(),
+		HookBeforeDeploy,
+		DeployPayload{Phase: "before"},
+	)
+	if err == nil {
+		t.Fatal("expected required plugin to veto deployment")
+	}
+	if !strings.Contains(err.Error(), "deployment rejected by policy") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestManager_DownHooksDelivered(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "down_hooks.log")
+	m := helperManager(t, "echo", out)
+	if m == nil {
+		t.Fatal("manager should have one live plugin")
+	}
+	defer m.Close()
+
+	ctx := context.Background()
+	m.Dispatch(ctx, HookBeforeDown, DeployPayload{
+		Event: "test-event",
+		Phase: "before",
+		Mode:  "docker",
+	})
+	m.Dispatch(ctx, HookAfterDown, DeployPayload{
+		Event:   "test-event",
+		Phase:   "after",
+		Mode:    "docker",
+		Outcome: "success",
+	})
+
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("read hooks log: %v", err)
+	}
+
+	s := string(data)
+	if !strings.Contains(s, "before_down") {
+		t.Errorf("before_down hook not delivered:\n%s", s)
+	}
+	if !strings.Contains(s, "after_down") {
+		t.Errorf("after_down hook not delivered:\n%s", s)
+	}
+	if !strings.Contains(s, `"outcome":"success"`) {
+		t.Errorf("after_down outcome not delivered:\n%s", s)
+	}
+}
+
+func TestManager_RequiredPluginStartupFailureBlocksDispatch(t *testing.T) {
+	raw := []map[string]any{{
+		"name":     "missing",
+		"command":  filepath.Join(t.TempDir(), "missing-plugin.exe"),
+		"required": true,
+	}}
+
+	m := Load(context.Background(), raw, Options{Log: os.Stderr})
+	if m == nil {
+		t.Fatal("expected manager when required plugin fails to start")
+	}
+	defer m.Close()
+
+	err := m.Dispatch(
+		context.Background(),
+		HookBeforeDeploy,
+		DeployPayload{Phase: "before"},
+	)
+	if err == nil {
+		t.Fatal("expected required plugin startup failure to block dispatch")
+	}
+	if !strings.Contains(err.Error(), "failed to start") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestManager_RequiredPluginHandshakeFailureBlocksDispatch(t *testing.T) {
+	m := helperManagerWithRequired(t, "badhandshake", "", true)
+	if m == nil {
+		t.Fatal("expected manager when required plugin handshake fails")
+	}
+	defer m.Close()
+
+	err := m.Dispatch(
+		context.Background(),
+		HookBeforeDeploy,
+		DeployPayload{Phase: "before"},
+	)
+	if err == nil {
+		t.Fatal("expected required plugin handshake failure to block dispatch")
+	}
+	if !strings.Contains(err.Error(), "handshake failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestManager_RequiredPluginInvalidConfigBlocksDispatch(t *testing.T) {
+	raw := []map[string]any{{
+		"name":     "invalid",
+		"required": true,
+		// Deliberately missing the required command field.
+	}}
+
+	m := Load(context.Background(), raw, Options{Log: os.Stderr})
+	if m == nil {
+		t.Fatal("expected manager for invalid required plugin configuration")
+	}
+	defer m.Close()
+
+	err := m.Dispatch(
+		context.Background(),
+		HookBeforeDeploy,
+		DeployPayload{Phase: "before"},
+	)
+	if err == nil {
+		t.Fatal("expected invalid required plugin configuration to block dispatch")
+	}
+	if !strings.Contains(err.Error(), "configuration is invalid") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }

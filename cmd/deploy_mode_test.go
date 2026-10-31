@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/kubernetes"
 )
 
 func cfgWithMode(mode string) *config.Config {
@@ -98,5 +99,61 @@ func TestApplyKube_DoesNotMutateConfig(t *testing.T) {
 	}
 	if nilDeploy.Deploy != nil {
 		t.Errorf("config mutated: Deploy = %+v, want nil", nilDeploy.Deploy)
+	}
+}
+
+func TestKubeDeployHookPayload_MapsAllUnitFields(t *testing.T) {
+	cfg := &config.Config{
+		Event: config.Event{Slug: "test-event"},
+	}
+
+	plan := []kubernetes.KubeUnit{
+		{
+			Challenge: "web/my-challenge",
+			Category:  "web",
+			Slug:      "my-challenge",
+			Name:      "mctf-test-web-my-challenge",
+			Image:     "registry.example.com/my-challenge:v1",
+		},
+	}
+
+	payload := kubeDeployHookPayload(
+		cfg,
+		"after",
+		false,
+		plan,
+		"success",
+		nil,
+	)
+
+	if payload.Event != "test-event" {
+		t.Errorf("Event = %q, want %q", payload.Event, "test-event")
+	}
+	if payload.Phase != "after" {
+		t.Errorf("Phase = %q, want %q", payload.Phase, "after")
+	}
+	if payload.Mode != "kubernetes" {
+		t.Errorf("Mode = %q, want %q", payload.Mode, "kubernetes")
+	}
+	if len(payload.Units) != 1 {
+		t.Fatalf("got %d units, want 1", len(payload.Units))
+	}
+
+	unit := payload.Units[0]
+
+	if unit.Challenge != "web/my-challenge" {
+		t.Errorf("Challenge = %q, want %q", unit.Challenge, "web/my-challenge")
+	}
+	if unit.Category != "web" {
+		t.Errorf("Category = %q, want %q", unit.Category, "web")
+	}
+	if unit.Slug != "my-challenge" {
+		t.Errorf("Slug = %q, want %q", unit.Slug, "my-challenge")
+	}
+	if unit.ProjectName != "mctf-test-web-my-challenge" {
+		t.Errorf("ProjectName = %q, want %q", unit.ProjectName, "mctf-test-web-my-challenge")
+	}
+	if unit.ImageTag != "registry.example.com/my-challenge:v1" {
+		t.Errorf("ImageTag = %q, want %q", unit.ImageTag, "registry.example.com/my-challenge:v1")
 	}
 }

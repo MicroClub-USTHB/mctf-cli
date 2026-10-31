@@ -188,10 +188,13 @@ var deployCmd = &cobra.Command{
 		// Lifecycle plugins (best-effort; a no-op without a `plugins:` block).
 		pm := plugin.Load(ctx, cfg.Plugins, plugin.Options{HostVersion: version, Dir: flagDir})
 		defer pm.Close()
-		pm.Dispatch(ctx, plugin.HookBeforeDeploy, deployHookPayload(cfg, mode, "before", flagDeployDryRun, plan, "", nil))
+		if err := pm.Dispatch(ctx, plugin.HookBeforeDeploy,
+			deployHookPayload(cfg, mode, "before", flagDeployDryRun, plan, "", nil)); err != nil {
+			return fmt.Errorf("deployment blocked by plugin: %w", err)
+		}
 
 		if err := deploy.ApplyUp(ctx, runner, plan); err != nil {
-			pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", flagDeployDryRun, plan, "failed", err))
+			_ = pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", flagDeployDryRun, plan, "failed", err))
 			notifyDiscord(ctx, "deploy failed", "error", fmt.Sprintf("%s: %v", planSlugs(plan), err))
 			return err
 		}
@@ -230,7 +233,9 @@ var deployCmd = &cobra.Command{
 
 		fmt.Println("\ndeploy complete")
 		if !flagDeployDryRun {
-			pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", false, plan, "success", nil))
+			if err := pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", false, plan, "success", nil)); err != nil {
+				return fmt.Errorf("after_deploy hook failed: %w", err)
+			}
 			notifyDiscord(ctx, "deploy succeeded", "success", fmt.Sprintf("%d challenge(s) up:\n%s", len(plan), planSlugs(plan)))
 		}
 		return nil
@@ -256,6 +261,36 @@ func deployHookPayload(cfg *config.Config, mode, phase string, dryRun bool, plan
 			Slug:        u.Slug,
 			ProjectName: u.ProjectName,
 			ImageTag:    u.ImageTag,
+		})
+	}
+	return p
+}
+
+func kubeDeployHookPayload(
+	cfg *config.Config,
+	phase string,
+	dryRun bool,
+	plan []kubernetes.KubeUnit,
+	outcome string,
+	err error,
+) plugin.DeployPayload {
+	p := plugin.DeployPayload{
+		Event:   cfg.Event.Slug,
+		Phase:   phase,
+		Mode:    "kubernetes",
+		DryRun:  dryRun,
+		Outcome: outcome,
+	}
+	if err != nil {
+		p.Error = err.Error()
+	}
+	for _, u := range plan {
+		p.Units = append(p.Units, plugin.DeployUnit{
+			Challenge:   u.Challenge,
+			Category:    u.Category,
+			Slug:        u.Slug,
+			ProjectName: u.Name,
+			ImageTag:    u.Image,
 		})
 	}
 	return p
@@ -368,10 +403,33 @@ var downCmd = &cobra.Command{
 				}
 			}
 		}
+		pm := plugin.Load(ctx, cfg.Plugins, plugin.Options{
+			HostVersion: version,
+			Dir:         flagDir,
+		})
+		defer pm.Close()
+
+		if err := pm.Dispatch(ctx, plugin.HookBeforeDown,
+			deployHookPayload(cfg, mode, "before", flagDownDryRun, plan, "", nil)); err != nil {
+			return fmt.Errorf("teardown blocked by plugin: %w", err)
+		}
+
 		if err := deploy.ApplyDown(ctx, runner, plan, flagDownVolumes); err != nil {
+			hookErr := pm.Dispatch(ctx, plugin.HookAfterDown,
+				deployHookPayload(cfg, mode, "after", flagDownDryRun, plan, "failed", err))
 			notifyDiscord(ctx, "teardown failed", "error",
 				fmt.Sprintf("%s: %v", planSlugs(plan), err))
+			if hookErr != nil {
+				return fmt.Errorf("after_down hook failed: %w (teardown also failed: %v)", hookErr, err)
+			}
 			return err
+		}
+
+		if !flagDownDryRun {
+			if err := pm.Dispatch(ctx, plugin.HookAfterDown,
+				deployHookPayload(cfg, mode, "after", false, plan, "success", nil)); err != nil {
+				return fmt.Errorf("after_down hook failed: %w", err)
+			}
 		}
 		fmt.Println("\ndown complete")
 		if !flagDownDryRun {
@@ -470,6 +528,26 @@ func applyKube(ctx context.Context, cfg *config.Config, challs []*challenge.Chal
 	}
 
 	printKubePlan(verb, plan)
+	pm := plugin.Load(ctx, cfg.Plugins, plugin.Options{
+		HostVersion: version,
+		Dir:         flagDir,
+	})
+	defer pm.Close()
+
+	beforeHook := plugin.HookBeforeDeploy
+	afterHook := plugin.HookAfterDeploy
+	operation := "deployment"
+
+	if verb == "down" {
+		beforeHook = plugin.HookBeforeDown
+		afterHook = plugin.HookAfterDown
+		operation = "teardown"
+	}
+
+	if err := pm.Dispatch(ctx, beforeHook,
+		kubeDeployHookPayload(cfg, "before", dry, plan, "", nil)); err != nil {
+		return fmt.Errorf("%s blocked by plugin: %w", operation, err)
+	}
 
 	kubeconfig := ""
 	if cfg.Deploy.Kubernetes != nil {
@@ -482,27 +560,49 @@ func applyKube(ctx context.Context, cfg *config.Config, challs []*challenge.Chal
 		runner = kubernetes.NewKubeRunner(kubeconfig)
 	}
 
+	var applyErr error
 	if verb == "up" {
-		if err := kubernetes.ApplyUp(ctx, runner, plan); err != nil {
-			notifyDiscord(ctx, "deploy failed", "error", err.Error())
-			return err
+		applyErr = kubernetes.ApplyUp(ctx, runner, plan)
+	} else {
+		applyErr = kubernetes.ApplyDown(ctx, runner, plan)
+	}
+
+	if applyErr != nil {
+		hookErr := pm.Dispatch(ctx, afterHook,
+			kubeDeployHookPayload(cfg, "after", dry, plan, "failed", applyErr))
+
+		if verb == "up" {
+			notifyDiscord(ctx, "deploy failed", "error", applyErr.Error())
+		} else {
+			notifyDiscord(ctx, "teardown failed", "error", applyErr.Error())
 		}
-		fmt.Println("\ndeploy complete")
-		if !dry {
+		if hookErr != nil {
+			return fmt.Errorf("after_%s hook failed: %w (operation also failed: %v)", verb, hookErr, applyErr)
+		}
+		return applyErr
+	}
+
+	if !dry {
+		if err := pm.Dispatch(ctx, afterHook,
+			kubeDeployHookPayload(cfg, "after", false, plan, "success", nil)); err != nil {
+			return fmt.Errorf("after_%s hook failed: %w", verb, err)
+		}
+
+		if verb == "up" {
+			fmt.Println("\ndeploy complete")
 			notifyDiscord(ctx, "deploy succeeded", "success",
 				fmt.Sprintf("%d challenge(s) up [kubernetes]", len(plan)))
-		}
-	} else {
-		if err := kubernetes.ApplyDown(ctx, runner, plan); err != nil {
-			notifyDiscord(ctx, "teardown failed", "error", err.Error())
-			return err
-		}
-		fmt.Println("\ndown complete")
-		if !dry {
+		} else {
+			fmt.Println("\ndown complete")
 			notifyDiscord(ctx, "teardown complete", "info",
 				fmt.Sprintf("%d challenge(s) down [kubernetes]", len(plan)))
 		}
+	} else if verb == "up" {
+		fmt.Println("\ndeploy complete")
+	} else {
+		fmt.Println("\ndown complete")
 	}
+
 	return nil
 }
 

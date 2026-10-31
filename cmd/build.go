@@ -91,18 +91,20 @@ var buildCmd = &cobra.Command{
 		// Lifecycle plugins (best-effort; a no-op without a `plugins:` block).
 		pm := plugin.Load(ctx, cfg.Plugins, plugin.Options{HostVersion: version, Dir: flagDir})
 		defer pm.Close()
-		pm.Dispatch(ctx, plugin.HookBeforeBuild, buildHookPayload(cfg, opts, "before", flagBuildDryRun, plan, "", nil))
+		if err := pm.Dispatch(ctx, plugin.HookBeforeBuild, buildHookPayload(cfg, opts, "before", flagBuildDryRun, plan, "", nil)); err != nil {
+			return fmt.Errorf("build blocked by plugin: %w", err)
+		}
 
 		buildOpts := opts
 		buildOpts.Push = false
 		if err := build.Apply(ctx, runner, plan, buildOpts); err != nil {
-			pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
+			_ = pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
 			return err
 		}
 
 		if !flagBuildDryRun && flagBuildScan {
 			if err := scanBuiltImages(ctx, plan); err != nil {
-				pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
+				_ = pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
 				return err
 			}
 		}
@@ -110,12 +112,14 @@ var buildCmd = &cobra.Command{
 		if flagBuildPush {
 			fmt.Printf("\npushing %d image(s) to registry...\n", len(plan))
 			if err := build.ApplyPush(ctx, runner, plan, opts); err != nil {
-				pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
+				_ = pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
 				return err
 			}
 		}
 
-		pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "success", nil))
+		if err := pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "success", nil)); err != nil {
+			return fmt.Errorf("build completed, but plugin hook failed: %w", err)
+		}
 		fmt.Println("\nbuild complete")
 		return nil
 	},

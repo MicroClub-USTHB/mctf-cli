@@ -7,11 +7,12 @@ import (
 
 // Config is one plugin entry from mctf.config.yml `plugins:`.
 type Config struct {
-	Name    string         `json:"name"`
-	Command string         `json:"command"`
-	Args    []string       `json:"args,omitempty"`
-	Enabled *bool          `json:"enabled,omitempty"` // nil => enabled
-	Config  map[string]any `json:"config,omitempty"`  // opaque, passed to the plugin
+	Name     string         `json:"name"`
+	Command  string         `json:"command"`
+	Args     []string       `json:"args,omitempty"`
+	Enabled  *bool          `json:"enabled,omitempty"` // nil => enabled
+	Required bool           `json:"required,omitempty"`
+	Config   map[string]any `json:"config,omitempty"` // opaque, passed to the plugin
 }
 
 func (c Config) isEnabled() bool { return c.Enabled == nil || *c.Enabled }
