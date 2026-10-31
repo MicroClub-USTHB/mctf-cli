@@ -76,7 +76,7 @@ Setting `required: true` opts a plugin into blocking behavior:
   the command is blocked when the plugin manager reports that failure.
 - If a required plugin returns an error or fails during a blocking `before_*`
   hook, the command is aborted before the corresponding operation runs.
-- Failures in `after_*` hooks do not undo an operation that has already completed.
+- Failures in after_* hooks do not undo an operation that has already completed. However, failures from required plugins are returned to the CLI, allowing CI pipelines to detect them.
 - Non-required plugins remain best-effort, and their failures do not block the
   command.
 

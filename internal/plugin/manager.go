@@ -34,9 +34,10 @@ type Manager struct {
 }
 
 // Load parses raw plugin config, starts each enabled plugin, and runs the
-// handshake. It is best-effort and crash-isolated: a plugin that fails to
-// parse, start, or handshake is logged and excluded, never aborting the host
-// command. Returns nil when no plugin is live.
+// handshake. Optional plugin failures are logged and excluded without
+// aborting the host command. Required plugin failures are retained and
+// returned by Dispatch so they can block the host operation.
+// Returns nil when no plugin is live and no required plugin has failed.
 func Load(ctx context.Context, raw []map[string]any, opts Options) *Manager {
 	log := opts.Log
 	if log == nil {
@@ -52,6 +53,20 @@ func Load(ctx context.Context, raw []map[string]any, opts Options) *Manager {
 	cfgs, err := ParseConfigs(raw)
 	if err != nil {
 		fmt.Fprintf(log, "warning: plugins disabled: %v\n", err)
+
+		// Preserve required-plugin configuration errors so Dispatch can
+		// prevent the host operation from proceeding.
+		for _, entry := range raw {
+			required, _ := entry["required"].(bool)
+			if required {
+				return &Manager{
+					opts:    opts,
+					log:     log,
+					loadErr: fmt.Errorf("required plugin configuration is invalid: %w", err),
+				}
+			}
+		}
+
 		return nil
 	}
 
@@ -95,9 +110,6 @@ func Load(ctx context.Context, raw []map[string]any, opts Options) *Manager {
 	return m
 }
 
-// Dispatch sends a hook to every subscribing plugin, sequentially, each under
-// its own DispatchTimeout. A plugin that errors, crashes, or times out is
-// logged and dropped from future dispatch. It never returns an error.
 // Dispatch sends a hook to every subscribing plugin, sequentially, each under
 // its own DispatchTimeout. Optional plugin failures are logged and dropped.
 // Failures from required plugins are also returned so blocking hooks can veto

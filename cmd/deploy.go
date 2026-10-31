@@ -233,7 +233,9 @@ var deployCmd = &cobra.Command{
 
 		fmt.Println("\ndeploy complete")
 		if !flagDeployDryRun {
-			_ = pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", false, plan, "success", nil))
+			if err := pm.Dispatch(ctx, plugin.HookAfterDeploy, deployHookPayload(cfg, mode, "after", false, plan, "success", nil)); err != nil {
+				return fmt.Errorf("after_deploy hook failed: %w", err)
+			}
 			notifyDiscord(ctx, "deploy succeeded", "success", fmt.Sprintf("%d challenge(s) up:\n%s", len(plan), planSlugs(plan)))
 		}
 		return nil
@@ -284,7 +286,11 @@ func kubeDeployHookPayload(
 	}
 	for _, u := range plan {
 		p.Units = append(p.Units, plugin.DeployUnit{
-			Challenge: u.Challenge,
+			Challenge:   u.Challenge,
+			Category:    u.Category,
+			Slug:        u.Slug,
+			ProjectName: u.Name,
+			ImageTag:    u.Image,
 		})
 	}
 	return p
@@ -409,16 +415,21 @@ var downCmd = &cobra.Command{
 		}
 
 		if err := deploy.ApplyDown(ctx, runner, plan, flagDownVolumes); err != nil {
-			_ = pm.Dispatch(ctx, plugin.HookAfterDown,
+			hookErr := pm.Dispatch(ctx, plugin.HookAfterDown,
 				deployHookPayload(cfg, mode, "after", flagDownDryRun, plan, "failed", err))
 			notifyDiscord(ctx, "teardown failed", "error",
 				fmt.Sprintf("%s: %v", planSlugs(plan), err))
+			if hookErr != nil {
+				return fmt.Errorf("after_down hook failed: %w (teardown also failed: %v)", hookErr, err)
+			}
 			return err
 		}
 
 		if !flagDownDryRun {
-			_ = pm.Dispatch(ctx, plugin.HookAfterDown,
-				deployHookPayload(cfg, mode, "after", false, plan, "success", nil))
+			if err := pm.Dispatch(ctx, plugin.HookAfterDown,
+				deployHookPayload(cfg, mode, "after", false, plan, "success", nil)); err != nil {
+				return fmt.Errorf("after_down hook failed: %w", err)
+			}
 		}
 		fmt.Println("\ndown complete")
 		if !flagDownDryRun {
@@ -557,7 +568,7 @@ func applyKube(ctx context.Context, cfg *config.Config, challs []*challenge.Chal
 	}
 
 	if applyErr != nil {
-		_ = pm.Dispatch(ctx, afterHook,
+		hookErr := pm.Dispatch(ctx, afterHook,
 			kubeDeployHookPayload(cfg, "after", dry, plan, "failed", applyErr))
 
 		if verb == "up" {
@@ -565,12 +576,17 @@ func applyKube(ctx context.Context, cfg *config.Config, challs []*challenge.Chal
 		} else {
 			notifyDiscord(ctx, "teardown failed", "error", applyErr.Error())
 		}
+		if hookErr != nil {
+			return fmt.Errorf("after_%s hook failed: %w (operation also failed: %v)", verb, hookErr, applyErr)
+		}
 		return applyErr
 	}
 
 	if !dry {
-		_ = pm.Dispatch(ctx, afterHook,
-			kubeDeployHookPayload(cfg, "after", false, plan, "success", nil))
+		if err := pm.Dispatch(ctx, afterHook,
+			kubeDeployHookPayload(cfg, "after", false, plan, "success", nil)); err != nil {
+			return fmt.Errorf("after_%s hook failed: %w", verb, err)
+		}
 
 		if verb == "up" {
 			fmt.Println("\ndeploy complete")
