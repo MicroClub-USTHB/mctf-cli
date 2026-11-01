@@ -141,6 +141,16 @@ func MakeInstanceID(c *challenge.Challenge, teamID string) string {
 // is explicit and easy to change later.
 func ProjectName(id string) string { return id }
 
+// NetworkName returns the dedicated Docker bridge network name for an
+// instance. The prefix is intentional: instance IDs already have their
+// own mctf-inst- prefix.
+func NetworkName(id string) string {
+	if strings.HasPrefix(id, "mctf-inst-") {
+		return id
+	}
+	return "mctf-inst-" + id
+}
+
 // allocateHostPort picks a free host port from [start,end] using a
 // hash of (id, internal) as the starting probe — so the same instance
 // re-allocating gets the same port (subject to availability) and
@@ -167,10 +177,17 @@ func allocateHostPort(start, end int, allocated map[int]bool, id string, interna
 }
 
 // DestroyArgs returns the `docker compose down` invocation for an
-// instance. Mirrors deploy.DownArgs but takes a SpawnSpec so callers
-// don't need to reconstruct the mapping.
-func DestroyArgs(s SpawnSpec, removeVolumes bool) []string {
-	args := []string{"compose", "-p", s.ID, "-f", s.ComposeFile, "down"}
+// instance. An optional override file can extend the instance's Compose
+// configuration (e.g. to attach it to its dedicated network).
+// removeVolumes controls whether named volumes are also removed.
+func DestroyArgs(s SpawnSpec, removeVolumes bool, overrideFile ...string) []string {
+	args := []string{"compose", "-p", s.ID, "-f", s.ComposeFile}
+
+	if len(overrideFile) > 0 && overrideFile[0] != "" {
+		args = append(args, "-f", overrideFile[0])
+	}
+
+	args = append(args, "down")
 	if removeVolumes {
 		args = append(args, "-v")
 	}
@@ -178,9 +195,16 @@ func DestroyArgs(s SpawnSpec, removeVolumes bool) []string {
 }
 
 // UpArgs returns the `docker compose up -d` invocation for an
-// instance. Env vars are stamped via the cmd.Env, not as flags.
-func UpArgs(s SpawnSpec) []string {
-	return []string{"compose", "-p", s.ID, "-f", s.ComposeFile, "up", "-d"}
+// instance. An optional override file can extend the Compose configuration.
+// Env vars are stamped via cmd.Env, not as flags.
+func UpArgs(s SpawnSpec, overrideFile ...string) []string {
+	args := []string{"compose", "-p", s.ID, "-f", s.ComposeFile}
+
+	if len(overrideFile) > 0 && overrideFile[0] != "" {
+		args = append(args, "-f", overrideFile[0])
+	}
+
+	return append(args, "up", "-d")
 }
 
 // EnvSlice returns Env as KEY=VALUE pairs sorted by key, suitable for
