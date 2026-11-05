@@ -101,6 +101,39 @@ func TestReaper_OrphanRecordRemoved(t *testing.T) {
 	if len(runner.DownCalls) != 0 {
 		t.Errorf("Down should not be called for an orphan: %v", runner.DownCalls)
 	}
+	if len(runner.RemoveNetworkCalls) != 1 || runner.RemoveNetworkCalls[0] != "orphan" {
+		t.Errorf("expected orphan network to be removed, got %v", runner.RemoveNetworkCalls)
+	}
+}
+
+func TestReaper_OrphanNetworkCleanupFailsLeavesRecord(t *testing.T) {
+	store := reapStore(t)
+	runner := NewFakeRunner()
+	runner.ErrOnRemoveNetwork = map[string]error{
+		"orphan": errors.New("network is still in use"),
+	}
+
+	_ = store.Put(Instance{
+		ID:            "orphan",
+		ChallengeSlug: "deleted/x",
+		TeamID:        "t",
+		ExpiresAt:     time.Now().Add(-time.Hour),
+	})
+
+	r := &Reaper{
+		Store:   store,
+		Runner:  runner,
+		ChalIdx: map[string]*challenge.Challenge{},
+	}
+	r.Tick(context.Background())
+
+	if _, ok := store.Get("orphan"); !ok {
+		t.Error("orphan record should remain when network cleanup fails")
+	}
+
+	if len(runner.RemoveNetworkCalls) != 0 {
+		t.Errorf("failed network removal should not be recorded as successful: %v", runner.RemoveNetworkCalls)
+	}
 }
 
 func TestReaper_RunCancelsOnContext(t *testing.T) {
