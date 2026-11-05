@@ -18,6 +18,12 @@ type Runner interface {
 	Down(ctx context.Context, spec SpawnSpec, volumes bool) error
 }
 
+// NetworkCleaner removes an instance's dedicated Docker network.
+// It is optional so existing Runner implementations remain compatible.
+type NetworkCleaner interface {
+	RemoveNetwork(ctx context.Context, id string) error
+}
+
 // DockerRunner shells out to `docker compose`. stdout/stderr stream to
 // the configured writers (default: os.Stdout / os.Stderr).
 type DockerRunner struct {
@@ -97,6 +103,11 @@ func (d *DockerRunner) removeNetwork(ctx context.Context, id string) error {
 		return fmt.Errorf("remove instance network: %w", err)
 	}
 	return nil
+}
+
+// RemoveNetwork removes the dedicated network for an instance.
+func (d *DockerRunner) RemoveNetwork(ctx context.Context, id string) error {
+	return d.removeNetwork(ctx, id)
 }
 
 // createNetworkOverride creates a temporary Compose file that connects
@@ -242,13 +253,15 @@ func (d *DockerRunner) containerIDs(ctx context.Context, s SpawnSpec) ([]string,
 // hands back canned container IDs. ErrOn lets tests inject failures
 // for specific instance IDs.
 type FakeRunner struct {
-	mu        sync.Mutex
-	UpCalls   []string
-	DownCalls []string
-	ErrOnUp   map[string]error
-	ErrOnDown map[string]error
-	IDsForUp  []string // returned by Up unless overridden by ErrOnUp
-	UpHook    func(ctx context.Context, s SpawnSpec)
+	mu                 sync.Mutex
+	UpCalls            []string
+	DownCalls          []string
+	ErrOnUp            map[string]error
+	ErrOnDown          map[string]error
+	IDsForUp           []string // returned by Up unless overridden by ErrOnUp
+	UpHook             func(ctx context.Context, s SpawnSpec)
+	RemoveNetworkCalls []string
+	ErrOnRemoveNetwork map[string]error
 }
 
 // NewFakeRunner returns a runner that succeeds for every call,
@@ -277,5 +290,17 @@ func (f *FakeRunner) Down(_ context.Context, s SpawnSpec, _ bool) error {
 		return err
 	}
 	f.DownCalls = append(f.DownCalls, s.ID)
+	return nil
+}
+
+func (f *FakeRunner) RemoveNetwork(_ context.Context, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if err, ok := f.ErrOnRemoveNetwork[id]; ok {
+		return err
+	}
+
+	f.RemoveNetworkCalls = append(f.RemoveNetworkCalls, id)
 	return nil
 }
