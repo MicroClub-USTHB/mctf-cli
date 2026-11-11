@@ -60,6 +60,7 @@ the repo and host.
 | `kubernetes` | K8s Deployment/Service/Ingress manifests + `kubectl apply` lifecycle. |
 | `instancer` | Per-team instances: on-disk store, lifecycle, docker runner, daemon, reaper; **plus an API client** for the remote Python instancer. |
 | `monitoring` | Render + run the Prometheus + Grafana + cAdvisor stack. |
+| `infra` | Render Terraform config for the event server (Hetzner / DigitalOcean VPS) + `terraform` runner. |
 | `platform` | `Platform` interface (sync / unsync / configure) + shared payload helpers; `cmd` picks the target from `platform.type`. |
 | `platform/ctfd` | Sync challenges + assets to CTFd (content-hash aware), unsync, configure. |
 | `platform/webhook` | POST signed JSON sync / unsync / configure events to a custom endpoint (`docs/spec/platforms.md`). |
@@ -111,9 +112,9 @@ deterministic deploys and `deploy --rollback`.
 
 - **Derived files are never authored.** `generate --check` enforces that the
   committed derived files match their sources (used in CI).
-- **Pure planners, injected runners.** `build`/`deploy`/`generate`/`monitoring`
+- **Pure planners, injected runners.** `build`/`deploy`/`generate`/`monitoring`/`infra`
   split a pure `Plan()` from an effectful runner, so planning is unit-tested
   without docker.
 - **Self-contained binary.** Schemas and scaffold templates are embedded; the
-  only runtime externals are `docker`/`git`/`ssh`/`kubectl` when a step needs
+  only runtime externals are `docker`/`git`/`ssh`/`kubectl`/`terraform` when a step needs
   them.

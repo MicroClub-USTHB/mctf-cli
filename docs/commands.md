@@ -35,6 +35,14 @@ deterministic deploys and `deploy --rollback`.
 | `mctf monitoring up` | Render + start Prometheus + Grafana + cAdvisor (scrape config auto-generated from challenges). `--dry-run` writes nothing |
 | `mctf monitoring down` | Stop the stack (`--volumes` drops data) |
 
+## Infrastructure
+
+| Command | Purpose |
+| --- | --- |
+| `mctf infra plan` | Render the Terraform config for the event server (Hetzner or DigitalOcean VPS) from the `infra` block and run `terraform plan`. `--dry-run` renders without running Terraform |
+| `mctf infra apply` | Render + `terraform apply` (`--auto-approve`) |
+| `mctf infra destroy` | `terraform destroy` what was applied (`--auto-approve`) |
+
 ## Per-team instancer
 
 | Command | Purpose |
