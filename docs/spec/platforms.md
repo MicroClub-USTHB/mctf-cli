@@ -13,6 +13,7 @@ platform:
 | --- | --- | --- |
 | `ctfd` | CTFd base URL | `MCTF_CTFD_TOKEN` (required) — CTFd admin API token |
 | `webhook` | Endpoint that receives the POSTs | `MCTF_WEBHOOK_SECRET` (optional) — HMAC signing secret |
+| `rctf` | rCTF base URL | `MCTF_RCTF_TOKEN` (required) — rCTF admin API bearer token |
 
 Every target implements the same interface (`internal/platform.Platform`):
 `Sync`, `ResolveUnsync` + `Unsync`, and `Configure`. Each target owns its own
@@ -25,6 +26,17 @@ Diffs the local challenges against the CTFd API and creates (or, with
 `--update`, reconciles) challenges, flags, tags, hints and files. `unsync`
 deletes the matching CTFd challenge; `configure` sets `ctf_name`,
 `ctf_description`, `start` and `end`.
+
+## rCTF
+
+For [rCTF](https://github.com/redpwn/rctf) platforms. Diffs local challenges against
+the rCTF API (`/api/v1/challs`) and plans creations, updates and skips:
+
+- Authenticates using `Authorization: Bearer $MCTF_RCTF_TOKEN`.
+- `sync` creates or updates challenges via `PUT /api/v1/challs/:id`, mapping
+  metadata, scoring (`initial`, `min`, `decay`) and static flags.
+- `unsync` deletes the challenge via `DELETE /api/v1/challs/:id`.
+- `configure` pushes event name and start/end timestamps via `PATCH /api/v1/admin/config`.
 
 ## Generic webhook
 

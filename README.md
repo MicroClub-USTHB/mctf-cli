@@ -87,8 +87,7 @@ Run `mctf --help` for the full command set, or see
   service by setting `instancer.url` — the CLI then manages it over its admin API.
 
 **Operate**
-- `mctf platform sync|unsync|configure` — CTFd integration (content-hash-aware
-  asset re-upload) or a generic signed webhook for custom scoreboards. See
+- `mctf platform sync|unsync|configure` — CTFd, rCTF or a generic signed webhook for custom scoreboards. See
   [`docs/spec/platforms.md`](docs/spec/platforms.md).
 - `mctf monitoring up` — a Prometheus + Grafana + cAdvisor stack with scrape
   config generated from your challenges.
@@ -105,7 +104,7 @@ Run `mctf --help` for the full command set, or see
   Scoop manifest, and a GHCR image via goreleaser.
 
 See the [backlog issues](https://github.com/MicroClub-USTHB/mctf-cli/issues) for
-what's planned (`mctf infra` clusters and DNS, rCTF platform, more plugin
+what's planned (`mctf infra` clusters and DNS, more plugin
 hooks, image vuln scanning, …).
 
 ## How the contract works
