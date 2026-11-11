@@ -171,6 +171,21 @@ remain isolated.
 the `mctf instance spawn` CLI command and the `mctf instancer serve` HTTP daemon).
 Fields `ports`, `flag`, and `containers` are omitted when empty.
 
+### Health failure payload
+
+```json
+{
+  "event": "myctf",
+  "instance_id": "inst-a1b2c3d4e5f6",
+  "challenge_slug": "web-sqli",
+  "container": "mctf-myctf-web-sqli-inst-a1b2c3d4e5f6-web-1",
+  "status": "unhealthy",
+  "timestamp": "2026-10-12T16:05:00Z"
+}
+```
+
+`on_health_failure` fires when an active instance container transitions to an `unhealthy` state during runtime health monitoring.
+
 ## Example
 
 A minimal POSIX-`sh` plugin lives at

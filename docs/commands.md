@@ -24,9 +24,10 @@ deterministic deploys and `deploy --rollback`.
 | `mctf init` | Scaffold a new event repo |
 | `mctf validate` | Validate the repo against the MCTF spec |
 | `mctf generate` | (Re)generate derived files (CTFd manifest, instance.toml, CSV, index.json); `--check` for CI, `--json` for tooling |
-| `mctf build` | Build container images for deployable challenges (`--push`, `--scan`) |
+| `mctf build` | Build container images for deployable challenges (`--push`, `--scan-vulns`) |
 | `mctf deploy` / `mctf down` | Bring challenges up / down (`--mode`, `--dry-run`, `--rollback`, `--volumes`) |
 | `mctf doctor` | Preflight: verify repo + host are deploy-ready |
+| `mctf release` | Prepare, validate, and draft release notes from conventional commits (`--dry-run`) |
 
 ## Monitoring
 
@@ -53,14 +54,14 @@ deterministic deploys and `deploy --rollback`.
 | `mctf instance extend` | Bump an instance's expiry (`--by`, default 15m; remote or local) |
 | `mctf instance destroy` / `reap` | Tear down one / all expired instances (remote or local) |
 
-## Platform (CTFd / webhook)
+## Platform (CTFd / rCTF / webhook)
 
-Target picked by `platform.type`; `--insecure-http` allows plain `http://` webhook URLs. See [`spec/platforms.md`](spec/platforms.md).
+Target picked by `platform.type` (`ctfd`, `rctf`, `webhook`); `--insecure-http` allows plain `http://` webhook URLs. See [`spec/platforms.md`](spec/platforms.md).
 
 | Command | Purpose |
 | --- | --- |
-| `mctf platform sync` | Sync challenges to the configured platform (CTFd: re-uploads assets on content change; webhook: POSTs a full snapshot) |
-| `mctf platform unsync` | Remove a challenge from the platform |
+| `mctf platform sync` | Sync challenges to the configured platform (CTFd: re-uploads assets on content change; rCTF: syncs challenges/scoring/flags; webhook: POSTs a full snapshot) |
+| `mctf platform unsync` | Remove a challenge from the platform (CTFd, rCTF, webhook) |
 | `mctf platform configure` | Sync event-level config (name, description, start, end) |
 
 ## Inspect
@@ -74,6 +75,14 @@ Target picked by `platform.type`; `--insecure-http` allows plain `http://` webho
 | `mctf categories` | Active category catalog |
 | `mctf logs` | Stream a deployed challenge's compose logs |
 | `mctf solve` | Run a challenge's solver and verify the flag (`--against-instance`) |
+
+## Utilities
+
+| Command | Purpose |
+| --- | --- |
+| `mctf gen-man <dir>` | Generate Unix man pages for all commands into the target directory |
+| `mctf completion [bash\|zsh\|fish\|powershell]` | Generate shell completion scripts |
+| `mctf version` | Display binary version, git commit, and build date |
 
 ## Challenge archetypes
 

@@ -63,7 +63,10 @@ the repo and host.
 | `infra` | Render Terraform config for the event server (Hetzner / DigitalOcean VPS) + `terraform` runner. |
 | `platform` | `Platform` interface (sync / unsync / configure) + shared payload helpers; `cmd` picks the target from `platform.type`. |
 | `platform/ctfd` | Sync challenges + assets to CTFd (content-hash aware), unsync, configure. |
+| `platform/rctf` | Sync challenges, scoring, and flags to rCTF (`/api/v1/challs`), unsync, configure (`docs/spec/platforms.md`). |
 | `platform/webhook` | POST signed JSON sync / unsync / configure events to a custom endpoint (`docs/spec/platforms.md`). |
+| `plugin` | Subprocess JSON-RPC plugin manager and lifecycle hooks (`before/after_deploy`, `before/after_down`, `before/after_build`, `on_instance_spawn`, `on_health_failure`). |
+| `release` | Release workflow helper: validate semver, parse conventional commits since prior tag, draft release notes. |
 | `solve` | Run a challenge's solver and verify the recovered flag (incl. `--against-instance`). |
 | `status` / `info` | Runtime state and derived-fact reporting (human + `--json`). |
 | `doctor` | Preflight checks on the repo and host (DNS, disk, docker, etc.). |

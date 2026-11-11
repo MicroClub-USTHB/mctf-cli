@@ -5,7 +5,7 @@ target is picked by `platform.type` in `mctf.config.yml`:
 
 ```yaml
 platform:
-  type: webhook                       # ctfd | webhook
+  type: webhook                       # ctfd | webhook | rctf
   url: "https://scoreboard.example.com/mctf-hook"
 ```
 

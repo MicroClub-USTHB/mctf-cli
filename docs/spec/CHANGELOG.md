@@ -10,7 +10,11 @@ All features below are merged into `develop` and pass CI. Not yet released to `m
 
 - **`feat(platform)`: platform interface + webhook and rCTF targets** — `mctf platform sync|unsync|configure` now dispatch on `platform.type` through a `Platform` interface (`internal/platform`); CTFd behavior is unchanged. New `type: webhook` POSTs versioned JSON payloads signed with HMAC-SHA256 (`X-MCTF-Signature`). New `type: rctf` syncs challenges, scoring, and flags to rCTF instances via `/api/v1/challs` using `MCTF_RCTF_TOKEN`. Schema `platform.type` enum gains `webhook` and `rctf`. See `docs/spec/platforms.md` (closes #45).
 
-- **`feat(plugin)`: plugin system foundation + deploy hooks** — external, language-agnostic plugins run as subprocesses speaking JSON-RPC 2.0 over newline-delimited JSON on stdio (`internal/plugin`). `mctf deploy` fires `before_deploy` / `after_deploy` hooks to configured plugins (`plugins:` in `mctf.config.yml`). Best-effort and crash-isolated: a plugin that fails/crashes/hangs is logged and dropped, never aborting the command. Schema gains a typed `plugins[]` item shape; see `docs/spec/plugins.md` and the `examples/sample-event/plugins/logger.sh` reference plugin. Remaining hooks (`before_build`/`after_build`/`on_instance_spawn`/`on_health_failure`) and `down`/kubernetes dispatch are follow-ups.
+- **`feat(plugin)`: plugin system + full lifecycle hooks** — external, language-agnostic plugins run as subprocesses speaking JSON-RPC 2.0 over newline-delimited JSON on stdio (`internal/plugin`). Plugins receive lifecycle hooks: `before_deploy` / `after_deploy`, `before_down` / `after_down`, `before_build` / `after_build`, `on_instance_spawn`, and `on_health_failure`. Standard plugins are best-effort and crash-isolated; plugins configured with `required: true` can veto operations on startup or blocking `before_*` hook failures. See `docs/spec/plugins.md` and `examples/sample-event/plugins/logger.sh`.
+
+- **`feat(build)`: opt-in Trivy vulnerability scanning** — `mctf build --scan-vulns` scans built challenge images with Trivy, reporting CVEs and failing on CRITICAL/HIGH severity vulnerabilities. Integrated with `SEC006`.
+
+- **`feat(release)`: `mctf release` command** — `mctf release <version>` automates tag preparation, validates semver syntax, drafts release notes by parsing conventional commits since the previous git tag, and supports `--dry-run` to preview the generated release notes.
 
 - **`feat(instancer)`: per-team dynamic flags** — the instancer now mints a unique flag per spawn when `flags[].dynamic: true` is set on a challenge. `SpawnOptions.FlagOverride` lets callers pass a pre-generated value; `Instance.Flag` persists it in the store. Schema extended with `flags[].dynamic` and `flags[].generator` (reserved). Validation rules added: `A010` (dynamic flag on non-instanced challenge) and `A011` (static flag + `dynamic: true` conflict).
 
@@ -52,14 +56,18 @@ All features below are merged into `develop` and pass CI. Not yet released to `m
 
 ### Fixes & Refactors
 
+- `fix(k8s)`: Challenge IDs separator normalized with forward slashes (`category/slug`) on every OS, preventing Windows backslash regressions in manifest generators and labels.
+- `fix(infra)`: Propagate cobra context to Terraform executions, normalize SSH key paths (`~` expansion), and fix macOS `/var` vs `/private/var` symlink comparison in tests.
 - `fix(generate)`: `PrometheusConfig` no longer mutates the caller's challenge slice (defensive copy before sort).
 - `fix(generate)`: Asset paths normalised with `filepath.ToSlash` — fixes Windows path separator in generated YAML.
 - `refactor(generate)`: `Apply()` signature cleaned — removed the always-empty `removed []string` return value; stale-file cleanup is the explicit responsibility of `CleanStale()`.
 - `fix(deploy)`: Registry/translate path gated on `registry.url` presence.
 - `fix(generate)`: `shouldEmitPrometheus()` guard added — `monitoring/prometheus.yml` is no longer emitted for static-only events.
 
-### Tests
+### Tests & CI
 
+- `test(e2e)`: Added dedicated end-to-end integration test suite (`e2e/`) exercising the full lifecycle: validate → generate → build → scan → deploy → solve → down against a live Docker daemon.
+- `ci`: Atomic coverage profiling with step summaries, artifact uploads, Codecov integration, and a dedicated `e2e` pipeline job.
 - `test(generate)`: First unit tests for `internal/generate` — `TestPrometheusConfig` (6 table-driven cases, golden YAML) and `TestShouldEmitPrometheus` (5 cases). Package went from `[no test files]` to covered.
 - `test(instancer)`: Tests for per-team dynamic flag minting in `lifecycle_test.go`.
 - `test(init)`: Prompt injection tests for `promptString` and `promptChoice`.
@@ -67,6 +75,8 @@ All features below are merged into `develop` and pass CI. Not yet released to `m
 
 ### Docs
 
+- `docs/spec/infra.md`: Documented `mctf infra plan|apply|destroy` with Terraform templates, firewall configurations, and provider specs.
+- `docs/spec/platforms.md`: Documented the `Platform` interface with `ctfd`, `rctf`, and generic `webhook` contracts.
 - `docs/spec/derived-files.md`: Added §6 documenting `monitoring/prometheus.yml` shape and generation rules.
 - `docs/spec/repository-layout.md`: Added `monitoring/` to the event repo tree.
 - `docs/spec/validation.md`: Added `D040`–`D042` (doctor), `SEC004` capability allowlist, `A010`/`A011` (dynamic flag rules).

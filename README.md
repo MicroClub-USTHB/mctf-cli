@@ -98,14 +98,14 @@ Run `mctf --help` for the full command set, or see
 
 **Extend & distribute**
 - **Plugin system** — language-agnostic plugins (subprocess + JSON-RPC over stdio)
-  receive lifecycle hooks (`before_deploy` / `after_deploy` today); best-effort and
-  crash-isolated. See [`docs/spec/plugins.md`](docs/spec/plugins.md).
+  receive lifecycle hooks (`before_deploy` / `after_deploy`, `before_down` / `after_down`,
+  `before_build` / `after_build`, `on_instance_spawn`, `on_health_failure`) with optional
+  blocking veto mode (`required: true`); best-effort and crash-isolated. See [`docs/spec/plugins.md`](docs/spec/plugins.md).
 - Releases ship cross-platform binaries, `.deb`/`.rpm`, a Homebrew cask, a
   Scoop manifest, and a GHCR image via goreleaser.
 
 See the [backlog issues](https://github.com/MicroClub-USTHB/mctf-cli/issues) for
-what's planned (`mctf infra` clusters and DNS, more plugin
-hooks, image vuln scanning, …).
+what's planned (`mctf infra` clusters and DNS, per-team instancer network isolation, …).
 
 ## How the contract works
 

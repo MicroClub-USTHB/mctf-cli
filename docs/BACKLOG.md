@@ -4,8 +4,8 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 ## Big rocks (multi-day each)
 
-- **K8s deploy mode** — `mctf deploy --mode kubernetes`. Generate K8s Deployment / Service / Ingress manifests from per-challenge compose, `kubectl apply -f`. Honor `cfg.Deploy.Kubernetes.{Kubeconfig, Namespace, IngressClass}`.
-- **Plugin system** — subprocess + JSON-RPC over stdio (Terraform-style), language-agnostic, crash-isolated. **Foundation + `before_deploy`/`after_deploy` + `before_build`/`after_build` + `on_instance_spawn` + `on_health_failure` shipped** (`internal/plugin`, `internal/instancer/health_monitor.go`, `docs/spec/plugins.md`). *Remaining:* dispatch on `down`/Kubernetes paths, and a blocking/`required` mode (a plugin that can veto).
+- **K8s deploy mode** — `mctf deploy --mode kubernetes`. Generate K8s Deployment / Service / Ingress manifests from per-challenge compose, `kubectl apply -f`. Honor `cfg.Deploy.Kubernetes.{Kubeconfig, Namespace, IngressClass}`. **Shipped:** deterministic NodePort allocation, pod-security hardening, TCP/startup probes, and cross-platform separator normalization (see `docs/commands.md`).
+- **Plugin system** — subprocess + JSON-RPC over stdio (Terraform-style), language-agnostic, crash-isolated. **Shipped:** Foundation + `before_deploy`/`after_deploy` + `before_down`/`after_down` + `before_build`/`after_build` + `on_instance_spawn` + `on_health_failure` + dispatch on `down`/Kubernetes paths, and a blocking/`required` mode (a plugin that can veto). See `docs/spec/plugins.md`.
 - ~~**Prometheus / Grafana wiring** — `mctf monitoring up` brings up prom + grafana + cAdvisor with prebuilt dashboards. Generate scrape config from challenge labels.~~ **Shipped:** `mctf monitoring up` / `down` render and run the stack under `monitoring/stack/` (see `docs/spec/monitoring.md`).
 - **Terraform wrapper** — `mctf infra plan|apply|destroy` for VPS, clusters, networking, DNS. Templates for DigitalOcean, Hetzner, DOKS, EKS, GKE. **Single VPS shipped** (Hetzner + DigitalOcean, firewall, docker via cloud-init; see `docs/spec/infra.md`). *Remaining:* DOKS/EKS/GKE clusters, DNS records, remote state backend.
 
@@ -14,9 +14,9 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 - ~~**Remote instancer control plane** — wire `mctf instance spawn/extend/flag/ps` to remote API.~~ **Shipped:** all subcommands drive the remote instancer when `instancer.url` is set with fallback to local store.
 - ~~**rCTF + generic-webhook platforms** — second + third platform targets behind the platform interface.~~ **Shipped:** interface + generic webhook + rCTF adapter (see `docs/spec/platforms.md`).
 - **Per-team auth on the instancer** — currently bearer tokens have full power; add team-scoped tokens (`POST /spawn` only allows the request when the token's team_id matches the body).
-- **Native instancer: docker-network isolation** — currently spawns share the event network; isolate each per-team instance to its own bridge.
+- **Native instancer: docker-network isolation** — currently spawns share the event network; isolate each per-team instance to its own bridge (Issue #54).
 - ~~**`mctf platform configure` extensions** — sync `start` / `end` timestamps (needs schema addition `event.start_at` / `event.end_at`), `ctf_description`.~~ **Shipped** (schema v1 event metadata + CTFd sync; see `docs/spec/CHANGELOG.md`).
-- **`mctf release`** — tag git, build via goreleaser, draft a release notes file from conventional-commits since last tag.
+- ~~**`mctf release`** — tag git, build via goreleaser, draft a release notes file from conventional-commits since last tag.~~ **Shipped:** `mctf release` validates semver, drafts changelog from commit history, supports `--dry-run`.
 
 ## Small wins (~half-day each)
 
@@ -41,7 +41,7 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 
 ## CI / quality
 
-- **golangci-lint** in CI (`go vet` is currently the only static check).
+- ~~**golangci-lint** in CI (`go vet` is currently the only static check).~~ **Shipped:** `golangci-lint` configured in `.github/workflows/ci.yml` and `make lint`.
 - ~~**Coverage reporting** — `go test -coverprofile` upload to Codecov / similar.~~ **Shipped:** CI runs atomic coverprofile, reports step summary, uploads to Codecov + artifacts, with local `make test-coverage`.
 - **Fuzz tests** for the manifest loader and the compose port parser.
 - ~~**End-to-end integration test** — sample-event fixture: validate → generate → build → scan → deploy → solve → down. Real docker daemon, gated on an `e2e` build tag.~~ **Shipped:** `e2e/` + `make test-e2e`, run by a dedicated `e2e` CI job against `misc/welcome`.
@@ -49,18 +49,18 @@ Open work organized by size. Each line is intentionally GitHub-issue-shaped: tit
 ## Security
 
 - **SEC005: capability allowlist enforcement** — honor `deploy.security_opts.allow_caps` so SEC004 only fires on caps not in the allowlist.
-- **SEC006: image vulnerability scan** — opt-in `mctf build --scan-vulns` via trivy or similar.
+- ~~**SEC006: image vulnerability scan** — opt-in `mctf build --scan-vulns` via trivy or similar.~~ **Shipped:** `mctf build --scan-vulns` scans images with Trivy and flags CRITICAL/HIGH vulnerabilities.
 - **Secret hygiene** — ~~warn under `mctf doctor` on `MCTF_*_TOKEN` patterns.~~ **Shipped** as `doctor` check `D043` (scans the tracked working tree for `MCTF_*_{TOKEN,KEY,SECRET,WEBHOOK}` values, filtering placeholders/env-refs; never prints the value). *Follow-up:* deep git-**history** scan (left to a dedicated tool like gitleaks).
 
 ---
 
 ## Suggested wave-1 issues
 
-Highest leverage, smallest blast radius — pick from these to start:
+*(All suggested wave-1 issues have shipped!)*
 
-1. **goreleaser + Homebrew tap** — unlock distribution.
-2. **K8s deploy mode** — biggest deployment-flexibility win.
-3. **`docs/spec/` refresh** — backfill what shipped this session.
+1. ~~**goreleaser + Homebrew tap** — unlock distribution.~~ **Shipped**.
+2. ~~**K8s deploy mode** — biggest deployment-flexibility win.~~ **Shipped**.
+3. ~~**`docs/spec/` refresh** — backfill what shipped this session.~~ **Shipped**.
 
 ## Conventions for new tasks
 
