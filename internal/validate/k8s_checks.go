@@ -1,8 +1,6 @@
 package validate
 
 import (
-	"path/filepath"
-
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 )
@@ -24,7 +22,7 @@ func checkKubernetes(r *Report, cfg *config.Config, eventRoot string, challs []*
 			continue
 		}
 		path := relTo(eventRoot, c.ManifestPath())
-		key := filepath.Join(c.CategoryDir, c.Slug)
+		key := c.CategoryDir + "/" + c.Slug
 
 		name := K8sResourceName(cfg.Event.Slug, c.CategoryDir, c.Slug)
 		if err := CheckK8sName(name); err != nil {
