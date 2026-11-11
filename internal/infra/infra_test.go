@@ -70,8 +70,8 @@ func TestOptionsFromConfig_Overrides(t *testing.T) {
 		t.Errorf("overrides not applied: %+v", o)
 	}
 	// Terraform runs from .mctf/infra, so a relative key path is anchored
-	// at the event root instead.
-	if want := filepath.Join(root, "keys", "ops.pub"); o.SSHPublicKey != want {
+	// at the event root instead, and normalized to forward slashes.
+	if want := filepath.ToSlash(filepath.Join(root, "keys", "ops.pub")); o.SSHPublicKey != want {
 		t.Errorf("ssh key = %q, want %q", o.SSHPublicKey, want)
 	}
 }
@@ -260,7 +260,7 @@ func fakeTerraform(t *testing.T, failOn string) (bin, log string) {
 	bin = filepath.Join(dir, "terraform")
 	log = filepath.Join(dir, "calls.log")
 	script := "#!/bin/sh\n" +
-		"echo \"$(pwd) $*\" >> " + log + "\n" +
+		"echo \"$(pwd -P) $*\" >> " + log + "\n" +
 		"[ \"$1\" = \"" + failOn + "\" ] && exit 1\n" +
 		"exit 0\n"
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {

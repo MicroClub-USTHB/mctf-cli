@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,7 +48,7 @@ var infraPlanCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return runner.Plan(context.Background(), ws.Dir)
+		return runner.Plan(cmd.Context(), ws.Dir)
 	},
 }
 
@@ -67,7 +66,7 @@ var infraApplyCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if err := runner.Apply(ctx, ws.Dir, flagInfraAutoApprove); err != nil {
 			notifyDiscord(ctx, "infra apply failed", "error", err.Error())
 			return err
@@ -112,7 +111,7 @@ var infraDestroyCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if err := runner.Destroy(ctx, dir, flagInfraAutoApprove); err != nil {
 			notifyDiscord(ctx, "infra destroy failed", "error", err.Error())
 			return err

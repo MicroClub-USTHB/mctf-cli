@@ -100,12 +100,15 @@ func OptionsFromConfig(cfg *config.Config, eventRoot string) (Options, error) {
 	// Terraform runs from WorkDir, so a relative key path would resolve
 	// against the wrong directory. ~-prefixed paths are left to
 	// Terraform's pathexpand().
-	if !strings.HasPrefix(o.SSHPublicKey, "~") && !filepath.IsAbs(o.SSHPublicKey) {
-		abs, err := filepath.Abs(filepath.Join(eventRoot, o.SSHPublicKey))
-		if err != nil {
-			return Options{}, fmt.Errorf("infra.ssh_public_key: %w", err)
+	if !strings.HasPrefix(o.SSHPublicKey, "~") {
+		if !filepath.IsAbs(o.SSHPublicKey) {
+			abs, err := filepath.Abs(filepath.Join(eventRoot, o.SSHPublicKey))
+			if err != nil {
+				return Options{}, fmt.Errorf("infra.ssh_public_key: %w", err)
+			}
+			o.SSHPublicKey = abs
 		}
-		o.SSHPublicKey = abs
+		o.SSHPublicKey = filepath.ToSlash(o.SSHPublicKey)
 	}
 
 	ports, err := FirewallPorts(cfg)
