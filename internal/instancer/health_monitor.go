@@ -138,7 +138,7 @@ func (m *HealthMonitor) Tick(ctx context.Context) error {
 			if m.Dispatch != nil {
 				m.Dispatch(ctx, plugin.HookOnHealthFailure, payload)
 			} else if m.PluginManager != nil {
-				m.PluginManager.Dispatch(ctx, plugin.HookOnHealthFailure, payload)
+				_ = m.PluginManager.Dispatch(ctx, plugin.HookOnHealthFailure, payload)
 			}
 		}
 	}
