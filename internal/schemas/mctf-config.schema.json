@@ -202,8 +202,8 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ctfd"],
-          "description": "v1 supports CTFd; rCTF and others via plugin in v0.4."
+          "enum": ["ctfd", "webhook"],
+          "description": "CTF platform target: ctfd (MCTF_CTFD_TOKEN) or webhook (optional MCTF_WEBHOOK_SECRET). rCTF planned."
         },
         "url": {
           "type": "string",

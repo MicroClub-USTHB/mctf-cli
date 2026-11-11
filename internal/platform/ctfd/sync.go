@@ -13,6 +13,7 @@ import (
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/platform"
 )
 
 // Action is one resolved sync operation. The CLI prints these and the
@@ -97,14 +98,14 @@ func BuildPayload(cfg *config.Config, c *challenge.Challenge) Challenge {
 	out := Challenge{
 		Name:        m.Challenge.Name,
 		Category:    m.Challenge.Category,
-		Description: descriptionWithAuthor(m.Challenge.Description, m.Challenge.Author),
+		Description: platform.DescriptionWithAuthor(m.Challenge.Description, m.Challenge.Author),
 		State:       "visible",
 	}
 	if m.Challenge.ForceHidden {
 		out.State = "hidden"
 	}
 
-	scoring := resolveScoring(cfg, m.Challenge.Scoring)
+	scoring := platform.ResolveScoring(cfg, m.Challenge.Scoring)
 	if scoring.Type == "static" {
 		v := scoring.Points
 		out.Type = "standard"
@@ -115,7 +116,7 @@ func BuildPayload(cfg *config.Config, c *challenge.Challenge) Challenge {
 		out.Initial, out.Decay, out.Minimum = &i, &d, &mn
 	}
 
-	out.ConnectionInfo = connectionInfo(cfg, c)
+	out.ConnectionInfo = platform.ConnectionInfo(cfg, c)
 	return out
 }
 
@@ -603,97 +604,6 @@ func wantHintDeltas(hs []Hint) []HintDelta {
 
 func challengeKey(category, name string) string {
 	return strings.ToLower(category) + "::" + strings.ToLower(name)
-}
-
-// descriptionWithAuthor matches the CTFd-manifest generator output so
-// the description sent over the wire equals what `mctf generate`
-// would have written.
-func descriptionWithAuthor(desc, author string) string {
-	desc = strings.TrimRight(desc, "\n")
-	if author == "" {
-		return desc
-	}
-	return desc + "\n\n**Author: " + author + "**"
-}
-
-// connectionInfo is the URL CTFd shows alongside the description.
-// For instanced challenges it's the instancer URL; for service it's
-// the public ingress URL; for static it's empty.
-func connectionInfo(cfg *config.Config, c *challenge.Challenge) string {
-	if !c.Manifest.Challenge.NeedDeploy || c.Manifest.Deploy == nil {
-		return ""
-	}
-	if c.Archetype == challenge.ArchetypeInstanced {
-		if cfg.Instancer != nil && cfg.Instancer.URL != "" {
-			return cfg.Instancer.URL
-		}
-		if cfg.Event.Domain != "" {
-			return "https://instancer." + cfg.Event.Domain
-		}
-		return ""
-	}
-	d := c.Manifest.Deploy
-	if cfg.Event.Domain == "" || d.Subdomain == "" {
-		return ""
-	}
-	scheme := "https"
-	if d.NoSSL {
-		scheme = "http"
-	}
-	if d.TCP {
-		port := 0
-		if d.Port != nil {
-			port = *d.Port
-		}
-		if port == 0 {
-			return ""
-		}
-		return fmt.Sprintf("nc %s.%s %d", d.Subdomain, cfg.Event.Domain, port)
-	}
-	if d.Port != nil {
-		return fmt.Sprintf("%s://%s.%s:%d", scheme, d.Subdomain, cfg.Event.Domain, *d.Port)
-	}
-	return fmt.Sprintf("%s://%s.%s", scheme, d.Subdomain, cfg.Event.Domain)
-}
-
-// resolveScoring picks per-challenge scoring or falls back to event default,
-// or to a static-100pt default. Mirrors generate.resolveScoring.
-type resolvedScoring struct {
-	Type    string
-	Points  int
-	Initial int
-	Decay   int
-	Minimum int
-}
-
-func resolveScoring(cfg *config.Config, override *challenge.Scoring) resolvedScoring {
-	if override != nil && override.Type != "" {
-		return scoringFrom(override.Type, override.Points, override.Initial, override.Decay, override.Minimum)
-	}
-	if cfg != nil && cfg.Event.Scoring != nil {
-		s := cfg.Event.Scoring
-		return scoringFrom(s.Type, s.Points, s.Initial, s.Decay, s.Minimum)
-	}
-	return resolvedScoring{Type: "static", Points: 100}
-}
-
-func scoringFrom(t string, points, initial, decay, minimum int) resolvedScoring {
-	if t == "static" {
-		if points == 0 {
-			points = 100
-		}
-		return resolvedScoring{Type: "static", Points: points}
-	}
-	if initial == 0 {
-		initial = 500
-	}
-	if decay == 0 {
-		decay = 10
-	}
-	if minimum == 0 {
-		minimum = 100
-	}
-	return resolvedScoring{Type: "dynamic", Initial: initial, Decay: decay, Minimum: minimum}
 }
 
 // Render produces a human-readable summary of the plan.

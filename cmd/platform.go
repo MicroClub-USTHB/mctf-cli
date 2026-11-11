@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -14,12 +13,53 @@ import (
 
 	"github.com/MicroClub-USTHB/mctf-cli/internal/challenge"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/platform"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/platform/ctfd"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/platform/webhook"
 )
 
 var platformCmd = &cobra.Command{
 	Use:   "platform",
-	Short: "Sync challenges to a CTF platform (CTFd in v0)",
+	Short: "Sync challenges to a CTF platform (CTFd or webhook)",
+	Long: "Pushes the event to the platform named by platform.type in\n" +
+		"mctf.config.yml:\n\n" +
+		"  ctfd     CTFd API at platform.url; token from $MCTF_CTFD_TOKEN\n" +
+		"  webhook  POSTs JSON events to platform.url; optional HMAC signing\n" +
+		"           secret from $MCTF_WEBHOOK_SECRET\n\n" +
+		"See docs/spec/platforms.md for the webhook payload contract.",
+}
+
+var flagPlatformInsecureHTTP bool
+
+// platformTypes lists the supported platform.type values, in the order
+// error messages show them.
+var platformTypes = []string{"ctfd", "webhook"}
+
+// newPlatform builds the target named by platform.type, reading its
+// credentials from the environment.
+func newPlatform(cfg *config.Config) (platform.Platform, error) {
+	typ := platformType(cfg)
+	switch typ {
+	case "ctfd", "webhook":
+	default:
+		return nil, fmt.Errorf("platform.type must be one of %s (got %q)", strings.Join(platformTypes, ", "), typ)
+	}
+	if cfg.Platform.URL == "" {
+		return nil, fmt.Errorf("platform.url is empty in mctf.config.yml")
+	}
+	if typ == "ctfd" {
+		token := os.Getenv("MCTF_CTFD_TOKEN")
+		if token == "" {
+			return nil, fmt.Errorf("MCTF_CTFD_TOKEN env var is empty — required to authenticate against %s", cfg.Platform.URL)
+		}
+		return ctfd.NewPlatform(cfg.Platform.URL, token), nil
+	}
+	p, err := webhook.New(cfg.Platform.URL, os.Getenv("MCTF_WEBHOOK_SECRET"), "mctf/"+version, flagPlatformInsecureHTTP)
+	if err != nil {
+		return nil, err
+	}
+	p.EventSlug = cfg.Event.Slug
+	return p, nil
 }
 
 var (
@@ -32,14 +72,16 @@ var (
 var platformSyncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync the event's challenges to the configured CTF platform",
-	Long: "Reads platform.url from mctf.config.yml and the API token from\n" +
-		"$MCTF_CTFD_TOKEN, then creates challenges that are missing on the\n" +
-		"platform.\n\n" +
-		"By default, challenges that already exist are skipped — pass\n" +
-		"--update to reconcile their fields and child resources (flags, tags,\n" +
-		"hints). With --dry-run, prints the plan without making any\n" +
-		"network calls beyond the read-only diff.\n\n" +
-		"Token: export MCTF_CTFD_TOKEN=<your-token> before running.\n\n" +
+	Long: "Reads platform.type and platform.url from mctf.config.yml and\n" +
+		"pushes the event's challenges to that platform.\n\n" +
+		"ctfd: creates challenges that are missing on the platform. By\n" +
+		"default, challenges that already exist are skipped — pass --update\n" +
+		"to reconcile their fields and child resources (flags, tags, hints).\n" +
+		"With --dry-run, prints the plan without making any network calls\n" +
+		"beyond the read-only diff. Token: export MCTF_CTFD_TOKEN=<token>.\n\n" +
+		"webhook: POSTs one snapshot of the (filtered) challenges, flags\n" +
+		"included. --update has no effect; --dry-run prints the payload\n" +
+		"without sending it. Set MCTF_WEBHOOK_SECRET to sign the body.\n\n" +
 		"Examples:\n" +
 		"  mctf platform sync --dry-run\n" +
 		"  mctf platform sync\n" +
@@ -51,15 +93,9 @@ var platformSyncCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if cfg.Platform == nil || cfg.Platform.Type != "ctfd" {
-			return fmt.Errorf("platform.type must be 'ctfd' (got %q) — only CTFd is supported in v0", platformType(cfg))
-		}
-		if cfg.Platform.URL == "" {
-			return fmt.Errorf("platform.url is empty in mctf.config.yml")
-		}
-		token := os.Getenv("MCTF_CTFD_TOKEN")
-		if token == "" {
-			return fmt.Errorf("MCTF_CTFD_TOKEN env var is empty — required to authenticate against %s", cfg.Platform.URL)
+		target, err := newPlatform(cfg)
+		if err != nil {
+			return err
 		}
 
 		challs, _, err := challenge.Discover(flagDir, cfg.ChallengesDir)
@@ -67,66 +103,17 @@ var platformSyncCmd = &cobra.Command{
 			return err
 		}
 
-		client := ctfd.New(cfg.Platform.URL, token)
-		ctx := context.Background()
-
-		plan, err := ctfd.Diff(ctx, client, cfg, challs, ctfd.PlanOptions{
+		return target.Sync(context.Background(), platform.SyncRequest{
+			Config:         cfg,
+			Challenges:     challs,
 			CategoryFilter: flagSyncCat,
 			SlugFilter:     flagSyncSlug,
 			AllowUpdate:    flagSyncUpdate,
+			DryRun:         flagSyncDryRun,
+			JSON:           flagJSON,
+			Out:            os.Stdout,
 		})
-		if err != nil {
-			return err
-		}
-
-		if flagJSON {
-			if err := printPlanJSON(plan); err != nil {
-				return err
-			}
-		} else {
-			fmt.Print(plan.Render())
-		}
-
-		if flagSyncDryRun {
-			return nil
-		}
-
-		applied, err := ctfd.Apply(ctx, client, plan)
-		if err != nil {
-			return err
-		}
-		if !flagJSON {
-			fmt.Printf("\napplied %d action(s)\n", applied)
-		}
-		return nil
 	},
-}
-
-type planRow struct {
-	Slug       string         `json:"slug"`
-	Action     ctfd.Action    `json:"action"`
-	Reason     string         `json:"reason"`
-	ExistingID int            `json:"existing_id,omitempty"`
-	Payload    ctfd.Challenge `json:"payload"`
-}
-
-func printPlanJSON(plan *ctfd.Plan) error {
-	rows := make([]planRow, 0, len(plan.Items))
-	for _, it := range plan.Items {
-		rows = append(rows, planRow{
-			Slug:       it.Slug,
-			Action:     it.Action,
-			Reason:     it.Reason,
-			ExistingID: it.ExistingID,
-			Payload:    it.Payload,
-		})
-	}
-	body, err := json.MarshalIndent(rows, "", "  ")
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(body))
-	return nil
 }
 
 func platformType(cfg *config.Config) string {
@@ -142,12 +129,13 @@ var (
 
 var platformConfigureCmd = &cobra.Command{
 	Use:   "configure",
-	Short: "Sync event-level CTFd config (ctf_name, ctf_description, start, end) from mctf.config.yml",
-	Long: "Pushes ctf_name, ctf_description, start, and end timestamps to CTFd's\n" +
-		"/api/v1/configs from the loaded event config. Theme settings\n" +
+	Short: "Sync event-level config (name, description, start, end) from mctf.config.yml",
+	Long: "ctfd: pushes ctf_name, ctf_description, start, and end timestamps to\n" +
+		"CTFd's /api/v1/configs from the loaded event config. Theme settings\n" +
 		"(theme_name, theme_color, custom HTML) are intentionally not synced —\n" +
-		"those are typically a one-time UI setup, not per-event automation.\n\n" +
+		"those are typically a one-time UI setup, not per-event automation.\n" +
 		"Token: export MCTF_CTFD_TOKEN=<your-token> before running.\n\n" +
+		"webhook: POSTs a configure event with the same fields.\n\n" +
 		"Examples:\n" +
 		"  mctf platform configure --dry-run\n" +
 		"  mctf platform configure",
@@ -156,15 +144,9 @@ var platformConfigureCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if cfg.Platform == nil || cfg.Platform.Type != "ctfd" {
-			return fmt.Errorf("platform.type must be 'ctfd' (got %q)", platformType(cfg))
-		}
-		if cfg.Platform.URL == "" {
-			return fmt.Errorf("platform.url is empty in mctf.config.yml")
-		}
-		token := os.Getenv("MCTF_CTFD_TOKEN")
-		if token == "" {
-			return fmt.Errorf("MCTF_CTFD_TOKEN env var is empty")
+		target, err := newPlatform(cfg)
+		if err != nil {
+			return err
 		}
 		if cfg.Event.Name == "" {
 			return fmt.Errorf("event.name is empty in mctf.config.yml — nothing to push")
@@ -199,9 +181,7 @@ var platformConfigureCmd = &cobra.Command{
 			return nil
 		}
 
-		client := ctfd.New(cfg.Platform.URL, token)
-		ctx := context.Background()
-		if err := client.Configure(ctx, ctfd.EventConfig{
+		if err := target.Configure(context.Background(), platform.EventConfig{
 			Name:        cfg.Event.Name,
 			Description: cfg.Event.Description,
 			StartAt:     cfg.Event.StartAt,
@@ -222,9 +202,10 @@ var (
 var platformUnsyncCmd = &cobra.Command{
 	Use:   "unsync <category>/<slug>",
 	Short: "Remove a challenge from the configured CTF platform",
-	Long: "Looks up the CTFd challenge that corresponds to <category>/<slug>\n" +
-		"and DELETEs it via /api/v1/challenges/<id>. CTFd cascades the\n" +
-		"delete to flags, tags, hints, and files.\n\n" +
+	Long: "ctfd: looks up the CTFd challenge that corresponds to\n" +
+		"<category>/<slug> and DELETEs it via /api/v1/challenges/<id>. CTFd\n" +
+		"cascades the delete to flags, tags, hints, and files.\n\n" +
+		"webhook: POSTs an unsync event for <category>/<slug>.\n\n" +
 		"Local files in challenges/<category>/<slug>/ are NOT touched —\n" +
 		"this only undoes the platform-side state. Use git for local\n" +
 		"cleanup.\n\n" +
@@ -245,15 +226,9 @@ var platformUnsyncCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if cfg.Platform == nil || cfg.Platform.Type != "ctfd" {
-			return fmt.Errorf("platform.type must be 'ctfd' (got %q)", platformType(cfg))
-		}
-		if cfg.Platform.URL == "" {
-			return fmt.Errorf("platform.url is empty in mctf.config.yml")
-		}
-		token := os.Getenv("MCTF_CTFD_TOKEN")
-		if token == "" {
-			return fmt.Errorf("MCTF_CTFD_TOKEN env var is empty")
+		target, err := newPlatform(cfg)
+		if err != nil {
+			return err
 		}
 
 		// Prefer the local manifest's display name when available — the
@@ -269,21 +244,13 @@ var platformUnsyncCmd = &cobra.Command{
 			}
 		}
 
-		client := ctfd.New(cfg.Platform.URL, token)
 		ctx := context.Background()
-		existing, err := client.ListChallenges(ctx)
+		t, err := target.ResolveUnsync(ctx, category, slug, wantName)
 		if err != nil {
-			return fmt.Errorf("list challenges: %w", err)
+			return err
 		}
 
-		target := findUnsyncTarget(existing, category, slug, wantName)
-		if target == nil {
-			return fmt.Errorf("no CTFd challenge matched %s/%s (looked for category=%s, name=%q)",
-				category, slug, category, wantName)
-		}
-
-		fmt.Printf("will delete CTFd challenge id=%d category=%q name=%q\n",
-			target.ID, target.Category, target.Name)
+		fmt.Printf("will %s\n", t.Description)
 		if flagUnsyncDryRun {
 			return nil
 		}
@@ -293,44 +260,12 @@ var platformUnsyncCmd = &cobra.Command{
 				return nil
 			}
 		}
-		if err := client.DeleteChallenge(ctx, target.ID); err != nil {
-			return fmt.Errorf("delete challenge id=%d: %w", target.ID, err)
+		if err := target.Unsync(ctx, t); err != nil {
+			return err
 		}
-		fmt.Printf("deleted id=%d\n", target.ID)
+		fmt.Println(t.Done)
 		return nil
 	},
-}
-
-// findUnsyncTarget picks one CTFd challenge from `existing` that
-// corresponds to <category>/<slug>. It tries:
-//
-//  1. category + exact name match (case-insensitive) using `wantName`
-//     from the local manifest, if provided.
-//  2. category + slug-derived name match (the fallback when the local
-//     challenge has already been removed).
-//
-// Returns nil if no candidate is found.
-func findUnsyncTarget(existing []ctfd.Challenge, category, slug, wantName string) *ctfd.Challenge {
-	for i := range existing {
-		ec := &existing[i]
-		if !strings.EqualFold(ec.Category, category) {
-			continue
-		}
-		if wantName != "" && strings.EqualFold(ec.Name, wantName) {
-			return ec
-		}
-	}
-	// Fallback: slug-from-name match.
-	for i := range existing {
-		ec := &existing[i]
-		if !strings.EqualFold(ec.Category, category) {
-			continue
-		}
-		if challenge.SlugFromName(ec.Name) == slug {
-			return ec
-		}
-	}
-	return nil
 }
 
 // confirmYes blocks on stdin for a y/N answer. Returns true only for
@@ -347,6 +282,8 @@ func confirmYes(in io.Reader, out io.Writer, prompt string) bool {
 }
 
 func init() {
+	platformCmd.PersistentFlags().BoolVar(&flagPlatformInsecureHTTP, "insecure-http", false, "allow http:// webhook URLs (payloads include flags)")
+
 	platformSyncCmd.Flags().BoolVar(&flagSyncDryRun, "dry-run", false, "show the plan without applying it")
 	platformSyncCmd.Flags().BoolVar(&flagSyncUpdate, "update", false, "reconcile existing challenges (default: skip them)")
 	platformSyncCmd.Flags().StringVar(&flagSyncCat, "category", "", "sync only challenges in this category")
