@@ -101,6 +101,10 @@ func TestCheckKubernetes_K003_NodePortCollision(t *testing.T) {
 	if got := rulesOf(r); len(got) != 1 || got[0] != "K003" {
 		t.Fatalf("rules = %v, want [K003]", got)
 	}
+	// The other challenge is named <category>/<slug> on every OS.
+	if msg := r.Issues[0].Message; !strings.HasSuffix(msg, "already assigned to pwn/a") {
+		t.Errorf("message = %q, want suffix %q", msg, "already assigned to pwn/a")
+	}
 }
 
 func TestCheckKubernetes_HTTPChallengeNeedsNoNodePort(t *testing.T) {

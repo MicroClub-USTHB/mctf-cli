@@ -108,14 +108,14 @@ func Plan(cfg *config.Config, challs []*challenge.Challenge, opts Options) ([]Ku
 			if err != nil {
 				return nil, fmt.Errorf("%s/%s: %w", c.CategoryDir, c.Slug, err)
 			}
-			key := filepath.Join(c.CategoryDir, c.Slug)
+			key := c.CategoryDir + "/" + c.Slug
 			if other, dup := seenNodePort[nodePort]; dup {
 				return nil, fmt.Errorf("%s: NodePort %d already assigned to %s (pick a different deploy.port offset within the category)", key, nodePort, other)
 			}
 			seenNodePort[nodePort] = key
 		}
 		out = append(out, KubeUnit{
-			Challenge:    filepath.Join(c.CategoryDir, c.Slug),
+			Challenge:    c.CategoryDir + "/" + c.Slug,
 			Category:     c.CategoryDir,
 			Slug:         c.Slug,
 			Name:         name,

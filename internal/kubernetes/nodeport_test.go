@@ -106,7 +106,7 @@ func TestPlan_NodePortErrors(t *testing.T) {
 					tcpUnitChall(t, root, "jailbreak", "d", 16007),
 				}
 			},
-			wantErr: "already assigned",
+			wantErr: "already assigned to pwn/c",
 		},
 		{
 			name: "name too long",
