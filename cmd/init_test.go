@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -200,5 +203,201 @@ func TestStdinIsTTY(t *testing.T) {
 	result := stdinIsTTY()
 	if result != true && result != false {
 		t.Errorf("stdinIsTTY() should return bool, got %v", result)
+	}
+}
+
+func TestInitCmd_CreatesDirectoryWhenNameArgGiven(t *testing.T) {
+	tmp := t.TempDir()
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+
+	flagInitNoTTY = true
+	flagInitForce = false
+	flagDir = "."
+	defer func() {
+		flagInitNoTTY = false
+		flagInitForce = false
+		flagDir = "."
+	}()
+
+	cmd := initCmd
+	if err := cmd.RunE(cmd, []string{"my-ctf"}); err != nil {
+		t.Fatalf("RunE: %v", err)
+	}
+
+	targetDir := filepath.Join(tmp, "my-ctf")
+	cfgPath := filepath.Join(targetDir, "mctf.config.yml")
+	if _, err := os.Stat(cfgPath); err != nil {
+		t.Fatalf("expected %s to exist: %v", cfgPath, err)
+	}
+
+	content, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), `name: "my-ctf"`) {
+		t.Errorf("mctf.config.yml does not contain name 'my-ctf':\n%s", string(content))
+	}
+}
+
+func TestInitCmd_NoArgsScaffoldsInCurrentDir(t *testing.T) {
+	tmp := t.TempDir()
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+
+	flagInitNoTTY = true
+	flagInitForce = false
+	flagDir = "."
+	defer func() {
+		flagInitNoTTY = false
+		flagInitForce = false
+		flagDir = "."
+	}()
+
+	cmd := initCmd
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatalf("RunE: %v", err)
+	}
+
+	cfgPath := filepath.Join(tmp, "mctf.config.yml")
+	if _, err := os.Stat(cfgPath); err != nil {
+		t.Fatalf("expected %s to exist directly in tmp: %v", cfgPath, err)
+	}
+
+	content, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantName := filepath.Base(tmp)
+	if !strings.Contains(string(content), fmt.Sprintf(`name: %q`, wantName)) {
+		t.Errorf("mctf.config.yml does not contain name %q:\n%s", wantName, string(content))
+	}
+}
+
+func TestInitCmd_DotArgScaffoldsInCurrentDir(t *testing.T) {
+	tmp := t.TempDir()
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+
+	flagInitNoTTY = true
+	flagInitForce = false
+	flagDir = "."
+	defer func() {
+		flagInitNoTTY = false
+		flagInitForce = false
+		flagDir = "."
+	}()
+
+	cmd := initCmd
+	if err := cmd.RunE(cmd, []string{"."}); err != nil {
+		t.Fatalf("RunE: %v", err)
+	}
+
+	cfgPath := filepath.Join(tmp, "mctf.config.yml")
+	if _, err := os.Stat(cfgPath); err != nil {
+		t.Fatalf("expected %s to exist: %v", cfgPath, err)
+	}
+}
+
+func TestInitCmd_WithDirFlagAndNameArg(t *testing.T) {
+	tmp := t.TempDir()
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+
+	flagInitNoTTY = true
+	flagInitForce = false
+	flagDir = "custom-folder"
+	defer func() {
+		flagInitNoTTY = false
+		flagInitForce = false
+		flagDir = "."
+	}()
+
+	cmd := initCmd
+	// Simulate -C flag being marked as changed on the command
+	f := cmd.Flag("dir")
+	if f != nil {
+		f.Changed = true
+		defer func() { f.Changed = false }()
+	}
+
+	if err := cmd.RunE(cmd, []string{"Custom Event"}); err != nil {
+		t.Fatalf("RunE: %v", err)
+	}
+
+	targetDir := filepath.Join(tmp, "custom-folder")
+	cfgPath := filepath.Join(targetDir, "mctf.config.yml")
+	if _, err := os.Stat(cfgPath); err != nil {
+		t.Fatalf("expected %s to exist: %v", cfgPath, err)
+	}
+
+	content, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), `name: "Custom Event"`) {
+		t.Errorf("mctf.config.yml does not contain name 'Custom Event':\n%s", string(content))
+	}
+}
+
+func TestInitCmd_AlreadyInitializedFailsWithoutForce(t *testing.T) {
+	tmp := t.TempDir()
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+
+	flagInitNoTTY = true
+	flagInitForce = false
+	flagDir = "."
+	defer func() {
+		flagInitNoTTY = false
+		flagInitForce = false
+		flagDir = "."
+	}()
+
+	cmd := initCmd
+	if err := cmd.RunE(cmd, []string{"demo-ctf"}); err != nil {
+		t.Fatalf("first RunE: %v", err)
+	}
+
+	// Second run without force should return ErrAlreadyInitialized
+	err = cmd.RunE(cmd, []string{"demo-ctf"})
+	if err == nil {
+		t.Fatal("expected error on second init without --force, got nil")
+	}
+
+	// Third run with force should succeed
+	flagInitForce = true
+	if err := cmd.RunE(cmd, []string{"demo-ctf"}); err != nil {
+		t.Fatalf("RunE with --force failed: %v", err)
 	}
 }

@@ -23,9 +23,10 @@ var (
 )
 
 var initCmd = &cobra.Command{
-	Use:   "init [event-name]",
+	Use:   "init [name-or-dir]",
 	Short: "Scaffold a new MCTF event repository",
-	Long: "Creates a new event repo at the path given by -C (default: cwd):\n\n" +
+	Long: "Creates a new event repo. When [name-or-dir] is provided and -C is not\n" +
+		"set, a directory with that name is automatically created and scaffolded into:\n\n" +
 		"  mctf.config.yml         # event config (filled with the name + slug)\n" +
 		"  README.md               # internal handbook for the event repo\n" +
 		"  .gitignore              # MCTF working dir + secrets\n" +
@@ -35,23 +36,36 @@ var initCmd = &cobra.Command{
 		"  templates/challenge_name/   # local starter template\n\n" +
 		"Refuses to overwrite an existing mctf.config.yml unless --force is set.\n\n" +
 		"Examples:\n" +
-		"  mctf init                              # uses dir name as event name\n" +
-		"  mctf init \"MCTF 6.0\"                   # explicit name\n" +
-		"  mctf init \"MCTF 6.0\" --domain mctf.microclub.info --profile instanced\n" +
-		"  mctf init -C ./my-event \"MCTF 6.0\"",
+		"  mctf init my-ctf                       # creates ./my-ctf and scaffolds into it\n" +
+		"  mctf init                              # scaffolds in current dir, uses dir name as event name\n" +
+		"  mctf init \"MCTF 6.0\"                   # creates ./MCTF 6.0 and scaffolds into it\n" +
+		"  mctf init -C ./my-event \"MCTF 6.0\"     # scaffolds into ./my-event with explicit event name",
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir := flagDir
-		abs, err := filepath.Abs(dir)
-		if err != nil {
-			return err
-		}
+		dirChanged := isDirFlagChanged(cmd)
 
 		var name string
 		if len(args) == 1 && args[0] != "" {
-			name = args[0]
+			if !dirChanged && args[0] != "." {
+				dir = args[0]
+			}
+			if dirChanged {
+				name = args[0]
+			} else {
+				name = filepath.Base(args[0])
+			}
 		} else {
-			name = filepath.Base(abs)
+			absPath, err := filepath.Abs(dir)
+			if err != nil {
+				return err
+			}
+			name = filepath.Base(absPath)
+		}
+
+		abs, err := filepath.Abs(dir)
+		if err != nil {
+			return err
 		}
 
 		vars := scaffold.NewEventVars(name)
@@ -105,11 +119,23 @@ var initCmd = &cobra.Command{
 		}
 		fmt.Printf("\nevent %q scaffolded at %s\n", vars.EventName, abs)
 		fmt.Printf("next:\n")
-		fmt.Printf("  cd %s\n", abs)
+		if dir != "." {
+			fmt.Printf("  cd %s\n", dir)
+		}
 		fmt.Printf("  mctf validate\n")
 		fmt.Printf("  cp -r templates/challenge_name challenges/<category>/<your-slug>\n")
 		return nil
 	},
+}
+
+func isDirFlagChanged(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return false
+	}
+	if f := cmd.Flag("dir"); f != nil {
+		return f.Changed
+	}
+	return false
 }
 
 // stdinIsTTY reports whether stdin is connected to a terminal. We avoid
