@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"strings"
 	"testing"
-
 )
 
 func TestConfirmYes(t *testing.T) {
