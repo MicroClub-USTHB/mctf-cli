@@ -120,7 +120,7 @@ var buildCmd = &cobra.Command{
 
 		if !flagBuildDryRun && flagBuildScanVulns {
 			if err := scanBuiltImagesForVulnerabilities(ctx, plan, flagBuildVulnSeverity); err != nil {
-				pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
+				_ = pm.Dispatch(ctx, plugin.HookAfterBuild, buildHookPayload(cfg, opts, "after", flagBuildDryRun, plan, "failed", err))
 				return err
 			}
 		}
