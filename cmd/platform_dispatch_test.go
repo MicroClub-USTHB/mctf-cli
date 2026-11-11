@@ -14,15 +14,34 @@ import (
 
 func TestNewPlatform_MissingBlock(t *testing.T) {
 	_, err := newPlatform(&config.Config{})
-	if err == nil || !strings.Contains(err.Error(), `must be one of ctfd, webhook (got "")`) {
+	if err == nil || !strings.Contains(err.Error(), `must be one of ctfd, webhook, rctf (got "")`) {
 		t.Errorf("err = %v", err)
 	}
 }
 
 func TestNewPlatform_UnknownType(t *testing.T) {
-	_, err := newPlatform(&config.Config{Platform: &config.Platform{Type: "rctf", URL: "https://x.example"}})
-	if err == nil || !strings.Contains(err.Error(), `(got "rctf")`) {
+	_, err := newPlatform(&config.Config{Platform: &config.Platform{Type: "unknown", URL: "https://x.example"}})
+	if err == nil || !strings.Contains(err.Error(), `(got "unknown")`) {
 		t.Errorf("err = %v", err)
+	}
+}
+
+func TestNewPlatform_RCTFMissingToken(t *testing.T) {
+	t.Setenv("MCTF_RCTF_TOKEN", "")
+	_, err := newPlatform(&config.Config{Platform: &config.Platform{Type: "rctf", URL: "https://rctf.example"}})
+	if err == nil || !strings.Contains(err.Error(), "MCTF_RCTF_TOKEN env var is empty") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestNewPlatform_RCTFSuccess(t *testing.T) {
+	t.Setenv("MCTF_RCTF_TOKEN", "valid-token")
+	plat, err := newPlatform(&config.Config{Platform: &config.Platform{Type: "rctf", URL: "https://rctf.example"}})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if plat == nil {
+		t.Fatal("expected non-nil platform")
 	}
 }
 

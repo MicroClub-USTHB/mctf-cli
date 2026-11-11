@@ -15,51 +15,63 @@ import (
 	"github.com/MicroClub-USTHB/mctf-cli/internal/config"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/platform"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/platform/ctfd"
+	"github.com/MicroClub-USTHB/mctf-cli/internal/platform/rctf"
 	"github.com/MicroClub-USTHB/mctf-cli/internal/platform/webhook"
 )
 
 var platformCmd = &cobra.Command{
 	Use:   "platform",
-	Short: "Sync challenges to a CTF platform (CTFd or webhook)",
+	Short: "Sync challenges to a CTF platform (CTFd, webhook or rCTF)",
 	Long: "Pushes the event to the platform named by platform.type in\n" +
 		"mctf.config.yml:\n\n" +
 		"  ctfd     CTFd API at platform.url; token from $MCTF_CTFD_TOKEN\n" +
 		"  webhook  POSTs JSON events to platform.url; optional HMAC signing\n" +
-		"           secret from $MCTF_WEBHOOK_SECRET\n\n" +
-		"See docs/spec/platforms.md for the webhook payload contract.",
+		"           secret from $MCTF_WEBHOOK_SECRET\n" +
+		"  rctf     rCTF API at platform.url; token from $MCTF_RCTF_TOKEN\n\n" +
+		"See docs/spec/platforms.md for the platform contracts.",
 }
 
 var flagPlatformInsecureHTTP bool
 
 // platformTypes lists the supported platform.type values, in the order
 // error messages show them.
-var platformTypes = []string{"ctfd", "webhook"}
+var platformTypes = []string{"ctfd", "webhook", "rctf"}
 
 // newPlatform builds the target named by platform.type, reading its
 // credentials from the environment.
 func newPlatform(cfg *config.Config) (platform.Platform, error) {
 	typ := platformType(cfg)
 	switch typ {
-	case "ctfd", "webhook":
+	case "ctfd", "webhook", "rctf":
 	default:
 		return nil, fmt.Errorf("platform.type must be one of %s (got %q)", strings.Join(platformTypes, ", "), typ)
 	}
 	if cfg.Platform.URL == "" {
 		return nil, fmt.Errorf("platform.url is empty in mctf.config.yml")
 	}
-	if typ == "ctfd" {
+	switch typ {
+	case "ctfd":
 		token := os.Getenv("MCTF_CTFD_TOKEN")
 		if token == "" {
 			return nil, fmt.Errorf("MCTF_CTFD_TOKEN env var is empty — required to authenticate against %s", cfg.Platform.URL)
 		}
 		return ctfd.NewPlatform(cfg.Platform.URL, token), nil
+	case "rctf":
+		token := os.Getenv("MCTF_RCTF_TOKEN")
+		if token == "" {
+			return nil, fmt.Errorf("MCTF_RCTF_TOKEN env var is empty — required to authenticate against %s", cfg.Platform.URL)
+		}
+		return rctf.NewPlatform(cfg.Platform.URL, token)
+	case "webhook":
+		p, err := webhook.New(cfg.Platform.URL, os.Getenv("MCTF_WEBHOOK_SECRET"), "mctf/"+version, flagPlatformInsecureHTTP)
+		if err != nil {
+			return nil, err
+		}
+		p.EventSlug = cfg.Event.Slug
+		return p, nil
+	default:
+		return nil, fmt.Errorf("platform.type must be one of %s (got %q)", strings.Join(platformTypes, ", "), typ)
 	}
-	p, err := webhook.New(cfg.Platform.URL, os.Getenv("MCTF_WEBHOOK_SECRET"), "mctf/"+version, flagPlatformInsecureHTTP)
-	if err != nil {
-		return nil, err
-	}
-	p.EventSlug = cfg.Event.Slug
-	return p, nil
 }
 
 var (

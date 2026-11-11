@@ -202,8 +202,8 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ctfd", "webhook"],
-          "description": "CTF platform target: ctfd (MCTF_CTFD_TOKEN) or webhook (optional MCTF_WEBHOOK_SECRET). rCTF planned."
+          "enum": ["ctfd", "webhook", "rctf"],
+          "description": "CTF platform target: ctfd (MCTF_CTFD_TOKEN), webhook (optional MCTF_WEBHOOK_SECRET) or rctf (MCTF_RCTF_TOKEN)."
         },
         "url": {
           "type": "string",
