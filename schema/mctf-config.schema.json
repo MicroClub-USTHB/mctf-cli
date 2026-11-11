@@ -221,6 +221,46 @@
         "default_extend_time": { "type": "integer", "minimum": 0, "default": 900 }
       }
     },
+    "infra": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider"],
+      "description": "Event server provisioned by `mctf infra plan|apply|destroy` (Terraform). API token via env: HCLOUD_TOKEN (hetzner) / DIGITALOCEAN_TOKEN (digitalocean).",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["hetzner", "digitalocean"],
+          "description": "Single-VPS provider. Managed clusters (DOKS, EKS, GKE) are planned."
+        },
+        "region": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Hetzner location (default fsn1) or DigitalOcean region (default fra1)."
+        },
+        "size": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Hetzner server type (default cx23) or DigitalOcean droplet size (default s-2vcpu-4gb)."
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1,
+          "description": "OS image with cloud-init and apt (default ubuntu-24.04 / ubuntu-24-04-x64)."
+        },
+        "ssh_public_key": {
+          "type": "string",
+          "minLength": 1,
+          "default": "~/.ssh/id_ed25519.pub",
+          "description": "Path to the operator public key installed for root. Relative paths are resolved from the event root."
+        },
+        "open_ports": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[0-9]{1,5}(-[0-9]{1,5})?$" },
+          "description": "Extra inbound TCP ports or ranges (e.g. \"8443\", \"20000-20100\"). 22, 80, 443 and every active category's port range are always open."
+        }
+      }
+    },
     "challenges_dir": {
       "type": "string",
       "default": "./challenges"

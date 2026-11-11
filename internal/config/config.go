@@ -40,6 +40,7 @@ type Config struct {
 	Deploy    *Deploy    `json:"deploy,omitempty"`
 	Platform  *Platform  `json:"platform,omitempty"`
 	Instancer *Instancer `json:"instancer,omitempty"`
+	Infra     *Infra     `json:"infra,omitempty"`
 
 	ChallengesDir string `json:"challenges_dir,omitempty"`
 
@@ -147,6 +148,17 @@ type Instancer struct {
 	URL               string `json:"url,omitempty"`
 	DefaultTimeout    int    `json:"default_timeout,omitempty"`
 	DefaultExtendTime int    `json:"default_extend_time,omitempty"`
+}
+
+// Infra describes the event server provisioned by `mctf infra`.
+// Empty fields fall back to per-provider defaults (internal/infra).
+type Infra struct {
+	Provider     string   `json:"provider"`
+	Region       string   `json:"region,omitempty"`
+	Size         string   `json:"size,omitempty"`
+	Image        string   `json:"image,omitempty"`
+	SSHPublicKey string   `json:"ssh_public_key,omitempty"`
+	OpenPorts    []string `json:"open_ports,omitempty"`
 }
 
 // Load reads, schema-validates, and decodes mctf.config.yml from dir.
