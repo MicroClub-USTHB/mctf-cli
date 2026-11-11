@@ -58,6 +58,7 @@ Every rule MCTF enforces, with rationale and severity. Hard-fails block the buil
 | `SEC003` | `pwn` or `jailbreak` Dockerfile lacks a non-root `USER` directive after the last `FROM` | warn / warn / **hard** |
 | `SEC004` | `cap_add` lists privileged caps (`SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE`, `SYS_MODULE`) without `deploy.security_opts.allow_caps` allowlisting them | warn / warn / **hard** |
 | `SEC005` | Unique flag value not present at all (e.g. challenge ships unflagged) | always hard |
+| `SEC006` | Opt-in Trivy vulnerability scan of built images; findings at or above the configured severity threshold fail the build when enabled | opt-in (`mctf build --scan-vulns`) |
 
 ### Deployment
 
