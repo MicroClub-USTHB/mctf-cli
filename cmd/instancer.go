@@ -115,6 +115,21 @@ var instancerServeCmd = &cobra.Command{
 			}
 		}()
 
+		healthMonitor := &instancer.HealthMonitor{
+			Store:         store,
+			Interval:      flagServeInterval,
+			Event:         cfg.Event.Slug,
+			PluginManager: pm,
+			Logger:        os.Stdout,
+		}
+
+		go func() {
+			if err := healthMonitor.Run(ctx); err != nil &&
+				!errors.Is(err, context.Canceled) {
+				fmt.Fprintf(os.Stderr, "health monitor exited: %v\n", err)
+			}
+		}()
+
 		httpSrv := &http.Server{Addr: flagServeAddr, Handler: srv.Handler()}
 		errCh := make(chan error, 1)
 		go func() {
