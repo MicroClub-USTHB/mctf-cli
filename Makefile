@@ -5,7 +5,7 @@ LDFLAGS := -X github.com/MicroClub-USTHB/mctf-cli/cmd.version=$(VERSION) \
            -X github.com/MicroClub-USTHB/mctf-cli/cmd.commit=$(COMMIT) \
            -X github.com/MicroClub-USTHB/mctf-cli/cmd.date=$(DATE)
 
-.PHONY: build test test-coverage coverage-html test-integration lint tidy run clean schemas man
+.PHONY: build test test-coverage coverage-html test-integration test-e2e lint tidy run clean schemas man
 
 build: schemas
 	go build -ldflags "$(LDFLAGS)" -o mctf .
@@ -41,6 +41,13 @@ coverage-html: test-coverage
 # daemon + ssh/scp/ssh-keygen on PATH; skips gracefully otherwise.
 test-integration:
 	go test -tags integration -run Integration ./...
+
+# End-to-end pipeline test (gated by the `e2e` build tag): validate →
+# generate --check → build → deploy → solve → down against a copy of
+# examples/sample-event. Requires docker daemon + compose, git, python3;
+# skips gracefully otherwise. Binds host port 14000.
+test-e2e:
+	go test -tags e2e -count=1 -v -timeout 15m ./e2e/...
 
 lint:
 	go vet ./...

@@ -67,6 +67,22 @@ jobs:
       - name: confirm derived files are in sync
         run: ./mctf -C examples/sample-event generate --check
 
+  e2e:
+    name: e2e (validate → generate → build → deploy → solve → down)
+    runs-on: ubuntu-latest  # ships a running docker daemon + compose plugin
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      - run: docker version && docker compose version
+
+      - run: make test-e2e
+
   schemas:
     name: schemas (python sanity check)
     runs-on: ubuntu-latest
