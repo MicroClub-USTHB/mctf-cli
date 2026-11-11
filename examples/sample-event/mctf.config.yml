@@ -53,3 +53,12 @@ instancer:
   default_extend_time: 900
 
 challenges_dir: "./challenges"
+
+# Event server provisioning for `mctf infra plan|apply|destroy` (Terraform).
+# Token via env: HCLOUD_TOKEN (hetzner) / DIGITALOCEAN_TOKEN (digitalocean).
+# infra:
+#   provider: hetzner        # or: digitalocean
+#   region: fsn1             # optional; digitalocean default fra1
+#   size: cx23               # optional; digitalocean default s-2vcpu-4gb
+#   ssh_public_key: "~/.ssh/id_ed25519.pub"
+#   open_ports: ["8443"]     # optional; extra inbound TCP ports/ranges
