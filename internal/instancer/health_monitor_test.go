@@ -105,3 +105,78 @@ func TestHealthMonitor_DispatchesOnUnhealthyTransitions(t *testing.T) {
 		t.Errorf("Timestamp = %v, want a non-zero UTC timestamp", first.Timestamp)
 	}
 }
+
+func TestParseDockerInspect(t *testing.T) {
+	tests := []struct {
+		name       string
+		raw        string
+		id         string
+		wantStatus string
+		wantErr    bool
+	}{
+		{
+			name: "unhealthy container",
+			raw: `[
+				{
+					"Id": "c1",
+					"Name": "/test-c1",
+					"State": {
+						"Health": {"Status": "unhealthy"}
+					}
+				}
+			]`,
+			id:         "c1",
+			wantStatus: "unhealthy",
+		},
+		{
+			name: "healthy container",
+			raw: `[
+				{
+					"Id": "c2",
+					"Name": "/test-c2",
+					"State": {
+						"Health": {"Status": "healthy"}
+					}
+				}
+			]`,
+			id:         "c2",
+			wantStatus: "healthy",
+		},
+		{
+			name: "no healthcheck defined",
+			raw: `[
+				{
+					"Id": "c3",
+					"Name": "/test-c3",
+					"State": {}
+				}
+			]`,
+			id:         "c3",
+			wantStatus: "",
+		},
+		{
+			name:    "empty array",
+			raw:     `[]`,
+			id:      "c4",
+			wantErr: true,
+		},
+		{
+			name:    "malformed json",
+			raw:     `{not json}`,
+			id:      "c5",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			health, err := parseDockerInspect([]byte(tt.raw), tt.id)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("parseDockerInspect() error = %v, wantErr = %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && health.Status != tt.wantStatus {
+				t.Errorf("Status = %q, want %q", health.Status, tt.wantStatus)
+			}
+		})
+	}
+}

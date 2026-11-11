@@ -155,25 +155,34 @@ func (m *HealthMonitor) Tick(ctx context.Context) error {
 	return nil
 }
 
+type dockerInspectContainer struct {
+	ID    string `json:"Id"`
+	Name  string `json:"Name"`
+	State struct {
+		Health *struct {
+			Status string `json:"Status"`
+		} `json:"Health"`
+	} `json:"State"`
+}
+
 // inspectContainerHealth reads Docker's structured health state.
 // Containers without a HEALTHCHECK have an empty status and do not trigger
 // on_health_failure.
 func inspectContainerHealth(ctx context.Context, id string) (ContainerHealth, error) {
-	cmd := exec.CommandContext(ctx, "docker", "inspect", id)
+	inspectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(inspectCtx, "docker", "inspect", id)
 	raw, err := cmd.Output()
 	if err != nil {
 		return ContainerHealth{}, fmt.Errorf("docker inspect: %w", err)
 	}
 
-	var containers []struct {
-		ID    string `json:"Id"`
-		Name  string `json:"Name"`
-		State struct {
-			Health *struct {
-				Status string `json:"Status"`
-			} `json:"Health"`
-		} `json:"State"`
-	}
+	return parseDockerInspect(raw, id)
+}
+
+func parseDockerInspect(raw []byte, id string) (ContainerHealth, error) {
+	var containers []dockerInspectContainer
 	if err := json.Unmarshal(raw, &containers); err != nil {
 		return ContainerHealth{}, fmt.Errorf("decode docker inspect output: %w", err)
 	}
