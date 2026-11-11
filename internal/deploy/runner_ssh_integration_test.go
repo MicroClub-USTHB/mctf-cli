@@ -41,6 +41,27 @@ func TestIntegration_SSHRunner_UpAndDown(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(home, ".ssh"), 0o700); err != nil {
 		t.Fatal(err)
 	}
+
+	// On macOS / Docker Desktop, the docker CLI looks for contexts and
+	// daemon sockets under ~/.docker (e.g. ~/.docker/run/docker.sock).
+	// Changing HOME without preserving docker configuration causes the
+	// client to fall back to Linux /var/run/docker.sock and fail.
+	origHome, _ := os.UserHomeDir()
+	if origHome != "" {
+		if os.Getenv("DOCKER_CONFIG") == "" {
+			origDocker := filepath.Join(origHome, ".docker")
+			if _, err := os.Stat(origDocker); err == nil {
+				t.Setenv("DOCKER_CONFIG", origDocker)
+			}
+		}
+		if os.Getenv("DOCKER_HOST") == "" {
+			macSock := filepath.Join(origHome, ".docker", "run", "docker.sock")
+			if _, err := os.Stat(macSock); err == nil {
+				t.Setenv("DOCKER_HOST", "unix://"+macSock)
+			}
+		}
+	}
+
 	t.Setenv("HOME", home)
 
 	// 1. Ephemeral keypair.
