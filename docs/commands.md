@@ -45,13 +45,15 @@ deterministic deploys and `deploy --rollback`.
 | `mctf instance extend` | Bump an instance's expiry (`--by`, default 15m; remote or local) |
 | `mctf instance destroy` / `reap` | Tear down one / all expired instances (remote or local) |
 
-## Platform (CTFd)
+## Platform (CTFd / webhook)
+
+Target picked by `platform.type`; `--insecure-http` allows plain `http://` webhook URLs. See [`spec/platforms.md`](spec/platforms.md).
 
 | Command | Purpose |
 | --- | --- |
-| `mctf platform sync` | Sync challenges to the configured platform (re-uploads assets on content change) |
+| `mctf platform sync` | Sync challenges to the configured platform (CTFd: re-uploads assets on content change; webhook: POSTs a full snapshot) |
 | `mctf platform unsync` | Remove a challenge from the platform |
-| `mctf platform configure` | Sync event-level config (`ctf_name`, `ctf_description`, `start`, `end`) |
+| `mctf platform configure` | Sync event-level config (name, description, start, end) |
 
 ## Inspect
 

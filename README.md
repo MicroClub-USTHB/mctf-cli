@@ -88,7 +88,8 @@ Run `mctf --help` for the full command set, or see
 
 **Operate**
 - `mctf platform sync|unsync|configure` — CTFd integration (content-hash-aware
-  asset re-upload).
+  asset re-upload) or a generic signed webhook for custom scoreboards. See
+  [`docs/spec/platforms.md`](docs/spec/platforms.md).
 - `mctf monitoring up` — a Prometheus + Grafana + cAdvisor stack with scrape
   config generated from your challenges.
 - `mctf doctor` — preflight the repo and host; `mctf list|info|status|event` for
@@ -102,7 +103,7 @@ Run `mctf --help` for the full command set, or see
   Scoop manifest, and a GHCR image via goreleaser.
 
 See the [backlog issues](https://github.com/MicroClub-USTHB/mctf-cli/issues) for
-what's planned (Terraform `mctf infra`, rCTF/webhook platforms, more plugin
+what's planned (Terraform `mctf infra`, rCTF platform, more plugin
 hooks, image vuln scanning, …).
 
 ## How the contract works
@@ -129,7 +130,7 @@ change.
 - **[Commands](docs/commands.md)** — the full command reference.
 - **[Architecture](docs/spec/architecture.md)** — how the packages fit together.
 - **[Repository layout](docs/spec/repository-layout.md)** · **[Categories](docs/spec/categories.md)** · **[Challenge manifest](docs/spec/challenge-manifest.md)** · **[Derived files](docs/spec/derived-files.md)** · **[Validation](docs/spec/validation.md)**
-- **[Monitoring](docs/spec/monitoring.md)** · **[Plugins](docs/spec/plugins.md)** · **[Releasing](docs/RELEASING.md)**
+- **[Platforms](docs/spec/platforms.md)** · **[Monitoring](docs/spec/monitoring.md)** · **[Plugins](docs/spec/plugins.md)** · **[Releasing](docs/RELEASING.md)**
 - **[CHANGELOG](docs/spec/CHANGELOG.md)** · **[Backlog](docs/BACKLOG.md)**
 
 ## Contributing

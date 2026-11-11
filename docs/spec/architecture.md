@@ -38,7 +38,7 @@ is the source of truth, and derived files are regenerated, never hand-edited.
                     ▼                    ▼
               ┌───────────┐        ┌────────────┐
               │ platform  │        │ monitoring │
-              │  (CTFd)   │        │ prom+graf  │
+              │ CTFd/hook │        │ prom+graf  │
               └───────────┘        └────────────┘
 ```
 
@@ -60,7 +60,9 @@ the repo and host.
 | `kubernetes` | K8s Deployment/Service/Ingress manifests + `kubectl apply` lifecycle. |
 | `instancer` | Per-team instances: on-disk store, lifecycle, docker runner, daemon, reaper; **plus an API client** for the remote Python instancer. |
 | `monitoring` | Render + run the Prometheus + Grafana + cAdvisor stack. |
+| `platform` | `Platform` interface (sync / unsync / configure) + shared payload helpers; `cmd` picks the target from `platform.type`. |
 | `platform/ctfd` | Sync challenges + assets to CTFd (content-hash aware), unsync, configure. |
+| `platform/webhook` | POST signed JSON sync / unsync / configure events to a custom endpoint (`docs/spec/platforms.md`). |
 | `solve` | Run a challenge's solver and verify the recovered flag (incl. `--against-instance`). |
 | `status` / `info` | Runtime state and derived-fact reporting (human + `--json`). |
 | `doctor` | Preflight checks on the repo and host (DNS, disk, docker, etc.). |
