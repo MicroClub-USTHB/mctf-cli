@@ -47,6 +47,10 @@ For custom scoreboards. Each command sends one `POST` with a JSON body:
 - Any 2xx response is success. Anything else fails the command with
   `webhook <event>: HTTP <code>: <first 512 bytes of the response body>`.
   There are no retries; re-run the command.
+- Redirects are not followed: a 3xx response is an error, so a payload never
+  reaches a host other than `platform.url`.
+- Userinfo and query strings in `platform.url` (e.g. `?token=…`) are sent but
+  never printed.
 - 30 s timeout per request.
 
 ### `sync` semantics
@@ -56,8 +60,9 @@ For custom scoreboards. Each command sends one `POST` with a JSON body:
   not "deleted" — deletions arrive as `unsync` events.
 - If the filters match no challenge, nothing is sent and the command fails.
 - `--update` has no effect (the webhook has no remote state to reconcile).
-- `--dry-run` prints the payload and sends nothing. `--json` prints only the
-  payload.
+- `--dry-run` prints the payload and sends nothing (with `--json`, only the
+  payload). A real sync with `--json` prints `{"posted": N, "url": "…"}`, never
+  the payload, so flags stay out of CI logs.
 
 ### Payloads (schema 1)
 

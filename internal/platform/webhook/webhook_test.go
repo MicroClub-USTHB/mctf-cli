@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -165,11 +166,12 @@ func TestSync_DryRunSendsNothing(t *testing.T) {
 	}
 }
 
-func TestSync_JSONPrintsPayloadOnly(t *testing.T) {
+func TestSync_DryRunJSONPrintsPayloadOnly(t *testing.T) {
 	rec := newRecorder(t, http.StatusOK, "")
 	var out bytes.Buffer
 	req := syncReq(&out)
 	req.JSON = true
+	req.DryRun = true
 	if err := newTestPlatform(t, rec.URL, "").Sync(context.Background(), req); err != nil {
 		t.Fatal(err)
 	}
@@ -253,5 +255,81 @@ func TestConfigure_Body(t *testing.T) {
 	}
 	if _, ok := body["description"]; ok {
 		t.Errorf("empty description should be omitted: %s", r.body)
+	}
+}
+
+func TestSync_RedirectNotFollowed(t *testing.T) {
+	for _, code := range []int{http.StatusFound, http.StatusTemporaryRedirect} {
+		var targetHits int
+		mux := http.NewServeMux()
+		mux.HandleFunc("/hook", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/elsewhere", code)
+		})
+		mux.HandleFunc("/elsewhere", func(w http.ResponseWriter, r *http.Request) {
+			targetHits++
+		})
+		srv := httptest.NewServer(mux)
+		err := newTestPlatform(t, srv.URL+"/hook", "s3cret").Sync(context.Background(), syncReq(io.Discard))
+		srv.Close()
+		if err == nil || !strings.Contains(err.Error(), "HTTP "+strconv.Itoa(code)) {
+			t.Errorf("%d: err = %v, want HTTP %d error", code, err, code)
+		}
+		if targetHits != 0 {
+			t.Errorf("%d: redirect target received %d request(s)", code, targetHits)
+		}
+	}
+}
+
+func TestURLSecretsNotPrinted(t *testing.T) {
+	const raw = "http://user:pw-secret@127.0.0.1:1/h?token=q-secret"
+	assertClean := func(what, s string) {
+		t.Helper()
+		if strings.Contains(s, "pw-secret") || strings.Contains(s, "q-secret") {
+			t.Errorf("%s leaks URL secret: %q", what, s)
+		}
+	}
+	p := newTestPlatform(t, raw, "")
+
+	var out bytes.Buffer
+	req := syncReq(&out)
+	req.DryRun = true
+	if err := p.Sync(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	assertClean("dry-run output", out.String())
+
+	tgt, _ := p.ResolveUnsync(context.Background(), "web", "a", "")
+	assertClean("unsync description", tgt.Description)
+
+	err := p.Sync(context.Background(), syncReq(io.Discard)) // port 1: connection refused
+	if err == nil {
+		t.Fatal("expected transport error")
+	}
+	assertClean("transport error", err.Error())
+
+	_, err = New("https://user:pw-secret@x.example/h?token=q-secret\x7f", "", "mctf/test", false)
+	if err == nil {
+		t.Fatal("expected invalid URL error")
+	}
+	assertClean("invalid URL error", err.Error())
+}
+
+func TestSync_JSONRealPrintsResultWithoutFlags(t *testing.T) {
+	rec := newRecorder(t, http.StatusOK, "")
+	var out bytes.Buffer
+	req := syncReq(&out)
+	req.JSON = true
+	req.Challenges[0].Manifest.Challenge.Flags = []challenge.Flag{{Flag: "mctf{do-not-log}"}}
+	if err := newTestPlatform(t, rec.URL, "").Sync(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "mctf{do-not-log}") {
+		t.Errorf("--json real sync printed flags: %s", out.String())
+	}
+	var res struct {
+		Posted int `json:"posted"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil || res.Posted != 1 {
+		t.Errorf("output = %q (err %v), want {\"posted\":1,...}", out.String(), err)
 	}
 }

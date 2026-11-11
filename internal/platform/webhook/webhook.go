@@ -28,6 +28,7 @@ const maxErrorBody = 512
 // Platform posts sync, unsync and configure events to one endpoint.
 type Platform struct {
 	url       string
+	display   string // url without userinfo or query, safe to print
 	secret    string
 	userAgent string
 	client    *http.Client
@@ -41,22 +42,42 @@ type Platform struct {
 // New validates rawURL and returns a webhook target. Payloads carry
 // flags, so plain http:// is refused unless the host is loopback or
 // allowHTTP is set. A non-empty secret signs every body with
-// HMAC-SHA256 in the X-MCTF-Signature header.
+// HMAC-SHA256 in the X-MCTF-Signature header. Redirects are not
+// followed, so a payload never reaches a host other than rawURL.
 func New(rawURL, secret, userAgent string, allowHTTP bool) (*Platform, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
-		return nil, fmt.Errorf("platform.url %q is not a valid URL", rawURL)
+		// rawURL may embed credentials, so it is not quoted back.
+		return nil, errors.New("platform.url is not a valid URL (want https://host/path)")
 	}
 	if u.Scheme == "http" && !allowHTTP && !isLoopback(u.Hostname()) {
 		return nil, errors.New("platform.url uses http:// — webhook payloads carry flags; use https or pass --insecure-http")
 	}
 	return &Platform{
 		url:       rawURL,
+		display:   displayURL(u),
 		secret:    secret,
 		userAgent: userAgent,
-		client:    &http.Client{Timeout: 30 * time.Second},
-		now:       time.Now,
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
+		now: time.Now,
 	}, nil
+}
+
+// displayURL drops userinfo, query and fragment, which may carry
+// credentials, so the URL can be printed.
+func displayURL(u *url.URL) string {
+	d := *u
+	d.User = nil
+	d.RawQuery = ""
+	d.ForceQuery = false
+	d.Fragment = ""
+	d.RawFragment = ""
+	return d.String()
 }
 
 func isLoopback(host string) bool {
@@ -76,16 +97,14 @@ func (p *Platform) Sync(ctx context.Context, req platform.SyncRequest) error {
 		return errors.New("no challenges matched the filters — nothing to send")
 	}
 
-	if req.DryRun || req.JSON {
+	if req.DryRun {
 		body, err := json.MarshalIndent(payload, "", "  ")
 		if err != nil {
 			return err
 		}
 		fmt.Fprintln(req.Out, string(body))
-	}
-	if req.DryRun {
 		if !req.JSON {
-			fmt.Fprintf(req.Out, "\ndry-run: would POST %d challenge(s) to %s\n", n, p.url)
+			fmt.Fprintf(req.Out, "\ndry-run: would POST %d challenge(s) to %s\n", n, p.display)
 		}
 		return nil
 	}
@@ -93,9 +112,19 @@ func (p *Platform) Sync(ctx context.Context, req platform.SyncRequest) error {
 	if err := p.post(ctx, payload.Event, payload); err != nil {
 		return err
 	}
-	if !req.JSON {
-		fmt.Fprintf(req.Out, "posted %d challenge(s) to %s\n", n, p.url)
+	if req.JSON {
+		// The payload carries flags; only the result goes to stdout.
+		body, err := json.Marshal(struct {
+			Posted int    `json:"posted"`
+			URL    string `json:"url"`
+		}{n, p.display})
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(req.Out, string(body))
+		return nil
 	}
+	fmt.Fprintf(req.Out, "posted %d challenge(s) to %s\n", n, p.display)
 	return nil
 }
 
@@ -105,7 +134,7 @@ func (p *Platform) ResolveUnsync(_ context.Context, category, slug, _ string) (p
 	return platform.Target{
 		Category:    category,
 		Slug:        slug,
-		Description: fmt.Sprintf("send unsync event for %s/%s to %s", category, slug, p.url),
+		Description: fmt.Sprintf("send unsync event for %s/%s to %s", category, slug, p.display),
 		Done:        "sent unsync event",
 	}, nil
 }
@@ -150,7 +179,12 @@ func (p *Platform) post(ctx context.Context, event string, v any) error {
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("webhook %s: %w", event, err)
+		// *url.Error quotes the full URL, query string included.
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			err = ue.Err
+		}
+		return fmt.Errorf("webhook %s: POST %s: %w", event, p.display, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
