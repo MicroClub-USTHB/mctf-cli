@@ -112,6 +112,7 @@ Two cases:
 | `make build` | Builds the `mctf` binary with embedded version and commit metadata (runs `schemas` first). |
 | `make test` | Runs all unit tests (`go test ./...`). |
 | `make test-integration` | Runs integration tests (`go test -tags integration ./...`). Requires Docker. |
+| `make test-e2e` | Runs the end-to-end pipeline test (`go test -tags e2e ./e2e/...`): validate → generate --check → build → deploy → solve → down on a temp copy of `examples/sample-event`. Requires Docker + compose, git and python3; binds host port 14000. |
 | `make lint` | Runs `go vet ./...` and `golangci-lint run ./...`. |
 | `make schemas` | Syncs canonical `schema/*.json` files into `internal/schemas/` and guards against drift. |
 | `make man` | Generates manual pages for all commands into `manpages/` via `mctf gen-man`. |
@@ -155,13 +156,14 @@ Common scopes: `validate`, `generate`, `config`, `challenge`, `cmd`, `schema`, `
 
 ## CI gates
 
-GitHub Actions runs three jobs on every push and PR:
+GitHub Actions runs four jobs on every push and PR:
 
 - **`lint`** — `golangci-lint run ./...`. Must be clean before anything else.
 - **`go`** — `go vet`, `go test -race`, `make build`, `mctf validate`, `mctf generate --check` against the sample event.
+- **`e2e`** — `make test-e2e`: the full validate → generate → build → deploy → solve → down pipeline against the sample event, on a runner with a docker daemon.
 - **`schemas`** — Python sanity checks: source manifests vs `challenge.schema.json`, generated files vs their schemas.
 
-All three must be green. If you can't get them green locally, push the WIP branch and let CI tell you why — that's faster than guessing.
+All four must be green. If you can't get them green locally, push the WIP branch and let CI tell you why — that's faster than guessing.
 
 ## Reviewing PRs
 
