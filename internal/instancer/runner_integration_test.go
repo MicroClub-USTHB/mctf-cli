@@ -116,7 +116,6 @@ services:
 		}
 	}
 
-	
 	output, err := runner.runCommand(
 		ctx,
 		[]string{
@@ -138,7 +137,6 @@ services:
 		t.Fatal("container B has no network IP")
 	}
 
-	
 	var serverReady bool
 
 	for i := 0; i < 20; i++ {
@@ -166,7 +164,6 @@ services:
 		t.Fatal("container B's HTTP server did not become ready within 10 seconds")
 	}
 
-	
 	_, err = runner.runCommand(
 		ctx,
 		[]string{
@@ -182,7 +179,6 @@ services:
 		t.Fatal("network isolation failed: instance A reached instance B")
 	}
 
-	
 	if err := runner.Down(ctx, specA, true); err != nil {
 		t.Fatalf("stop instance A: %v", err)
 	}
@@ -199,7 +195,6 @@ services:
 		t.Fatalf("network %s still exists after Down", networkA)
 	}
 
-	
 	if err := runner.Down(ctx, specB, true); err != nil {
 		t.Fatalf("stop instance B: %v", err)
 	}

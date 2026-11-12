@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Runner brings up, tears down, and inspects compose projects for one
@@ -51,12 +52,25 @@ func executeDockerCommand(
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Dir = dir
 	cmd.Env = env
-	cmd.Stderr = stderr
+
+	var errBuf strings.Builder
+	if stderr != nil {
+		cmd.Stderr = io.MultiWriter(stderr, &errBuf)
+	} else {
+		cmd.Stderr = &errBuf
+	}
 
 	var output strings.Builder
-	cmd.Stdout = io.MultiWriter(stdout, &output)
+	if stdout != nil {
+		cmd.Stdout = io.MultiWriter(stdout, &output)
+	} else {
+		cmd.Stdout = &output
+	}
 
 	err := cmd.Run()
+	if err != nil && errBuf.Len() > 0 {
+		return []byte(output.String()), fmt.Errorf("%w: %s", err, strings.TrimSpace(errBuf.String()))
+	}
 	return []byte(output.String()), err
 }
 
@@ -74,6 +88,7 @@ func NewQuietDockerRunner() *DockerRunner {
 }
 
 // createNetwork creates a dedicated bridge network for an instance.
+// If the network already exists, it is treated as a success (idempotent).
 func (d *DockerRunner) createNetwork(ctx context.Context, id string) error {
 	_, err := d.runCommand(
 		ctx,
@@ -84,12 +99,17 @@ func (d *DockerRunner) createNetwork(ctx context.Context, id string) error {
 		d.Stderr,
 	)
 	if err != nil {
+		errStr := strings.ToLower(err.Error())
+		if strings.Contains(errStr, "already exists") {
+			return nil
+		}
 		return fmt.Errorf("create instance network: %w", err)
 	}
 	return nil
 }
 
 // removeNetwork removes the dedicated network belonging to an instance.
+// If the network is already gone, it is treated as a success (idempotent).
 func (d *DockerRunner) removeNetwork(ctx context.Context, id string) error {
 	_, err := d.runCommand(
 		ctx,
@@ -100,6 +120,10 @@ func (d *DockerRunner) removeNetwork(ctx context.Context, id string) error {
 		d.Stderr,
 	)
 	if err != nil {
+		errStr := strings.ToLower(err.Error())
+		if strings.Contains(errStr, "not found") || strings.Contains(errStr, "no such network") {
+			return nil
+		}
 		return fmt.Errorf("remove instance network: %w", err)
 	}
 	return nil
@@ -127,13 +151,13 @@ func (d *DockerRunner) createNetworkOverride(id string) (string, error) {
 	}
 
 	if _, err := file.WriteString(content); err != nil {
-		file.Close()
-		os.Remove(file.Name())
+		_ = file.Close()
+		_ = os.Remove(file.Name())
 		return "", fmt.Errorf("write network override: %w", err)
 	}
 
 	if err := file.Close(); err != nil {
-		os.Remove(file.Name())
+		_ = os.Remove(file.Name())
 		return "", fmt.Errorf("close network override: %w", err)
 	}
 
@@ -152,7 +176,9 @@ func (d *DockerRunner) Up(ctx context.Context, s SpawnSpec) ([]string, error) {
 	// Generate a temporary Compose override that uses this network.
 	overrideFile, err := d.createNetworkOverride(s.ID)
 	if err != nil {
-		if cleanupErr := d.removeNetwork(context.Background(), s.ID); cleanupErr != nil {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if cleanupErr := d.removeNetwork(cleanupCtx, s.ID); cleanupErr != nil {
 			return nil, fmt.Errorf(
 				"%w (network cleanup failed: %v)",
 				err,
@@ -161,7 +187,7 @@ func (d *DockerRunner) Up(ctx context.Context, s SpawnSpec) ([]string, error) {
 		}
 		return nil, err
 	}
-	defer os.Remove(overrideFile)
+	defer func() { _ = os.Remove(overrideFile) }()
 
 	// Start the Compose project on its dedicated network.
 	_, err = d.runCommand(
@@ -174,16 +200,20 @@ func (d *DockerRunner) Up(ctx context.Context, s SpawnSpec) ([]string, error) {
 	)
 	if err != nil {
 		// Compose may have partially started containers. Stop them before
-		// removing their network.
+		// removing their network. Use a bounded timeout detached from ctx
+		// in case ctx has already timed out or been canceled.
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
 		_, downErr := d.runCommand(
-			context.Background(),
+			cleanupCtx,
 			DestroyArgs(s, false, overrideFile),
 			filepath.Dir(s.ComposeFile),
 			os.Environ(),
 			d.Stdout,
 			d.Stderr,
 		)
-		removeErr := d.removeNetwork(context.Background(), s.ID)
+		removeErr := d.removeNetwork(cleanupCtx, s.ID)
 
 		if downErr != nil || removeErr != nil {
 			return nil, fmt.Errorf(
@@ -203,7 +233,7 @@ func (d *DockerRunner) Down(ctx context.Context, s SpawnSpec, volumes bool) erro
 	if err != nil {
 		return err
 	}
-	defer os.Remove(overrideFile)
+	defer func() { _ = os.Remove(overrideFile) }()
 
 	_, err = d.runCommand(
 		ctx,

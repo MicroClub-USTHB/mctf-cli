@@ -233,3 +233,68 @@ func TestDockerRunnerUp_CleansUpWhenComposeFails(t *testing.T) {
 		t.Errorf("fourth command = %v, want network rm", calls[3])
 	}
 }
+
+func TestDockerRunnerDown_IdempotentWhenNetworkNotFound(t *testing.T) {
+	runner := &DockerRunner{
+		Stdout: io.Discard,
+		Stderr: io.Discard,
+		runCommand: func(
+			ctx context.Context,
+			args []string,
+			dir string,
+			env []string,
+			stdout io.Writer,
+			stderr io.Writer,
+		) ([]byte, error) {
+			if len(args) >= 2 && args[0] == "network" && args[1] == "rm" {
+				return nil, errors.New("exit status 1: Error response from daemon: network mctf-inst-test-123 not found")
+			}
+			return nil, nil
+		},
+	}
+
+	spec := SpawnSpec{
+		ID:          "mctf-inst-test-123",
+		ComposeFile: filepath.Join(t.TempDir(), "docker-compose.yml"),
+	}
+
+	if err := runner.Down(context.Background(), spec, false); err != nil {
+		t.Fatalf("Down() should ignore 'not found' network error, got: %v", err)
+	}
+}
+
+func TestDockerRunnerUp_IdempotentWhenNetworkAlreadyExists(t *testing.T) {
+	runner := &DockerRunner{
+		Stdout: io.Discard,
+		Stderr: io.Discard,
+		runCommand: func(
+			ctx context.Context,
+			args []string,
+			dir string,
+			env []string,
+			stdout io.Writer,
+			stderr io.Writer,
+		) ([]byte, error) {
+			if len(args) >= 2 && args[0] == "network" && args[1] == "create" {
+				return nil, errors.New("exit status 1: Error response from daemon: network with name mctf-inst-test-123 already exists")
+			}
+			if len(args) >= 2 && args[len(args)-2] == "ps" && args[len(args)-1] == "-q" {
+				return []byte("container-123\n"), nil
+			}
+			return nil, nil
+		},
+	}
+
+	spec := SpawnSpec{
+		ID:          "mctf-inst-test-123",
+		ComposeFile: filepath.Join(t.TempDir(), "docker-compose.yml"),
+	}
+
+	containers, err := runner.Up(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Up() should ignore 'already exists' network error, got: %v", err)
+	}
+	if !reflect.DeepEqual(containers, []string{"container-123"}) {
+		t.Fatalf("Up() containers = %v, want [container-123]", containers)
+	}
+}
