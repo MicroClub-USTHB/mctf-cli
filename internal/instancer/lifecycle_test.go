@@ -256,3 +256,35 @@ func TestPlanSpawn_ChallengeSlugFormat(t *testing.T) {
 		t.Errorf("ChallengeSlug contains backslash: %q", spec.ChallengeSlug)
 	}
 }
+
+func TestNetworkNameWithPrefix(t *testing.T) {
+	id := "mctf-inst-cub3-team1-a1b2c3d4"
+
+	if got := NetworkName(id); got != id {
+		t.Errorf("NetworkName(%q) = %q, want %q", id, got, id)
+	}
+}
+
+func TestNetworkNameWithoutPrefix(t *testing.T) {
+	id := "cub3-team1-a1b2c3d4"
+	want := "mctf-inst-" + id
+
+	if got := NetworkName(id); got != want {
+		t.Errorf("NetworkName(%q) = %q, want %q", id, got, want)
+	}
+}
+
+func TestComposeArgs_WithNetworkOverride(t *testing.T) {
+	s := SpawnSpec{ID: "instance-1", ComposeFile: "/x.yml"}
+	override := "/tmp/network-override.yml"
+
+	wantUp := "compose -p instance-1 -f /x.yml -f /tmp/network-override.yml up -d"
+	if got := strings.Join(UpArgs(s, override), " "); got != wantUp {
+		t.Errorf("UpArgs = %q, want %q", got, wantUp)
+	}
+
+	wantDown := "compose -p instance-1 -f /x.yml -f /tmp/network-override.yml down"
+	if got := strings.Join(DestroyArgs(s, false, override), " "); got != wantDown {
+		t.Errorf("DestroyArgs = %q, want %q", got, wantDown)
+	}
+}

@@ -56,8 +56,26 @@ func (r *Reaper) Tick(ctx context.Context) {
 		}
 		c, ok := r.ChalIdx[inst.ChallengeSlug]
 		if !ok {
-			r.logf("reaper: %s — challenge no longer in catalog, removing record\n", inst.ID)
-			_ = r.Store.Delete(inst.ID)
+			cleaner, supported := r.Runner.(NetworkCleaner)
+			if !supported {
+				r.logf("reaper: %s — challenge no longer in catalog and runner cannot remove networks\n", inst.ID)
+				continue
+			}
+
+			cleanupCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+			err := cleaner.RemoveNetwork(cleanupCtx, inst.ID)
+			cancel()
+			if err != nil {
+				r.logf("reaper: %s — orphan network cleanup failed: %v\n", inst.ID, err)
+				continue
+			}
+
+			if err := r.Store.Delete(inst.ID); err != nil {
+				r.logf("reaper: %s — store delete failed: %v\n", inst.ID, err)
+				continue
+			}
+
+			r.logf("reaper: reaped orphan %s (network removed)\n", inst.ID)
 			continue
 		}
 		spec := SpawnSpec{ID: inst.ID, ComposeFile: c.ChallengeDir + "/docker-compose.yml"}
